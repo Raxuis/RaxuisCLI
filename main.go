@@ -11,7 +11,7 @@ func main() {
 	var name string
 
 	var rootCmd = &cobra.Command{
-		Use:   "mycli",
+		Use:   "raxuiscli",
 		Short: "A simple greeting CLI",
 		Long:  "This CLI prints a greeting message to the user",
 		Run: func(cmd *cobra.Command, args []string) {
