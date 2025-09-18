@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"RaxuisCLI/cmd"
+	"raxuiscli/cmd"
 )
 
 func main() {
