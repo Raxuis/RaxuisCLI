@@ -20,7 +20,7 @@ var portsCmd = &cobra.Command{
 			Host:      portsHost,
 			PortRange: portsPortRange,
 			Timeout:   portsTimeout,
-			ScanType:  "tcp", // Default scan type
+			ScanType:  portsScanType,
 		}
 
 		ports.Scan(options)
@@ -29,8 +29,8 @@ var portsCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(portsCmd)
-	portsCmd.PersistentFlags().StringVar(&portsHost, "host", "localhost", "Target host to scan")
-	portsCmd.PersistentFlags().StringVar(&portsPortRange, "port-range", "1-65535", "Port range to scan (e.g., 1-1000)")
-	portsCmd.PersistentFlags().IntVar(&portsTimeout, "timeout", 5, "Timeout in seconds for each port scan")
-	portsCmd.PersistentFlags().StringVar(&portsScanType, "scan-type", "tcp", "Type of scan to perform (tcp/udp)")
+	portsCmd.PersistentFlags().StringVarP(&portsHost, "host", "H", "localhost", "Target host to scan")
+	portsCmd.PersistentFlags().StringVarP(&portsPortRange, "port-range", "p", "1-1024", "Port range to scan (e.g., 1-65535)")
+	portsCmd.PersistentFlags().IntVarP(&portsTimeout, "timeout", "t", 5, "Timeout in seconds for each port scan")
+	portsCmd.PersistentFlags().StringVarP(&portsScanType, "scan-type", "s", "tcp", "Type of scan (tcp/udp)")
 }
