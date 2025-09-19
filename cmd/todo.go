@@ -67,9 +67,24 @@ var todoCompleteCmd = &cobra.Command{
 	},
 }
 
+var todoIncompleteCmd = &cobra.Command{
+	Use:   "incomplete [id]",
+	Short: "Mark a todo item as incomplete",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		if err := todo.Incomplete(id); err != nil {
+			fmt.Printf("Error marking task as incomplete: %v\n", err)
+			return
+		}
+		fmt.Printf("Marked task as incomplete: %s\n", id)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(todoCmd)
 	todoCmd.AddCommand(todoAddCmd)
 	todoCmd.AddCommand(todoListCmd)
 	todoCmd.AddCommand(todoCompleteCmd)
+	todoCmd.AddCommand(todoIncompleteCmd)
 }

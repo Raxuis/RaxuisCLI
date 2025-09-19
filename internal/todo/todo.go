@@ -122,3 +122,30 @@ func Complete(idStr string) error {
 
 	return saveTasks(taskList)
 }
+
+func Incomplete(idStr string) error {
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return fmt.Errorf("invalid task ID: %s", idStr)
+	}
+
+	taskList, err := loadTasks()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for i := range taskList.Tasks {
+		if taskList.Tasks[i].ID == id {
+			taskList.Tasks[i].Completed = false
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("task with ID %d not found", id)
+	}
+
+	return saveTasks(taskList)
+}
