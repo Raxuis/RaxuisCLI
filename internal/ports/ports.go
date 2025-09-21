@@ -39,12 +39,14 @@ func Scan(opts Options) {
 		results:  make([]ScanResult, 0),
 	}
 
+	portRange := expandPresetRanges(opts.PortRange)
+
 	fmt.Printf("🔍 Scanning %s ports on %s...\n", strings.ToUpper(scanner.scanType), scanner.host)
-	fmt.Printf("📊 Port range: %s\n", opts.PortRange)
+	fmt.Printf("📊 Port range: %s\n", portRange)
 	fmt.Printf("⏱️  Timeout: %d seconds\n", opts.Timeout)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	ports, err := parsePortRange(opts.PortRange)
+	ports, err := parsePortRange(portRange)
 	if err != nil {
 		fmt.Printf("❌ Error parsing port range: %v\n", err)
 		return
@@ -57,6 +59,22 @@ func Scan(opts Options) {
 	scanner.displayResults(duration, len(ports))
 }
 
+func expandPresetRanges(portRange string) string {
+	presets := map[string]string{
+		"common":   "21,22,23,25,53,80,110,135,139,143,443,993,995,1433,3306,3389,5432,8080",
+		"web":      "80,443,8000,8080,8443,8888,9000,9090",
+		"database": "1433,3306,5432,6379,27017",
+		"dev":      "3000,3001,4000,5000,8000,8080,8888,9000",
+		"system":   "21,22,23,25,53,80,135,139,443,445",
+		"all":      "1-65535",
+		"extended": "1-10000",
+	}
+
+	if expandedRange, exists := presets[strings.ToLower(portRange)]; exists {
+		return expandedRange
+	}
+	return portRange
+}
 func parsePortRange(portRange string) ([]int, error) {
 	var ports []int
 
@@ -236,24 +254,37 @@ func (ps *PortScanner) scanUDP(target string) string {
 
 func getServiceName(port int) string {
 	commonServices := map[int]string{
-		21:   "(FTP)",
-		22:   "(SSH)",
-		23:   "(Telnet)",
-		25:   "(SMTP)",
-		53:   "(DNS)",
-		80:   "(HTTP)",
-		110:  "(POP3)",
-		143:  "(IMAP)",
-		443:  "(HTTPS)",
-		993:  "(IMAPS)",
-		995:  "(POP3S)",
-		1433: "(MSSQL)",
-		3306: "(MySQL)",
-		3389: "(RDP)",
-		5432: "(PostgreSQL)",
-		6379: "(Redis)",
-		8080: "(HTTP-Alt)",
-		9200: "(Elasticsearch)",
+		21:    "(FTP)",
+		22:    "(SSH)",
+		23:    "(Telnet)",
+		25:    "(SMTP)",
+		53:    "(DNS)",
+		80:    "(HTTP)",
+		110:   "(POP3)",
+		135:   "(RPC)",
+		139:   "(NetBIOS)",
+		143:   "(IMAP)",
+		443:   "(HTTPS)",
+		445:   "(SMB)",
+		993:   "(IMAPS)",
+		995:   "(POP3S)",
+		1433:  "(MSSQL)",
+		3000:  "(Node.js/Next.js/React Dev)",
+		3001:  "(Node.js Dev)",
+		3306:  "(MySQL)",
+		3389:  "(RDP)",
+		4000:  "(Dev Server)",
+		4200:  "(Default Angular Dev Server)",
+		5000:  "(Dev Server)",
+		5432:  "(PostgreSQL)",
+		6379:  "(Redis)",
+		8000:  "(HTTP-Alt)",
+		8080:  "(HTTP-Alt)",
+		8443:  "(HTTPS-Alt)",
+		8888:  "(HTTP-Alt)",
+		9000:  "(Dev Server)",
+		9200:  "(Elasticsearch)",
+		27017: "(MongoDB)",
 	}
 
 	if service, exists := commonServices[port]; exists {
