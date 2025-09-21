@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"raxuiscli/internal/pwgen"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -28,13 +29,47 @@ var pwgenGenerateCmd = &cobra.Command{
 			NoNumbers: pwgenNoNumbers,
 		}
 
+		var lastPassword string
+
 		for i := 0; i < pwgenCount; i++ {
 			password, err := pwgen.Generate(options)
 			if err != nil {
 				fmt.Printf("Error generating password: %v\n", err)
 				return
 			}
-			fmt.Println(password)
+
+			fmt.Printf("Password %d: %s\n", i+1, password)
+			lastPassword = password
+		}
+
+		// Demander si l'utilisateur veut copier le dernier mot de passe
+		if pwgenCount == 1 {
+			fmt.Print("Voulez-vous copier ce mot de passe dans le presse-papiers ? (y/N): ")
+		} else {
+			fmt.Print("Voulez-vous copier le dernier mot de passe dans le presse-papiers ? (y/N): ")
+		}
+
+		var response string
+		_, err := fmt.Scanln(&response)
+		if err != nil {
+			return
+		}
+
+		response = strings.ToLower(strings.TrimSpace(response))
+		if response == "y" || response == "yes" || response == "oui" {
+			err := pwgen.CopyToClipboard(lastPassword)
+			if err != nil {
+				fmt.Printf("Erreur lors de la copie dans le presse-papiers: %v\n", err)
+			} else {
+				fmt.Println("Mot de passe copié dans le presse-papiers!")
+
+				// Optionnel : vérifier que la copie a bien fonctionné
+				if err := pwgen.VerifyClipboard(lastPassword); err != nil {
+					fmt.Printf("Attention: %v\n", err)
+				} else {
+					fmt.Println("✓ Copie vérifiée avec succès")
+				}
+			}
 		}
 	},
 }
