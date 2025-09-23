@@ -16,6 +16,7 @@ type ProjectType string
 
 type ListOption struct {
 	TemplateName string
+	ProjectType  string
 }
 
 const (
@@ -220,6 +221,22 @@ func (g *Generator) ListAvailableTemplatesByProject(option ListOption) {
 	}
 	fmt.Println("Available project types and templates:")
 	fmt.Println()
+
+	// Optional filter by project type
+	if option.ProjectType != "" {
+		pt := ProjectType(option.ProjectType)
+		templates, ok := g.availableTemplates[pt]
+		if !ok {
+			fmt.Printf("Project type '%s' not found. Available: nextjs, node, go, rust\n", option.ProjectType)
+			return
+		}
+		fmt.Printf("📁 %s:\n", string(pt))
+		for _, templateName := range templates {
+			fmt.Printf("   • %s (%s)\n", templateName, g.getOutputFilename(templateName))
+		}
+		fmt.Println()
+		return
+	}
 
 	for projectType, templates := range g.availableTemplates {
 		fmt.Printf("📁 %s:\n", string(projectType))

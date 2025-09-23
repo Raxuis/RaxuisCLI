@@ -61,8 +61,9 @@ var listCmd = &cobra.Command{
 	Long:  "Display all available project types and their supported template files.",
 	Run: func(cmd *cobra.Command, args []string) {
 		template, _ := cmd.Flags().GetString("template")
+		project, _ := cmd.Flags().GetString("project")
 		generator := templates.NewGenerator()
-		generator.ListAvailableTemplatesByProject(templates.ListOption{TemplateName: template})
+		generator.ListAvailableTemplatesByProject(templates.ListOption{TemplateName: template, ProjectType: project})
 	},
 }
 
@@ -79,4 +80,5 @@ func init() {
 
 	// Flags pour la commande list
 	listCmd.Flags().StringP("template", "t", "", "Filter output by specific template name")
+	listCmd.Flags().StringP("project", "p", "", "Filter output by specific project type (nextjs, node, go, rust)")
 }
