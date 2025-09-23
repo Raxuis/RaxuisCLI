@@ -73,4 +73,7 @@ func init() {
 	generateCmd.Flags().StringSliceP("files", "f", []string{}, "Specific files to generate (default: all)")
 	generateCmd.Flags().BoolP("force", "", false, "Overwrite existing files")
 	generateCmd.Flags().StringP("name", "n", "", "Project name for template customization")
+
+	// Flags pour la commande list
+	listCmd.Flags().StringP("template", "t", "", "Filter output by specific template name")
 }
