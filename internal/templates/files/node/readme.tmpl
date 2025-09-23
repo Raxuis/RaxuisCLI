@@ -1,0 +1,220 @@
+# {{.ProjectName}}
+
+A modern Node.js application built with best practices and contemporary tooling.
+
+## Prerequisites
+
+- Node.js 18.x or higher
+- npm 9.x or yarn 1.22.x or pnpm 8.x
+
+## Installation
+
+```bash
+# Clone the repository
+git clone
+cd {{.ProjectName}}
+
+# Install dependencies
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+## Usage
+
+```bash
+# Development mode with hot reload
+npm run dev
+
+# Production mode
+npm start
+
+# Using PM2 for production
+npm run pm2:start
+npm run pm2:stop
+npm run pm2:restart
+```
+
+## Scripts
+
+- `npm start` - Start the application in production mode
+- `npm run dev` - Start in development mode with hot reload
+- `npm run build` - Build the application for production
+- `npm test` - Run tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run lint` - Lint code using ESLint
+- `npm run lint:fix` - Fix linting issues automatically
+- `npm run format` - Format code using Prettier
+- `npm run type-check` - Run TypeScript type checking (if using TS)
+
+## Development
+
+```bash
+# Install development dependencies
+npm install --save-dev nodemon eslint prettier
+
+# Setup git hooks (optional)
+npm run prepare
+
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+
+# Run tests in watch mode during development
+npm run test:watch
+```
+
+## Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=mongodb://localhost:27017/{{.ProjectName}}
+JWT_SECRET=your-super-secret-jwt-key
+API_BASE_URL=http://localhost:3000/api
+```
+
+## Project Structure
+
+```
+.
+├── src/                    # Source files
+│   ├── controllers/        # Route controllers
+│   ├── middleware/         # Express middleware
+│   ├── models/             # Data models
+│   ├── routes/             # API routes
+│   ├── services/           # Business logic
+│   ├── utils/              # Utility functions
+│   ├── config/             # Configuration files
+│   ├── types/              # TypeScript type definitions
+│   └── app.js              # Express app setup
+├── tests/                  # Test files
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   └── fixtures/           # Test data
+├── docs/                   # Documentation
+├── public/                 # Static files
+├── logs/                   # Log files (gitignored)
+├── .github/                # GitHub Actions workflows
+├── package.json            # Dependencies and scripts
+├── .env.example            # Environment variables example
+├── .eslintrc.js            # ESLint configuration
+├── .prettierrc             # Prettier configuration
+├── jest.config.js          # Jest testing configuration
+├── Dockerfile              # Container definition
+├── docker-compose.yml      # Multi-container setup
+└── README.md               # This file
+```
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run specific test file
+npm test -- --testPathPattern=user.test.js
+
+# Run tests for specific environment
+NODE_ENV=test npm test
+```
+
+## Docker
+
+```bash
+# Build image
+docker build -t {{.ProjectName}} .
+
+# Run container
+docker run -p 3000:3000 {{.ProjectName}}
+
+# Using docker-compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+## API Documentation
+
+The API documentation is available at:
+- Local: `http://localhost:3000/api-docs`
+- Swagger JSON: `http://localhost:3000/api-docs.json`
+
+## Performance Monitoring
+
+- **Health Check**: `GET /health`
+- **Metrics**: `GET /metrics` (Prometheus format)
+- **Status**: `GET /status`
+
+## Deployment
+
+### Using PM2
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start application
+pm2 start ecosystem.config.js
+
+# Monitor
+pm2 monit
+
+# View logs
+pm2 logs {{.ProjectName}}
+```
+
+### Using Docker
+
+```bash
+# Build and run
+docker-compose up -d
+
+# Scale services
+docker-compose up -d --scale app=3
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Write tests for your changes
+4. Make sure all tests pass (`npm test`)
+5. Check code style (`npm run lint`)
+6. Commit your changes (`git commit -m 'Add some amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## Security
+
+- Always validate input data
+- Use environment variables for sensitive data
+- Keep dependencies updated (`npm audit`)
+- Follow security best practices
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For support and questions:
+- Create an issue in the repository
+- Check existing documentation
+- Review the FAQ section
+
+---

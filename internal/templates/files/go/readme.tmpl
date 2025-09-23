@@ -1,0 +1,151 @@
+# {{.ProjectName}}
+
+A Go application built with modern Go practices and best conventions.
+
+## Prerequisites
+
+- Go 1.21 or higher
+- Make (optional, for convenient commands)
+
+## Installation
+
+```bash
+# Clone the repository
+git clone
+cd {{.ProjectName}}
+
+# Download dependencies
+go mod tidy
+```
+
+## Usage
+
+```bash
+# Run the application
+go run main.go
+
+# Or run with arguments
+go run main.go --help
+```
+
+## Building
+
+```bash
+# Build for current platform
+go build -o bin/{{.ProjectName}}
+
+# Build for multiple platforms
+make build-all
+
+# Or manually:
+GOOS=linux GOARCH=amd64 go build -o bin/{{.ProjectName}}-linux-amd64
+GOOS=windows GOARCH=amd64 go build -o bin/{{.ProjectName}}-windows-amd64.exe
+GOOS=darwin GOARCH=amd64 go build -o bin/{{.ProjectName}}-darwin-amd64
+```
+
+## Development
+
+```bash
+# Install development tools
+go install github.com/air-verse/air@latest
+go install golang.org/x/tools/cmd/goimports@latest
+
+# Run with hot reload
+air
+
+# Format code
+go fmt ./...
+goimports -w .
+
+# Lint code
+golangci-lint run
+```
+
+## Testing
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run benchmarks
+go test -bench=. ./...
+```
+
+## Project Structure
+
+```
+.
+├── cmd/                    # Application entrypoints
+│   └── {{.ProjectName}}/   # Main application
+├── internal/               # Private application code
+│   ├── config/            # Configuration
+│   ├── handler/           # HTTP handlers
+│   ├── service/           # Business logic
+│   └── repository/        # Data access layer
+├── pkg/                   # Public library code
+├── api/                   # API definitions (OpenAPI/Swagger)
+├── web/                   # Web UI assets
+├── migrations/            # Database migrations
+├── scripts/               # Build and deployment scripts
+├── configs/               # Configuration files
+├── test/                  # Additional external test apps and test data
+├── docs/                  # Design and user documents
+├── .github/               # GitHub Actions workflows
+├── Dockerfile             # Container definition
+├── Makefile               # Common tasks
+└── README.md              # This file
+```
+
+## Configuration
+
+The application can be configured using:
+
+1. **Environment variables**: `{{.ProjectName | upper}}_PORT=8080`
+2. **Configuration files**: `configs/config.yaml`
+3. **Command-line flags**: `--port 8080`
+
+## Docker
+
+```bash
+# Build image
+docker build -t {{.ProjectName}} .
+
+# Run container
+docker run -p 8080:8080 {{.ProjectName}}
+
+# Using docker-compose
+docker-compose up
+```
+
+## API Documentation
+
+When the server is running, visit:
+- Swagger UI: `http://localhost:8080/swagger/`
+- API docs: `http://localhost:8080/docs/`
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Add tests for new functionality
+5. Run tests and ensure they pass
+6. Commit your changes (`git commit -m 'Add some amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [Viper](https://github.com/spf13/viper) - Configuration management
+- [Gin](https://github.com/gin-gonic/gin) - HTTP web framework
+
+---
