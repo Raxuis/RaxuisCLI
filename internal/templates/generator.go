@@ -189,7 +189,7 @@ func (g *Generator) getOutputFilename(templateName string) string {
 	}
 }
 
-func (g *Generator) ListAvailable(option ListOption) {
+func (g *Generator) ListAvailableTemplatesByProject(option ListOption) {
 	if option.TemplateName != "" {
 		found := false
 		for projectType, templates := range g.availableTemplates {

@@ -47,7 +47,7 @@ var generateCmd = &cobra.Command{
 			fmt.Printf("Error generating templates: %v\n", err)
 			fmt.Println()
 			fmt.Println("Available project types and templates:")
-			generator.ListAvailable(templates.ListOption{})
+			generator.ListAvailableTemplatesByProject(templates.ListOption{})
 			return
 		}
 
@@ -62,7 +62,7 @@ var listCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		template, _ := cmd.Flags().GetString("template")
 		generator := templates.NewGenerator()
-		generator.ListAvailable(templates.ListOption{TemplateName: template})
+		generator.ListAvailableTemplatesByProject(templates.ListOption{TemplateName: template})
 	},
 }
 
