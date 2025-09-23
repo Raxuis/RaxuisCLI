@@ -57,8 +57,9 @@ var listCmd = &cobra.Command{
 	Short: "List available project types and template files",
 	Long:  "Display all available project types and their supported template files.",
 	Run: func(cmd *cobra.Command, args []string) {
+		template, _ := cmd.Flags().GetString("template")
 		generator := templates.NewGenerator()
-		generator.ListAvailable()
+		generator.ListAvailable(templates.ListOption{TemplateName: template})
 	},
 }
 

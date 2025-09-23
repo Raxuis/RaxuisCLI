@@ -14,6 +14,10 @@ var filesFS embed.FS
 
 type ProjectType string
 
+type ListOption struct {
+	TemplateName string
+}
+
 const (
 	NextJS ProjectType = "nextjs"
 	NodeJS ProjectType = "node"
@@ -181,7 +185,25 @@ func (g *Generator) getOutputFilename(templateName string) string {
 	}
 }
 
-func (g *Generator) ListAvailable() {
+func (g *Generator) ListAvailable(option ListOption) {
+	if option.TemplateName != "" {
+		found := false
+		for projectType, templates := range g.availableTemplates {
+			for _, t := range templates {
+				if t == option.TemplateName {
+					if !found {
+						fmt.Printf("Template '%s' is available for:\n", option.TemplateName)
+						found = true
+					}
+					fmt.Printf(" - %s\n", projectType)
+				}
+			}
+		}
+		if !found {
+			fmt.Printf("Template '%s' is not available for any project type.\n", option.TemplateName)
+		}
+		return
+	}
 	fmt.Println("Available project types and templates:")
 	fmt.Println()
 
