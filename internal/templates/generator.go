@@ -78,7 +78,11 @@ func (g *Generator) Generate(config GenerateConfig) error {
 	// Vérifier si le type de projet existe
 	templates, exists := g.availableTemplates[projectType]
 	if !exists {
-		return fmt.Errorf("unsupported project type: %s", config.ProjectType)
+		var available []string
+		for pt := range g.availableTemplates {
+			available = append(available, string(pt))
+		}
+		return fmt.Errorf("unsupported project type: %s (available: %s)", config.ProjectType, strings.Join(available, ", "))
 	}
 
 	// Créer le répertoire de sortie si nécessaire
@@ -200,7 +204,17 @@ func (g *Generator) ListAvailable(option ListOption) {
 			}
 		}
 		if !found {
+			// Construire une vue d'ensemble rapide des templates disponibles
 			fmt.Printf("Template '%s' is not available for any project type.\n", option.TemplateName)
+			fmt.Println()
+			fmt.Println("Available templates by project type:")
+			for projectType, templates := range g.availableTemplates {
+				fmt.Printf("📁 %s:\n", string(projectType))
+				for _, templateName := range templates {
+					fmt.Printf("   • %s (%s)\n", templateName, g.getOutputFilename(templateName))
+				}
+				fmt.Println()
+			}
 		}
 		return
 	}

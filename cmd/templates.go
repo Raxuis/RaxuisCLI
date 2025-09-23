@@ -45,6 +45,9 @@ var generateCmd = &cobra.Command{
 
 		if err := generator.Generate(config); err != nil {
 			fmt.Printf("Error generating templates: %v\n", err)
+			fmt.Println()
+			fmt.Println("Available project types and templates:")
+			generator.ListAvailable(templates.ListOption{})
 			return
 		}
 
