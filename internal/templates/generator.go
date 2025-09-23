@@ -191,6 +191,40 @@ func (g *Generator) getOutputFilename(templateName string) string {
 }
 
 func (g *Generator) ListAvailableTemplatesByProject(option ListOption) {
+	if option.ProjectType != "" && option.TemplateName != "" {
+		pt := ProjectType(option.ProjectType)
+		templates, ok := g.availableTemplates[pt]
+		if !ok {
+			fmt.Printf("Project type '%s' not found. Available: nextjs, node, go, rust\n", option.ProjectType)
+			return
+		}
+
+		var matches []string
+		for _, t := range templates {
+			if t == option.TemplateName || strings.HasPrefix(t, option.TemplateName) {
+				matches = append(matches, t)
+			}
+		}
+
+		if len(matches) > 0 {
+			fmt.Printf("📁 %s (matching '%s'):\n", string(pt), option.TemplateName)
+			for _, templateName := range matches {
+				fmt.Printf("   • %s (%s)\n", templateName, g.getOutputFilename(templateName))
+			}
+			fmt.Println()
+			return
+		}
+
+		fmt.Printf("Template '%s' is not available for project '%s'.\n", option.TemplateName, string(pt))
+		fmt.Println()
+		fmt.Printf("📁 %s:\n", string(pt))
+		for _, templateName := range templates {
+			fmt.Printf("   • %s (%s)\n", templateName, g.getOutputFilename(templateName))
+		}
+		fmt.Println()
+		return
+	}
+
 	if option.TemplateName != "" {
 		found := false
 		for projectType, templates := range g.availableTemplates {
@@ -205,7 +239,6 @@ func (g *Generator) ListAvailableTemplatesByProject(option ListOption) {
 			}
 		}
 		if !found {
-			// Construire une vue d'ensemble rapide des templates disponibles
 			fmt.Printf("Template '%s' is not available for any project type.\n", option.TemplateName)
 			fmt.Println()
 			fmt.Println("Available templates by project type:")
@@ -222,7 +255,6 @@ func (g *Generator) ListAvailableTemplatesByProject(option ListOption) {
 	fmt.Println("Available project types and templates:")
 	fmt.Println()
 
-	// Optional filter by project type
 	if option.ProjectType != "" {
 		pt := ProjectType(option.ProjectType)
 		templates, ok := g.availableTemplates[pt]
