@@ -29,6 +29,11 @@ var pwgenGenerateCmd = &cobra.Command{
 			NoNumbers: pwgenNoNumbers,
 		}
 
+		if pwgenLength > 100000 {
+			fmt.Println("La longueur maximale du mot de passe est de 100000 caractères.")
+			return
+		}
+
 		var lastPassword string
 
 		for i := 0; i < pwgenCount; i++ {
@@ -78,7 +83,7 @@ func init() {
 	rootCmd.AddCommand(pwgenCmd)
 	pwgenCmd.AddCommand(pwgenGenerateCmd)
 
-	pwgenCmd.PersistentFlags().IntVar(&pwgenLength, "length", 16, "Password length")
+	pwgenCmd.PersistentFlags().IntVarP(&pwgenLength, "length", "l", 16, "Password length")
 	pwgenCmd.PersistentFlags().BoolVar(&pwgenNoSymbols, "no-symbols", false, "Exclude symbols")
 	pwgenCmd.PersistentFlags().BoolVar(&pwgenNoNumbers, "no-numbers", false, "Exclude numbers")
 	pwgenCmd.PersistentFlags().IntVar(&pwgenCount, "count", 1, "Number of passwords to generate")
