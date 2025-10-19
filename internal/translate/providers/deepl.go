@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"raxuiscli/internal/translate/types"
 	"strings"
 )
 
@@ -42,11 +43,7 @@ type deeplLanguage struct {
 	Name     string `json:"name"`
 }
 
-type deeplLanguagesResponse struct {
-	Languages []deeplLanguage `json:"languages"`
-}
-
-func (d *DeepL) Translate(text string, source, target string) (*Result, error) {
+func (d *DeepL) Translate(text string, source, target string) (*types.Result, error) {
 	// Préparer les paramètres
 	data := url.Values{}
 	data.Set("text", text)
@@ -93,7 +90,7 @@ func (d *DeepL) Translate(text string, source, target string) (*Result, error) {
 	}
 
 	translation := deeplResp.Translations[0]
-	result := &Result{
+	result := &types.Result{
 		TranslatedText:   translation.Text,
 		DetectedLanguage: strings.ToLower(translation.DetectedSourceLanguage),
 	}

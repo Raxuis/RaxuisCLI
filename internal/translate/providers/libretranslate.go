@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"raxuiscli/internal/translate/types"
 )
 
 type LibreTranslate struct {
@@ -41,7 +42,7 @@ type libreLanguage struct {
 	Name string `json:"name"`
 }
 
-func (lt *LibreTranslate) Translate(text string, source, target string) (*Result, error) {
+func (lt *LibreTranslate) Translate(text string, source, target string) (*types.Result, error) {
 	reqBody := libreTranslateRequest{
 		Q:      text,
 		Source: source,
@@ -76,7 +77,7 @@ func (lt *LibreTranslate) Translate(text string, source, target string) (*Result
 		return nil, fmt.Errorf("erreur lors du décodage de la réponse: %w", err)
 	}
 
-	result := &Result{
+	result := &types.Result{
 		TranslatedText: translateResp.TranslatedText,
 	}
 
@@ -110,9 +111,4 @@ func (lt *LibreTranslate) ListLanguages() (map[string]string, error) {
 	}
 
 	return result, nil
-}
-
-type Result struct {
-	TranslatedText   string
-	DetectedLanguage string
 }
