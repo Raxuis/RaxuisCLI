@@ -2,17 +2,18 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
+	"raxuiscli/internal/files"
 
 	"github.com/spf13/cobra"
 )
 
-// Commande principale files
 var filesCmd = &cobra.Command{
 	Use:   "files",
 	Short: "File operations",
 	Long:  `Perform various file operations such as encryption, decryption, compression, and more.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Afficher l'aide si aucune sous-commande n'est spécifiée
 		err := cmd.Help()
 		if err != nil {
 			fmt.Println("Error displaying help:", err)
@@ -21,14 +22,12 @@ var filesCmd = &cobra.Command{
 	},
 }
 
-// === COMMANDES ENCRYPT/DECRYPT ===
 var filesEncryptCmd = &cobra.Command{
 	Use:   "encrypt [file]",
 	Short: "Encrypt a file",
 	Long:  `Encrypt a file using a specified encryption algorithm.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Récupérer les flags
 		algo, _ := cmd.Flags().GetString("algo")
 		password, _ := cmd.Flags().GetString("password")
 		keyFile, _ := cmd.Flags().GetString("key-file")
@@ -36,9 +35,29 @@ var filesEncryptCmd = &cobra.Command{
 		overwrite, _ := cmd.Flags().GetBool("overwrite")
 		armor, _ := cmd.Flags().GetBool("armor")
 		salt, _ := cmd.Flags().GetBool("salt")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("Encrypting file: %s with algorithm: %s\n", args[0], algo)
-		// TODO: Implémenter la logique de chiffrement
+		if verbose {
+			fmt.Printf("Encrypting file: %s with algorithm: %s\n", args[0], algo)
+		}
+
+		opts := files.EncryptOptions{
+			Algorithm:  algo,
+			Password:   password,
+			KeyFile:    keyFile,
+			OutputPath: out,
+			Overwrite:  overwrite,
+			Armor:      armor,
+			Salt:       salt,
+		}
+
+		if err := files.Encrypt(args[0], opts); err != nil {
+			_, err2 := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err2 != nil {
+				return
+			}
+			os.Exit(1)
+		}
 	},
 }
 
@@ -48,19 +67,35 @@ var filesDecryptCmd = &cobra.Command{
 	Long:  `Decrypt a file using a specified decryption algorithm.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Récupérer les flags
 		algo, _ := cmd.Flags().GetString("algo")
 		password, _ := cmd.Flags().GetString("password")
 		keyFile, _ := cmd.Flags().GetString("key-file")
 		out, _ := cmd.Flags().GetString("out")
 		overwrite, _ := cmd.Flags().GetBool("overwrite")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("Decrypting file: %s with algorithm: %s\n", args[0], algo)
-		// TODO: Implémenter la logique de déchiffrement
+		if verbose {
+			fmt.Printf("Decrypting file: %s with algorithm: %s\n", args[0], algo)
+		}
+
+		opts := files.DecryptOptions{
+			Algorithm:  algo,
+			Password:   password,
+			KeyFile:    keyFile,
+			OutputPath: out,
+			Overwrite:  overwrite,
+		}
+
+		if err := files.Decrypt(args[0], opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
+			os.Exit(1)
+		}
 	},
 }
 
-// === COMMANDE SHRED ===
 var filesShredCmd = &cobra.Command{
 	Use:   "shred [file...]",
 	Short: "Securely delete files",
@@ -72,16 +107,30 @@ var filesShredCmd = &cobra.Command{
 		zero, _ := cmd.Flags().GetBool("zero")
 		recursive, _ := cmd.Flags().GetBool("recursive")
 		force, _ := cmd.Flags().GetBool("force")
+		yes, _ := cmd.Flags().GetBool("yes")
 
-		fmt.Printf("Shredding files with %d passes\n", passes)
-		for _, file := range args {
-			fmt.Printf("Shredding: %s\n", file)
-			// TODO: Implémenter la logique de suppression sécurisée
+		if yes {
+			force = true
+		}
+
+		opts := files.ShredOptions{
+			Passes:    passes,
+			Random:    random,
+			Zero:      zero,
+			Recursive: recursive,
+			Force:     force,
+		}
+
+		if err := files.Shred(args, opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
+			os.Exit(1)
 		}
 	},
 }
 
-// === COMMANDE CHECKSUM ===
 var filesChecksumCmd = &cobra.Command{
 	Use:   "checksum [file...]",
 	Short: "Calculate file checksums",
@@ -94,19 +143,24 @@ var filesChecksumCmd = &cobra.Command{
 		recursive, _ := cmd.Flags().GetBool("recursive")
 		relative, _ := cmd.Flags().GetBool("relative")
 
-		if verify != "" {
-			fmt.Printf("Verifying checksums from: %s\n", verify)
-		} else {
-			fmt.Printf("Calculating %s checksums for files\n", algo)
-			for _, file := range args {
-				fmt.Printf("Processing: %s\n", file)
-				// TODO: Implémenter le calcul de checksum
+		opts := files.ChecksumOptions{
+			Algorithm: algo,
+			Verify:    verify,
+			Output:    output,
+			Recursive: recursive,
+			Relative:  relative,
+		}
+
+		if err := files.Checksum(args, opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
 			}
+			os.Exit(1)
 		}
 	},
 }
 
-// === COMMANDE FIND ===
 var filesFindCmd = &cobra.Command{
 	Use:   "find [path...]",
 	Short: "Find files",
@@ -120,18 +174,25 @@ var filesFindCmd = &cobra.Command{
 		mtime, _ := cmd.Flags().GetString("mtime")
 		exec, _ := cmd.Flags().GetString("exec")
 
-		fmt.Printf("Searching in paths: %v\n", args)
-		if name != "" {
-			fmt.Printf("Name pattern: %s\n", name)
+		opts := files.FindOptions{
+			Name:     name,
+			Contains: contains,
+			Regex:    regex,
+			Size:     size,
+			Mtime:    mtime,
+			Exec:     exec,
 		}
-		if contains != "" {
-			fmt.Printf("Contains: %s (regex: %t)\n", contains, regex)
+
+		if err := files.Find(args, opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
+			os.Exit(1)
 		}
-		// TODO: Implémenter la logique de recherche
 	},
 }
 
-// === COMMANDES COMPRESS/EXTRACT ===
 var filesCompressCmd = &cobra.Command{
 	Use:   "compress [files...]",
 	Short: "Compress files",
@@ -142,10 +203,27 @@ var filesCompressCmd = &cobra.Command{
 		out, _ := cmd.Flags().GetString("out")
 		password, _ := cmd.Flags().GetString("password")
 		overwrite, _ := cmd.Flags().GetBool("overwrite")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("Compressing files to %s format\n", format)
-		fmt.Printf("Output: %s\n", out)
-		// TODO: Implémenter la compression
+		if verbose {
+			fmt.Printf("Compressing files to %s format\n", format)
+			fmt.Printf("Output: %s\n", out)
+		}
+
+		opts := files.CompressOptions{
+			Format:    format,
+			Output:    out,
+			Password:  password,
+			Overwrite: overwrite,
+		}
+
+		if err := files.Compress(args, opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
+			os.Exit(1)
+		}
 	},
 }
 
@@ -159,19 +237,33 @@ var filesExtractCmd = &cobra.Command{
 		stripComponents, _ := cmd.Flags().GetInt("strip-components")
 		password, _ := cmd.Flags().GetString("password")
 		overwrite, _ := cmd.Flags().GetBool("overwrite")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("Extracting archive: %s\n", args[0])
-		fmt.Printf("Format: %s, Strip components: %d\n", format, stripComponents)
-		// TODO: Implémenter l'extraction
+		if verbose {
+			fmt.Printf("Extracting archive: %s\n", args[0])
+			fmt.Printf("Format: %s, Strip components: %d\n", format, stripComponents)
+		}
+
+		opts := files.ExtractOptions{
+			Format:          format,
+			StripComponents: stripComponents,
+			Password:        password,
+			Overwrite:       overwrite,
+		}
+
+		if err := files.Extract(args[0], opts); err != nil {
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
+			os.Exit(1)
+		}
 	},
 }
 
-// Fonction d'initialisation pour configurer toutes les commandes et flags
 func init() {
-	// Ajouter la commande files à la commande racine
 	rootCmd.AddCommand(filesCmd)
 
-	// Ajouter toutes les sous-commandes à files
 	filesCmd.AddCommand(filesEncryptCmd)
 	filesCmd.AddCommand(filesDecryptCmd)
 	filesCmd.AddCommand(filesShredCmd)
@@ -180,8 +272,6 @@ func init() {
 	filesCmd.AddCommand(filesCompressCmd)
 	filesCmd.AddCommand(filesExtractCmd)
 
-	// === FLAGS POUR ENCRYPT/DECRYPT ===
-	// Flags pour encrypt
 	filesEncryptCmd.Flags().String("algo", "aes256", "Encryption algorithm (aes256|chacha20|rsa)")
 	filesEncryptCmd.Flags().String("password", "", "Passphrase for encryption")
 	filesEncryptCmd.Flags().String("key-file", "", "Path to key material")
@@ -190,28 +280,24 @@ func init() {
 	filesEncryptCmd.Flags().Bool("armor", false, "ASCII-armored output")
 	filesEncryptCmd.Flags().Bool("salt", true, "Use salt (use --no-salt to disable)")
 
-	// Flags pour decrypt (similaires à encrypt)
 	filesDecryptCmd.Flags().String("algo", "aes256", "Decryption algorithm (aes256|chacha20|rsa)")
 	filesDecryptCmd.Flags().String("password", "", "Passphrase for decryption")
 	filesDecryptCmd.Flags().String("key-file", "", "Path to key material")
 	filesDecryptCmd.Flags().String("out", "", "Output file path")
 	filesDecryptCmd.Flags().Bool("overwrite", false, "Overwrite the original file in place")
 
-	// === FLAGS POUR SHRED ===
 	filesShredCmd.Flags().Int("passes", 3, "Number of overwrite passes")
 	filesShredCmd.Flags().Bool("random", false, "Use random data instead of fixed patterns")
 	filesShredCmd.Flags().Bool("zero", false, "Final overwrite with zeros")
 	filesShredCmd.Flags().Bool("recursive", false, "Shred directories recursively")
 	filesShredCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 
-	// === FLAGS POUR CHECKSUM ===
 	filesChecksumCmd.Flags().String("algo", "sha256", "Hashing algorithm (md5|sha1|sha256|sha512|blake2)")
 	filesChecksumCmd.Flags().String("verify", "", "Verify checksums from a manifest file")
 	filesChecksumCmd.Flags().String("output", "", "Write checksums to a file")
 	filesChecksumCmd.Flags().Bool("recursive", false, "Walk directories")
 	filesChecksumCmd.Flags().Bool("relative", false, "Store relative paths in manifest")
 
-	// === FLAGS POUR FIND ===
 	filesFindCmd.Flags().String("name", "", "Glob pattern for file names")
 	filesFindCmd.Flags().String("contains", "", "Search file contents")
 	filesFindCmd.Flags().Bool("regex", false, "Treat --contains as regex")
@@ -219,7 +305,6 @@ func init() {
 	filesFindCmd.Flags().String("mtime", "", "Modified time filter (e.g., -7d, +1h)")
 	filesFindCmd.Flags().String("exec", "", "Run command for each match")
 
-	// === FLAGS POUR COMPRESS/EXTRACT ===
 	filesCompressCmd.Flags().String("format", "zip", "Archive format (zip|tar|gz|bz2|xz)")
 	filesCompressCmd.Flags().String("out", "", "Output archive name")
 	filesCompressCmd.Flags().String("password", "", "Password for protected archives")
@@ -230,7 +315,6 @@ func init() {
 	filesExtractCmd.Flags().String("password", "", "Password for protected archives")
 	filesExtractCmd.Flags().Bool("overwrite", false, "Replace existing files")
 
-	// === FLAGS GLOBAUX POUR TOUTES LES SOUS-COMMANDES ===
 	commands := []*cobra.Command{
 		filesEncryptCmd, filesDecryptCmd, filesShredCmd,
 		filesChecksumCmd, filesFindCmd, filesCompressCmd, filesExtractCmd,
@@ -241,6 +325,5 @@ func init() {
 		cmd.Flags().Bool("verbose", false, "Print extra logs")
 		cmd.Flags().Bool("dry-run", false, "Simulate actions")
 		cmd.Flags().Bool("yes", false, "Skip confirmations")
-		cmd.Flags().String("format", "", "Output style (table|json|yaml)")
 	}
 }
