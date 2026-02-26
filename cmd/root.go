@@ -20,6 +20,5 @@ func Execute() error {
 }
 
 func init() {
-	//👇 Global flags can be added here
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
 }

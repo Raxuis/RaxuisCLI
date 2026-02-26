@@ -30,7 +30,7 @@ var pwgenGenerateCmd = &cobra.Command{
 		}
 
 		if pwgenLength > 100000 {
-			fmt.Println("La longueur maximale du mot de passe est de 100000 caractères.")
+			fmt.Println("Maximum password length is 100000 characters.")
 			return
 		}
 
@@ -47,11 +47,10 @@ var pwgenGenerateCmd = &cobra.Command{
 			lastPassword = password
 		}
 
-		// Demander si l'utilisateur veut copier le dernier mot de passe
 		if pwgenCount == 1 {
-			fmt.Print("Voulez-vous copier ce mot de passe dans le presse-papiers ? (y/N): ")
+			fmt.Print("Copy this password to clipboard? (y/N): ")
 		} else {
-			fmt.Print("Voulez-vous copier le dernier mot de passe dans le presse-papiers ? (y/N): ")
+			fmt.Print("Copy the last password to clipboard? (y/N): ")
 		}
 
 		var response string
@@ -61,18 +60,17 @@ var pwgenGenerateCmd = &cobra.Command{
 		}
 
 		response = strings.ToLower(strings.TrimSpace(response))
-		if response == "y" || response == "yes" || response == "oui" {
+		if response == "y" || response == "yes" {
 			err := pwgen.CopyToClipboard(lastPassword)
 			if err != nil {
-				fmt.Printf("Erreur lors de la copie dans le presse-papiers: %v\n", err)
+				fmt.Printf("Error copying to clipboard: %v\n", err)
 			} else {
-				fmt.Println("Mot de passe copié dans le presse-papiers!")
+				fmt.Println("Password copied to clipboard!")
 
-				// Optionnel : vérifier que la copie a bien fonctionné
 				if err := pwgen.VerifyClipboard(lastPassword); err != nil {
-					fmt.Printf("Attention: %v\n", err)
+					fmt.Printf("Warning: %v\n", err)
 				} else {
-					fmt.Println("✓ Copie vérifiée avec succès")
+					fmt.Println("Copy verified successfully")
 				}
 			}
 		}
