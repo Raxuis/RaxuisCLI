@@ -338,7 +338,7 @@ func init() {
 
 	// Main command flags
 	certinfoCmd.Flags().BoolP("chain", "c", false, "Show full certificate chain")
-	certinfoCmd.Flags().BoolP("validate", "v", false, "Validate certificate")
+	certinfoCmd.Flags().Bool("validate", false, "Validate certificate")
 	certinfoCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
 	// Subcommands
