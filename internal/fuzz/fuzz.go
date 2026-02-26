@@ -246,8 +246,8 @@ func FuzzParameter(opts FuzzOptions, resultChan chan<- FuzzResult, doneChan chan
 	wg.Wait()
 }
 
-// FuzzVhost performs virtual host fuzzing
-func FuzzVhost(opts FuzzOptions, resultChan chan<- FuzzResult, doneChan chan<- bool) {
+// FuzzVirtualHost performs virtual host fuzzing
+func FuzzVirtualHost(opts FuzzOptions, resultChan chan<- FuzzResult, doneChan chan<- bool) {
 	defer func() { doneChan <- true }()
 
 	client := createHTTPClient(opts)

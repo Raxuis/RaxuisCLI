@@ -238,7 +238,7 @@ Examples:
 			RateLimit:    rateLimit,
 		}
 
-		runFuzzer(opts, fuzz.FuzzVhost)
+		runFuzzer(opts, fuzz.FuzzVirtualHost)
 	},
 }
 

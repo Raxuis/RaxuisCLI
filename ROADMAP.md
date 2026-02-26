@@ -69,14 +69,14 @@
 
 ---
 
-## ⏳ Sprint 3: Sécurité Web
+## ✅ Sprint 3: Sécurité Web (COMPLÉTÉ)
 
-| Commande | Description                            | Status    |
-|----------|----------------------------------------|-----------|
-| `http`   | Custom HTTP requests, headers analysis | ⏳ Pending |
-| `fuzz`   | Directory/param/vhost fuzzing          | ⏳ Pending |
-| `vuln`   | XSS/SQLi/LFI detection                 | ⏳ Pending |
-| `cookie` | Cookie decode & analysis               | ⏳ Pending |
+| Commande | Description                            | Status  |
+|----------|----------------------------------------|---------|
+| `http`   | Custom HTTP requests, headers analysis | ✅ Done |
+| `fuzz`   | Directory/param/vhost fuzzing          | ✅ Done |
+| `vuln`   | XSS/SQLi/LFI detection                 | ✅ Done |
+| `cookie` | Cookie decode & analysis               | ✅ Done |
 
 ---
 
@@ -104,11 +104,11 @@
 - **Sprint 1 (Réseau):** 3/3 ✅
 - **Sprint 1.5 (Red Team):** 15/15 ✅
 - **Sprint 2 (Crypto):** 4/4 ✅
-- **Sprint 3 (Web):** 0/4
+- **Sprint 3 (Web):** 4/4 ✅
 - **Sprint 4 (Binaires):** 0/3
 - **Sprint 5 (Utils):** 0/2
 
-**Total: 22 / 31 commandes implémentées (71%)**
+**Total: 26 / 31 commandes implémentées (84%)**
 
 ---
 
@@ -118,14 +118,28 @@
 # Build
 go build -o bin/raxuiscli .
 
-# Test commands
+# Test commands - Network
 ./bin/raxuiscli dns lookup google.com
 ./bin/raxuiscli whois example.com
 ./bin/raxuiscli recon example.com:80
+
+# Test commands - Red Team
 ./bin/raxuiscli privesc check
 ./bin/raxuiscli ntlm hash "Password123"
 ./bin/raxuiscli cloud aws s3 companyname
 ./bin/raxuiscli kerberos roast -d corp.local
+
+# Test commands - Cryptography
+./bin/raxuiscli cipher xor "secret" --key "key"
+./bin/raxuiscli jwt decode "eyJ..."
+./bin/raxuiscli keygen aes --bits 256
+./bin/raxuiscli certinfo example.com
+
+# Test commands - Web Security
+./bin/raxuiscli http headers https://example.com
+./bin/raxuiscli fuzz dir https://example.com --common
+./bin/raxuiscli vuln scan "https://site.com?id=1"
+./bin/raxuiscli cookie decode "eyJhZG1pbiI6dHJ1ZX0="
 ```
 
 ---
@@ -135,10 +149,10 @@ go build -o bin/raxuiscli .
 ```
 RaxuisCLI/
 ├── cmd/                    # Définitions des commandes
-│   ├── dns.go
+│   ├── dns.go              # Sprint 1 - Réseau
 │   ├── whois.go
 │   ├── recon.go
-│   ├── ldap.go
+│   ├── ldap.go             # Sprint 1.5 - Red Team
 │   ├── privesc.go
 │   ├── creds.go
 │   ├── smb.go
@@ -152,7 +166,15 @@ RaxuisCLI/
 │   ├── exfil.go
 │   ├── persist.go
 │   ├── container.go
-│   └── k8s.go
+│   ├── k8s.go
+│   ├── cipher.go           # Sprint 2 - Crypto
+│   ├── jwt.go
+│   ├── keygen.go
+│   ├── certinfo.go
+│   ├── http.go             # Sprint 3 - Web Security
+│   ├── fuzz.go
+│   ├── vuln.go
+│   └── cookie.go
 ├── internal/               # Logique métier
 │   ├── dns/
 │   ├── whois/
@@ -171,6 +193,14 @@ RaxuisCLI/
 │   ├── exfil/
 │   ├── persist/
 │   ├── container/
-│   └── k8s/
+│   ├── k8s/
+│   ├── cipher/
+│   ├── jwt/
+│   ├── keygen/
+│   ├── certinfo/
+│   ├── http/
+│   ├── fuzz/
+│   ├── vuln/
+│   └── cookie/
 └── main.go
 ```
