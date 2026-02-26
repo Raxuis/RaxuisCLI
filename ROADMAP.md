@@ -6,11 +6,11 @@
 
 ## ✅ Sprint 1: Réseau (COMPLÉTÉ)
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `dns` | DNS lookup, zone transfer, subdomain brute | ✅ Done |
-| `whois` | Domain/IP/ASN information | ✅ Done |
-| `recon` | Banner grabbing, service detection | ✅ Done |
+| Commande | Description                                | Status |
+|----------|--------------------------------------------|--------|
+| `dns`    | DNS lookup, zone transfer, subdomain brute | ✅ Done |
+| `whois`  | Domain/IP/ASN information                  | ✅ Done |
+| `recon`  | Banner grabbing, service detection         | ✅ Done |
 
 ---
 
@@ -18,84 +18,84 @@
 
 ### Haute Priorité
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `ldap` | Active Directory enumeration | ✅ Done |
-| `privesc` | Privilege escalation checks | ✅ Done |
-| `creds` | Credential extraction & analysis | ✅ Done |
-| `smb` | SMB shares, spider, relay | ✅ Done |
-| `cloud` | AWS/Azure/GCP enumeration | ✅ Done |
+| Commande  | Description                      | Status |
+|-----------|----------------------------------|--------|
+| `ldap`    | Active Directory enumeration     | ✅ Done |
+| `privesc` | Privilege escalation checks      | ✅ Done |
+| `creds`   | Credential extraction & analysis | ✅ Done |
+| `smb`     | SMB shares, spider, relay        | ✅ Done |
+| `cloud`   | AWS/Azure/GCP enumeration        | ✅ Done |
 
 ### Réseau & Pivoting
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `tunnel` | DNS/ICMP/HTTP tunneling | ✅ Done |
-| `pivot` | SOCKS5 proxy, port forwarding | ✅ Done |
-| `poison` | LLMNR/mDNS/NetBIOS poisoning | ✅ Done |
+| Commande | Description                   | Status |
+|----------|-------------------------------|--------|
+| `tunnel` | DNS/ICMP/HTTP tunneling       | ✅ Done |
+| `pivot`  | SOCKS5 proxy, port forwarding | ✅ Done |
+| `poison` | LLMNR/mDNS/NetBIOS poisoning  | ✅ Done |
 
 ### Authentification
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `ntlm` | NTLM cracking, pass-the-hash, relay | ✅ Done |
-| `kerberos` | AS-REP roasting, Kerberoasting | ✅ Done |
+| Commande   | Description                         | Status |
+|------------|-------------------------------------|--------|
+| `ntlm`     | NTLM cracking, pass-the-hash, relay | ✅ Done |
+| `kerberos` | AS-REP roasting, Kerberoasting      | ✅ Done |
 
 ### Utilitaires Offensifs
 
-| Commande | Description | Status |
-|----------|-------------|--------|
+| Commande    | Description                      | Status |
+|-------------|----------------------------------|--------|
 | `obfuscate` | PowerShell/shellcode obfuscation | ✅ Done |
-| `exfil` | Data exfiltration helpers | ✅ Done |
-| `persist` | Persistence mechanisms | ✅ Done |
+| `exfil`     | Data exfiltration helpers        | ✅ Done |
+| `persist`   | Persistence mechanisms           | ✅ Done |
 
 ### Cloud & Containers
 
-| Commande | Description | Status |
-|----------|-------------|--------|
+| Commande    | Description               | Status |
+|-------------|---------------------------|--------|
 | `container` | Container escape, secrets | ✅ Done |
-| `k8s` | Kubernetes pentesting | ✅ Done |
+| `k8s`       | Kubernetes pentesting     | ✅ Done |
 
 ---
 
-## ⏳ Sprint 2: Cryptographie
+## ✅ Sprint 2: Cryptographie (COMPLÉTÉ)
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `cipher` | XOR, Vigenère, frequency analysis | ⏳ Pending |
-| `jwt` | JWT decode/forge/crack | ⏳ Pending |
-| `keygen` | Generate RSA/SSH/certs | ⏳ Pending |
-| `certinfo` | Certificate analysis | ⏳ Pending |
+| Commande   | Description                               | Status |
+|------------|-------------------------------------------|--------|
+| `cipher`   | XOR, Vigenère, Caesar, frequency analysis | ✅ Done |
+| `jwt`      | JWT decode/forge/crack/none-attack        | ✅ Done |
+| `keygen`   | Generate RSA/ECDSA/Ed25519/SSH/certs/AES  | ✅ Done |
+| `certinfo` | Certificate analysis, chain, validation   | ✅ Done |
 
 ---
 
 ## ⏳ Sprint 3: Sécurité Web
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `http` | Custom HTTP requests, headers analysis | ⏳ Pending |
-| `fuzz` | Directory/param/vhost fuzzing | ⏳ Pending |
-| `vuln` | XSS/SQLi/LFI detection | ⏳ Pending |
-| `cookie` | Cookie decode & analysis | ⏳ Pending |
+| Commande | Description                            | Status    |
+|----------|----------------------------------------|-----------|
+| `http`   | Custom HTTP requests, headers analysis | ⏳ Pending |
+| `fuzz`   | Directory/param/vhost fuzzing          | ⏳ Pending |
+| `vuln`   | XSS/SQLi/LFI detection                 | ⏳ Pending |
+| `cookie` | Cookie decode & analysis               | ⏳ Pending |
 
 ---
 
 ## ⏳ Sprint 4: Analyse Binaires
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `bininfo` | PE/ELF/Mach-O analysis | ⏳ Pending |
-| `stego` | Steganography detect/extract | ⏳ Pending |
-| `ioc` | IoC extraction, YARA | ⏳ Pending |
+| Commande  | Description                  | Status    |
+|-----------|------------------------------|-----------|
+| `bininfo` | PE/ELF/Mach-O analysis       | ⏳ Pending |
+| `stego`   | Steganography detect/extract | ⏳ Pending |
+| `ioc`     | IoC extraction, YARA         | ⏳ Pending |
 
 ---
 
 ## ⏳ Sprint 5: Utilitaires
 
-| Commande | Description | Status |
-|----------|-------------|--------|
-| `wordlist` | Generate/mutate wordlists | ⏳ Pending |
-| `payload` | Reverse shells, XSS, SQLi generators | ⏳ Pending |
+| Commande   | Description                          | Status    |
+|------------|--------------------------------------|-----------|
+| `wordlist` | Generate/mutate wordlists            | ⏳ Pending |
+| `payload`  | Reverse shells, XSS, SQLi generators | ⏳ Pending |
 
 ---
 
@@ -103,12 +103,12 @@
 
 - **Sprint 1 (Réseau):** 3/3 ✅
 - **Sprint 1.5 (Red Team):** 15/15 ✅
-- **Sprint 2 (Crypto):** 0/4
+- **Sprint 2 (Crypto):** 4/4 ✅
 - **Sprint 3 (Web):** 0/4
 - **Sprint 4 (Binaires):** 0/3
 - **Sprint 5 (Utils):** 0/2
 
-**Total: 18 / 31 commandes implémentées (58%)**
+**Total: 22 / 31 commandes implémentées (71%)**
 
 ---
 
