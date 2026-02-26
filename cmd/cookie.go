@@ -47,10 +47,10 @@ Examples:
 
 		value := args[0]
 
-		// If it's a name=value pair, extract the value
-		if strings.Contains(value, "=") && !strings.Contains(value, ";") {
+		// If it's a name=value pair, extract the value (but not if it looks like base64)
+		if strings.Contains(value, "=") && !strings.Contains(value, ";") && !strings.HasSuffix(value, "=") && !strings.HasSuffix(value, "==") {
 			parts := strings.SplitN(value, "=", 2)
-			if len(parts) == 2 {
+			if len(parts) == 2 && len(parts[0]) < 50 && !strings.ContainsAny(parts[0], "+/") {
 				fmt.Printf("Cookie name: %s\n", parts[0])
 				value = parts[1]
 			}

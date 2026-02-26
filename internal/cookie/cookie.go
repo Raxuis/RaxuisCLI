@@ -194,9 +194,16 @@ func DecodeCookieValue(value string) *DecodedCookie {
 
 // DetectSessionType tries to identify the session cookie type
 func DetectSessionType(value string) string {
-	// Flask session (starts with . and has base64 payload)
-	if strings.HasPrefix(value, ".") && strings.Count(value, ".") >= 2 {
-		return "Flask"
+	// Flask session (starts with . and has base64-like payload)
+	if strings.HasPrefix(value, ".") {
+		// Check for Flask itsdangerous format: .payload.timestamp.signature or .payload.signature
+		if strings.Count(value, ".") >= 2 {
+			return "Flask"
+		}
+		// Also check if it starts with .eJ (compressed zlib base64)
+		if len(value) > 3 && (strings.HasPrefix(value[1:], "eJ") || strings.HasPrefix(value[1:], "ey")) {
+			return "Flask"
+		}
 	}
 
 	// Django session
