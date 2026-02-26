@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/ldap"
 
 	"github.com/spf13/cobra"
@@ -180,7 +181,7 @@ var ldapTestCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(ldapCmd)
+	cmd.RootCmd.AddCommand(ldapCmd)
 
 	// Global LDAP flags
 	ldapCmd.PersistentFlags().IntVarP(&ldapPort, "port", "P", 389, "LDAP port (389 or 636 for LDAPS)")

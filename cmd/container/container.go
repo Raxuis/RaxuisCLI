@@ -1,6 +1,7 @@
-package cmd
+package container
 
 import (
+	"raxuiscli/cmd"
 	"raxuiscli/internal/container/container"
 
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ var containerCheckCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(containerCmd)
+	cmd.RootCmd.AddCommand(containerCmd)
 
 	containerCmd.AddCommand(containerDetectCmd)
 	containerCmd.AddCommand(containerEscapeCmd)

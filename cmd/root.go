@@ -6,7 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
+// RootCmd is exported so subpackages can add their commands
+var RootCmd = &cobra.Command{
 	Use:   "raxuiscli",
 	Short: "A powerful CLI toolkit",
 	Long:  `RaxuisCLI is a collection of the most used commands by @Raxuis.`,
@@ -16,9 +17,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
-	return rootCmd.Execute()
+	return RootCmd.Execute()
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
+	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
 }

@@ -1,7 +1,8 @@
-package cmd
+package crypto
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strconv"
 	"strings"
 
@@ -334,7 +335,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(certinfoCmd)
+	cmd.RootCmd.AddCommand(certinfoCmd)
 
 	// Main command flags
 	certinfoCmd.Flags().BoolP("chain", "c", false, "Show full certificate chain")

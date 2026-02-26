@@ -1,7 +1,8 @@
-package cmd
+package web
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -361,7 +362,7 @@ func truncateCookie(s string, max int) string {
 }
 
 func init() {
-	rootCmd.AddCommand(cookieCmd)
+	cmd.RootCmd.AddCommand(cookieCmd)
 
 	// Decode command
 	cookieCmd.AddCommand(cookieDecodeCmd)

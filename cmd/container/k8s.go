@@ -1,7 +1,8 @@
-package cmd
+package container
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/container/k8s"
 
 	"github.com/spf13/cobra"
@@ -141,7 +142,7 @@ var k8sCheckCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(k8sCmd)
+	cmd.RootCmd.AddCommand(k8sCmd)
 
 	// Global flags
 	k8sCmd.PersistentFlags().StringVarP(&k8sNamespace, "namespace", "n", "", "Kubernetes namespace")

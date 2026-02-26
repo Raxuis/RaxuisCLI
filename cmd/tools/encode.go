@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/encode"
 	"strings"
 
@@ -127,7 +128,7 @@ Example:
 }
 
 func init() {
-	rootCmd.AddCommand(encodeCmd)
+	cmd.RootCmd.AddCommand(encodeCmd)
 	encodeCmd.AddCommand(decodeCmd)
 	encodeCmd.AddCommand(rotBruteCmd)
 

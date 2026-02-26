@@ -1,8 +1,9 @@
-package cmd
+package network
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/network/dns"
 	"strings"
 
@@ -140,7 +141,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(dnsCmd)
+	cmd.RootCmd.AddCommand(dnsCmd)
 
 	// Global DNS flags
 	dnsCmd.PersistentFlags().StringVarP(&dnsNameserver, "server", "s", "", "Custom DNS server (e.g., 8.8.8.8)")

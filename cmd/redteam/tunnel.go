@@ -1,9 +1,10 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
 	"os/signal"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/tunnel"
 	"syscall"
 
@@ -163,7 +164,7 @@ var tunnelDecodeCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(tunnelCmd)
+	cmd.RootCmd.AddCommand(tunnelCmd)
 
 	// TCP subcommand
 	tunnelCmd.AddCommand(tunnelTCPCmd)

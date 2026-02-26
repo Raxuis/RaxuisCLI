@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/kerberos"
 
 	"github.com/spf13/cobra"
@@ -145,7 +146,7 @@ var kerbSilverCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(kerberosCmd)
+	cmd.RootCmd.AddCommand(kerberosCmd)
 
 	// Global flags
 	kerberosCmd.PersistentFlags().StringVarP(&kerbDomain, "domain", "d", "", "Domain name")

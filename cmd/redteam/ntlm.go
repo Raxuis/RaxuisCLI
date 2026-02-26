@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/ntlm"
 
 	"github.com/spf13/cobra"
@@ -136,7 +137,7 @@ Generates commands for various tools to perform PTH attacks.`,
 }
 
 func init() {
-	rootCmd.AddCommand(ntlmCmd)
+	cmd.RootCmd.AddCommand(ntlmCmd)
 
 	// Hash subcommand
 	ntlmCmd.AddCommand(ntlmHashCmd)

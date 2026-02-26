@@ -1,7 +1,8 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/poison"
 
 	"github.com/spf13/cobra"
@@ -153,7 +154,7 @@ var poisonResponderCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(poisonCmd)
+	cmd.RootCmd.AddCommand(poisonCmd)
 
 	// Global flags
 	poisonCmd.PersistentFlags().StringVarP(&poisonInterface, "interface", "i", "eth0", "Network interface")

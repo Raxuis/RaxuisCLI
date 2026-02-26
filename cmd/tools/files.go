@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 
 	"raxuiscli/internal/tools/files"
 
@@ -262,7 +263,7 @@ var filesExtractCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(filesCmd)
+	cmd.RootCmd.AddCommand(filesCmd)
 
 	filesCmd.AddCommand(filesEncryptCmd)
 	filesCmd.AddCommand(filesDecryptCmd)

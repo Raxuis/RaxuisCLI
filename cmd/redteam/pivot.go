@@ -1,9 +1,10 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
 	"os/signal"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/pivot"
 	"syscall"
 
@@ -130,7 +131,7 @@ var pivotTestCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(pivotCmd)
+	cmd.RootCmd.AddCommand(pivotCmd)
 
 	// SOCKS5 subcommand
 	pivotCmd.AddCommand(pivotSocks5Cmd)

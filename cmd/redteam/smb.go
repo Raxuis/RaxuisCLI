@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/smb"
 
 	"github.com/spf13/cobra"
@@ -113,7 +114,7 @@ var smbNullCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(smbCmd)
+	cmd.RootCmd.AddCommand(smbCmd)
 
 	// Global flags
 	smbCmd.PersistentFlags().IntVarP(&smbPort, "port", "P", 445, "SMB port")

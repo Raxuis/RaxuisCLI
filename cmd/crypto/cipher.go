@@ -1,9 +1,10 @@
-package cmd
+package crypto
 
 import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -408,7 +409,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(cipherCmd)
+	cmd.RootCmd.AddCommand(cipherCmd)
 
 	// XOR command
 	cipherCmd.AddCommand(cipherXORCmd)

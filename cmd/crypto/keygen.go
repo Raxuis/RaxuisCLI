@@ -1,7 +1,8 @@
-package cmd
+package crypto
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -260,7 +261,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(keygenCmd)
+	cmd.RootCmd.AddCommand(keygenCmd)
 
 	// RSA command
 	keygenCmd.AddCommand(keygenRSACmd)

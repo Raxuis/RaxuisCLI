@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/metadata"
 	"sort"
 	"strings"
@@ -132,7 +133,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(metadataCmd)
+	cmd.RootCmd.AddCommand(metadataCmd)
 	metadataCmd.AddCommand(metadataStripCmd)
 
 	metadataStripCmd.Flags().StringVarP(&metadataStripOutputPath, "out", "o", "", "Output file path")

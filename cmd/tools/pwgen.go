@@ -1,7 +1,8 @@
-package cmd
+package tools
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/pwgen"
 	"strings"
 
@@ -78,7 +79,7 @@ var pwgenGenerateCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(pwgenCmd)
+	cmd.RootCmd.AddCommand(pwgenCmd)
 	pwgenCmd.AddCommand(pwgenGenerateCmd)
 
 	pwgenCmd.PersistentFlags().IntVarP(&pwgenLength, "length", "l", 16, "Password length")

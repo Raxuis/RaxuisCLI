@@ -1,8 +1,9 @@
-package cmd
+package network
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/network/recon"
 	"strconv"
 	"strings"
@@ -92,7 +93,7 @@ func parseTarget(target string) (string, int) {
 }
 
 func init() {
-	rootCmd.AddCommand(reconCmd)
+	cmd.RootCmd.AddCommand(reconCmd)
 
 	reconCmd.Flags().StringVarP(&reconPorts, "ports", "p", "", "Ports to scan (e.g., 80,443 or 1-1024 or 'common')")
 	reconCmd.Flags().IntVarP(&reconTimeout, "timeout", "t", 5, "Connection timeout in seconds")

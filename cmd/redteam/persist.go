@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/persist"
 	"runtime"
 
@@ -163,7 +164,7 @@ var persistLaunchdCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(persistCmd)
+	cmd.RootCmd.AddCommand(persistCmd)
 
 	// List subcommand
 	persistCmd.AddCommand(persistListCmd)

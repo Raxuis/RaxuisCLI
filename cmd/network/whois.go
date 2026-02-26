@@ -1,7 +1,8 @@
-package cmd
+package network
 
 import (
 	"net"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/network/whois"
 	"regexp"
 	"strings"
@@ -72,7 +73,7 @@ func detectQueryType(query string) string {
 }
 
 func init() {
-	rootCmd.AddCommand(whoisCmd)
+	cmd.RootCmd.AddCommand(whoisCmd)
 
 	whoisCmd.Flags().IntVarP(&whoisTimeout, "timeout", "t", 10, "Timeout in seconds")
 	whoisCmd.Flags().BoolVarP(&whoisRaw, "raw", "r", false, "Show raw WHOIS data")

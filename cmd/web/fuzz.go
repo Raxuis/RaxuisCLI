@@ -1,7 +1,8 @@
-package cmd
+package web
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strings"
 	"time"
 
@@ -289,7 +290,7 @@ func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- f
 }
 
 func init() {
-	rootCmd.AddCommand(fuzzCmd)
+	cmd.RootCmd.AddCommand(fuzzCmd)
 
 	// Common flags
 	commonFlags := func(cmd *cobra.Command) {

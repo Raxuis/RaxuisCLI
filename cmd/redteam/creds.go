@@ -1,9 +1,10 @@
-package cmd
+package redteam
 
 import (
 	"bufio"
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/creds"
 	"strings"
 
@@ -264,7 +265,7 @@ func readLines(path string) ([]string, error) {
 }
 
 func init() {
-	rootCmd.AddCommand(credsCmd)
+	cmd.RootCmd.AddCommand(credsCmd)
 
 	// Global flags
 	credsCmd.PersistentFlags().BoolVar(&credsShowAll, "all", false, "Show all details")

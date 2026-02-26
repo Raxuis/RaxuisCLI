@@ -1,10 +1,11 @@
-package cmd
+package crypto
 
 import (
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -342,7 +343,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(jwtCmd)
+	cmd.RootCmd.AddCommand(jwtCmd)
 
 	// Decode command
 	jwtCmd.AddCommand(jwtDecodeCmd)

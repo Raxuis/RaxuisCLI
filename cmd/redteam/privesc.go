@@ -1,7 +1,8 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/privesc"
 
 	"github.com/spf13/cobra"
@@ -127,7 +128,7 @@ var privescInfoCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(privescCmd)
+	cmd.RootCmd.AddCommand(privescCmd)
 
 	// Global flags
 	privescCmd.PersistentFlags().BoolVar(&privescThorough, "thorough", false, "Perform thorough checks")

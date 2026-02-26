@@ -1,6 +1,7 @@
-package cmd
+package tools
 
 import (
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/ports"
 
 	"github.com/spf13/cobra"
@@ -43,7 +44,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(portsCmd)
+	cmd.RootCmd.AddCommand(portsCmd)
 	portsCmd.PersistentFlags().StringVarP(&portsHost, "host", "H", "localhost", "Target host to scan")
 	portsCmd.PersistentFlags().StringVarP(&portsPortRange, "port-range", "p", "common", "Port range to scan (e.g., 1-65535, common, dev, web)")
 	portsCmd.PersistentFlags().IntVarP(&portsTimeout, "timeout", "t", 5, "Timeout in seconds for each port scan")

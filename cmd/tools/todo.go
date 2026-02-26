@@ -1,7 +1,8 @@
-package cmd
+package tools
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/todo"
 
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ var todoIncompleteCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(todoCmd)
+	cmd.RootCmd.AddCommand(todoCmd)
 	todoCmd.AddCommand(todoAddCmd)
 	todoCmd.AddCommand(todoListCmd)
 	todoCmd.AddCommand(todoCompleteCmd)

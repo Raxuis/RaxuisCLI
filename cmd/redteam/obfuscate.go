@@ -1,9 +1,10 @@
-package cmd
+package redteam
 
 import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/obfuscate"
 
 	"github.com/spf13/cobra"
@@ -137,7 +138,7 @@ var obfShellcodeHexCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(obfuscateCmd)
+	cmd.RootCmd.AddCommand(obfuscateCmd)
 
 	// PowerShell subcommand
 	obfuscateCmd.AddCommand(obfPSCmd)

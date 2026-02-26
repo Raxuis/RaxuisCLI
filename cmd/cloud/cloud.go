@@ -1,8 +1,9 @@
-package cmd
+package cloud
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/cloud/cloud"
 
 	"github.com/spf13/cobra"
@@ -214,7 +215,7 @@ Provider can be: aws, azure, gcp, or all.`,
 }
 
 func init() {
-	rootCmd.AddCommand(cloudCmd)
+	cmd.RootCmd.AddCommand(cloudCmd)
 
 	// Global flags
 	cloudCmd.PersistentFlags().IntVarP(&cloudTimeout, "timeout", "t", 5, "Request timeout")

@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/hexdump"
 
 	"github.com/spf13/cobra"
@@ -69,7 +70,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(hexdumpCmd)
+	cmd.RootCmd.AddCommand(hexdumpCmd)
 
 	hexdumpCmd.Flags().Int64VarP(&hexdumpOffset, "offset", "o", 0, "Starting offset in bytes")
 	hexdumpCmd.Flags().Int64VarP(&hexdumpLength, "length", "l", 0, "Number of bytes to display (0 = all)")

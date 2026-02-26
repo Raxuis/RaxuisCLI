@@ -1,8 +1,9 @@
-package cmd
+package redteam
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/exfil"
 
 	"github.com/spf13/cobra"
@@ -164,7 +165,7 @@ Methods: dns, http`,
 }
 
 func init() {
-	rootCmd.AddCommand(exfilCmd)
+	cmd.RootCmd.AddCommand(exfilCmd)
 
 	// Chunk subcommand
 	exfilCmd.AddCommand(exfilChunkCmd)

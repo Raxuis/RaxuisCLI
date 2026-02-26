@@ -1,7 +1,8 @@
-package cmd
+package web
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strings"
 	"time"
 
@@ -842,7 +843,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(vulnCmd)
+	cmd.RootCmd.AddCommand(vulnCmd)
 
 	// Common flags
 	commonFlags := func(cmd *cobra.Command) {

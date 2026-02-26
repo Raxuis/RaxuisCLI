@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/entropy"
 	"strings"
 
@@ -109,7 +110,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(entropyCmd)
+	cmd.RootCmd.AddCommand(entropyCmd)
 
 	entropyCmd.Flags().IntVarP(&entropyBlockSize, "block-size", "b", 0, "Block size for per-block analysis (0 = global only)")
 	entropyCmd.Flags().BoolVar(&entropyNoColor, "no-color", false, "Disable colorized output")

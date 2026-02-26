@@ -1,8 +1,9 @@
-package cmd
+package tools
 
 import (
 	"fmt"
 	"os"
+	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/strings"
 
 	"github.com/spf13/cobra"
@@ -51,7 +52,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(stringsCmd)
+	cmd.RootCmd.AddCommand(stringsCmd)
 
 	stringsCmd.Flags().IntVarP(&stringsMinLength, "min", "n", 4, "Minimum string length")
 	stringsCmd.Flags().StringVarP(&stringsEncoding, "encoding", "e", "ascii", "String encoding (ascii|unicode|utf16le|utf16be|all)")

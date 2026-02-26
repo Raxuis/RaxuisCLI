@@ -1,7 +1,8 @@
-package cmd
+package web
 
 import (
 	"fmt"
+	"raxuiscli/cmd"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -317,7 +318,7 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
 }
 
 func init() {
-	rootCmd.AddCommand(httpCmd)
+	cmd.RootCmd.AddCommand(httpCmd)
 
 	// Common flags for request commands
 	requestFlags := func(cmd *cobra.Command) {
