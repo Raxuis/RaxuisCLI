@@ -54,25 +54,31 @@ type K8sVulnerability struct {
 	Details     string
 }
 
+// rootPrefix lets tests sandbox the service-account file reads under a
+// t.TempDir() instead of the real machine's filesystem. Empty (the
+// default) preserves real behavior exactly - production code never sets
+// this.
+var rootPrefix string
+
 // DetectK8s detects if running inside Kubernetes
 func DetectK8s() *K8sInfo {
 	info := &K8sInfo{}
 
 	// Check for service account token
-	tokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	tokenPath := rootPrefix + "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	if data, err := os.ReadFile(tokenPath); err == nil {
 		info.InCluster = true
 		info.Token = string(data)
 	}
 
 	// Get namespace
-	nsPath := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	nsPath := rootPrefix + "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 	if data, err := os.ReadFile(nsPath); err == nil {
 		info.Namespace = string(data)
 	}
 
 	// Get CA cert path
-	caPath := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	caPath := rootPrefix + "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	if _, err := os.Stat(caPath); err == nil {
 		info.CACert = caPath
 	}

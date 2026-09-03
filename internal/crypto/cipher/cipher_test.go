@@ -1,6 +1,29 @@
 package cipher
 
-import "testing"
+import (
+	"bytes"
+	"io"
+	"os"
+	"strings"
+	"testing"
+)
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stdout = w
+	fn()
+	w.Close()
+	os.Stdout = orig
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String()
+}
 
 func TestXOREncryptRoundTrip(t *testing.T) {
 	data := []byte("Hello, World!")
@@ -179,5 +202,175 @@ func TestDetectCipherTypeBase64(t *testing.T) {
 	want := "Possibly Base64 encoded"
 	if got != want {
 		t.Errorf("DetectCipherType(base64) = %q, want %q", got, want)
+	}
+}
+
+func TestXORBruteForceMultiByte(t *testing.T) {
+	plaintext := "the quick brown fox jumps over the lazy dog repeated for length the quick brown fox jumps over the lazy dog"
+	key := []byte("KEY")
+	encrypted := XOREncrypt([]byte(plaintext), key)
+
+	results := XORBruteForceMultiByte(encrypted, 5)
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results (key lengths 1-5), got %d", len(results))
+	}
+
+	// The best-scoring result should be the correct 3-byte key recovering the plaintext.
+	best := results[0]
+	if string(best.Result) != plaintext {
+		t.Errorf("best XORBruteForceMultiByte result = %q, want %q", best.Result, plaintext)
+	}
+}
+
+func TestVigenereCrackReturnsRankedResults(t *testing.T) {
+	// Kasiski examination needs repeated substrings spaced at multiples of
+	// the key length to reliably find that length, so use a text built from
+	// a repeating phrase (long enough to give the heuristic real signal)
+	// rather than asserting exact key/plaintext recovery, which isn't
+	// guaranteed for every input even when the heuristic is working.
+	plaintext := strings.ToUpper(strings.Repeat("the quick brown fox jumps over the lazy dog and then runs away ", 4))
+	plaintext = strings.ReplaceAll(plaintext, " ", "")
+	ciphertext := VigenereEncrypt(plaintext, "KEY")
+
+	results := VigenereCrack(ciphertext)
+	if len(results) == 0 {
+		t.Fatal("VigenereCrack on a long, repetitive ciphertext should return candidate results")
+	}
+
+	// Results must be sorted by descending score (best guess first).
+	for i := 1; i < len(results); i++ {
+		if results[i].Score > results[i-1].Score {
+			t.Errorf("VigenereCrack results not sorted by descending score at index %d: %v > %v", i, results[i].Score, results[i-1].Score)
+		}
+	}
+}
+
+func TestDetectCipherTypeHex(t *testing.T) {
+	got := DetectCipherType("68656c6c6f776f726c64")
+	want := "Possibly XOR-encrypted (hex format)"
+	if got != want {
+		t.Errorf("DetectCipherType(hex) = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCipherTypeCaesar(t *testing.T) {
+	// Caesar-shift a long, letter-heavy English sentence so ScoreEnglish has
+	// enough signal to clear the 0.8 threshold DetectCipherType checks for.
+	plaintext := "the quick brown fox jumps over the lazy dog and runs away very quickly into the forest"
+	encrypted := CaesarDecrypt(plaintext, -5)
+
+	got := DetectCipherType(encrypted)
+	if !strings.Contains(got, "Caesar") {
+		t.Errorf("DetectCipherType(caesar-shifted text) = %q, want it to mention Caesar", got)
+	}
+}
+
+func TestDetectCipherTypeNoLetters(t *testing.T) {
+	got := DetectCipherType("12345 67890 !@#$%")
+	want := "No alphabetic characters - possibly binary/encoded data"
+	if got != want {
+		t.Errorf("DetectCipherType(no letters) = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCipherTypePolyalphabetic(t *testing.T) {
+	// A Vigenere-encrypted long, varied text should have a low Index of
+	// Coincidence, exercising the IOC-based branches of DetectCipherType
+	// (as opposed to the Caesar/ROT heuristic, which a short or repetitive
+	// input can spuriously satisfy).
+	plaintext := "the quick brown fox jumps over the lazy dog while a clever fox watches silently from the shadows near the old wooden barn and thinks about dinner plans for tonight"
+	encrypted := VigenereEncrypt(plaintext, "SECRETKEY")
+
+	got := DetectCipherType(encrypted)
+	if !strings.Contains(got, "Vigenere") && !strings.Contains(got, "monoalphabetic") && !strings.Contains(got, "Caesar") {
+		t.Errorf("DetectCipherType(vigenere text) = %q, want it to mention Vigenere, monoalphabetic or Caesar", got)
+	}
+}
+
+func TestDetectCipherTypeMonoalphabeticIOC(t *testing.T) {
+	// A long, ROT-shifted, non-repetitive text that doesn't clear the 0.8
+	// Caesar-detection score threshold still has a normal English-like index
+	// of coincidence, exercising calculateIOC's "monoalphabetic" branch.
+	plaintext := "wxyz qrst mnop ijkl efgh abcd zyxw tsrq ponm lkji hgfe dcba wxyz qrst mnop ijkl efgh"
+	got := DetectCipherType(plaintext)
+	if got == "" || got == "Unknown cipher type" {
+		t.Errorf("DetectCipherType should reach the IOC-based classification, got %q", got)
+	}
+}
+
+func TestIsBase64EdgeCases(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"", false},
+		{"YQ==", true},
+		{"not valid base64!!", false},
+		{"abc", false}, // length not a multiple of 4
+	}
+	for _, tt := range tests {
+		got := DetectCipherType(tt.in)
+		isB64 := got == "Possibly Base64 encoded"
+		if isB64 != tt.want {
+			t.Errorf("isBase64(%q) via DetectCipherType = %v, want %v (got %q)", tt.in, isB64, tt.want, got)
+		}
+	}
+}
+
+func TestDisplayFrequencyAnalysis(t *testing.T) {
+	results := AnalyzeFrequency("aaabbc")
+	out := captureStdout(t, func() {
+		DisplayFrequencyAnalysis(results)
+	})
+	if !strings.Contains(out, "FREQUENCY ANALYSIS") || !strings.Contains(out, "a") {
+		t.Errorf("DisplayFrequencyAnalysis output looks wrong: %q", out)
+	}
+}
+
+func TestDisplayXORResults(t *testing.T) {
+	results := XORBruteForce([]byte(XOREncrypt([]byte("hello world"), []byte{0x42})))
+	out := captureStdout(t, func() {
+		DisplayXORResults(results, 3)
+	})
+	if !strings.Contains(out, "XOR BRUTE FORCE RESULTS") {
+		t.Errorf("DisplayXORResults output missing header: %q", out)
+	}
+}
+
+func TestDisplayVigenereResultsEmpty(t *testing.T) {
+	out := captureStdout(t, func() {
+		DisplayVigenereResults(nil, 5)
+	})
+	if !strings.Contains(out, "No results found") {
+		t.Errorf("DisplayVigenereResults(nil) should report no results: %q", out)
+	}
+}
+
+func TestDisplayVigenereResultsWithData(t *testing.T) {
+	results := []VigenereResult{{Key: "KEY", Plaintext: "hello world", KeyLength: 3, Score: -1.5}}
+	out := captureStdout(t, func() {
+		DisplayVigenereResults(results, 5)
+	})
+	if !strings.Contains(out, "KEY") || !strings.Contains(out, "hello world") {
+		t.Errorf("DisplayVigenereResults output missing data: %q", out)
+	}
+}
+
+func TestDisplayCaesarResults(t *testing.T) {
+	results := CaesarBruteForce("uryyb jbeyq")
+	out := captureStdout(t, func() {
+		DisplayCaesarResults(results, 26)
+	})
+	if !strings.Contains(out, "CAESAR BRUTE FORCE RESULTS") || !strings.Contains(out, "ROT13") {
+		t.Errorf("DisplayCaesarResults output looks wrong: %q", out)
+	}
+}
+
+func TestMin(t *testing.T) {
+	if got := min(3, 5); got != 3 {
+		t.Errorf("min(3, 5) = %d, want 3", got)
+	}
+	if got := min(5, 3); got != 3 {
+		t.Errorf("min(5, 3) = %d, want 3", got)
 	}
 }

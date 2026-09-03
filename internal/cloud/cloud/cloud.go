@@ -56,6 +56,24 @@ type EnumOptions struct {
 	Threads  int
 }
 
+// URL builders and metadata service base URLs, factored out as overridable
+// vars so tests can point them at a local httptest server instead of real
+// cloud provider hosts. They default to today's real endpoints and are not
+// otherwise configurable from the CLI.
+var (
+	s3RegionURL        = func(name, region string) string { return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/", name, region) }
+	s3VirtualHostedURL = func(name string) string { return fmt.Sprintf("https://%s.s3.amazonaws.com/", name) }
+	azureBlobURL       = func(account, container string) string {
+		return fmt.Sprintf("https://%s.blob.core.windows.net/%s?restype=container&comp=list", account, container)
+	}
+	azureAccountURL = func(account string) string { return fmt.Sprintf("https://%s.blob.core.windows.net/", account) }
+	gcpBucketURL    = func(name string) string { return fmt.Sprintf("https://storage.googleapis.com/%s/", name) }
+
+	awsMetadataBaseURL   = "http://169.254.169.254"
+	gcpMetadataBaseURL   = "http://169.254.169.254"
+	azureMetadataBaseURL = "http://169.254.169.254"
+)
+
 // Common bucket/storage name mutations
 var CommonMutations = []string{
 	"",
@@ -105,7 +123,7 @@ func CheckS3Bucket(name string, timeout int) S3BucketResult {
 	regions := []string{"us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"}
 
 	for _, region := range regions {
-		url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/", name, region)
+		url := s3RegionURL(name, region)
 
 		resp, err := client.Get(url)
 		if err != nil {
@@ -143,7 +161,7 @@ func CheckS3Bucket(name string, timeout int) S3BucketResult {
 	}
 
 	// Try virtual hosted style
-	url := fmt.Sprintf("https://%s.s3.amazonaws.com/", name)
+	url := s3VirtualHostedURL(name)
 	resp, err := client.Get(url)
 	if err == nil {
 		defer resp.Body.Close()
@@ -171,7 +189,7 @@ func CheckAzureBlob(account, container string, timeout int) AzureBlobResult {
 	}
 
 	// Check blob storage
-	url := fmt.Sprintf("https://%s.blob.core.windows.net/%s?restype=container&comp=list", account, container)
+	url := azureBlobURL(account, container)
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -190,7 +208,7 @@ func CheckAzureBlob(account, container string, timeout int) AzureBlobResult {
 	case 404:
 		// Container doesn't exist, but account might
 		// Check if account exists
-		accountURL := fmt.Sprintf("https://%s.blob.core.windows.net/", account)
+		accountURL := azureAccountURL(account)
 		if accResp, err := client.Get(accountURL); err == nil {
 			accResp.Body.Close()
 			if accResp.StatusCode != 404 {
@@ -211,7 +229,7 @@ func CheckGCPBucket(name string, timeout int) GCPBucketResult {
 		Timeout: time.Duration(timeout) * time.Second,
 	}
 
-	url := fmt.Sprintf("https://storage.googleapis.com/%s/", name)
+	url := gcpBucketURL(name)
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -315,7 +333,7 @@ func CheckAWSMetadata(timeout int) (map[string]interface{}, error) {
 	}
 
 	// IMDSv1
-	url := "http://169.254.169.254/latest/meta-data/"
+	url := awsMetadataBaseURL + "/latest/meta-data/"
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -332,7 +350,7 @@ func CheckAWSMetadata(timeout int) (map[string]interface{}, error) {
 	}
 
 	// Try to get instance identity
-	idURL := "http://169.254.169.254/latest/dynamic/instance-identity/document"
+	idURL := awsMetadataBaseURL + "/latest/dynamic/instance-identity/document"
 	if idResp, err := client.Get(idURL); err == nil {
 		defer idResp.Body.Close()
 		if idBody, err := io.ReadAll(idResp.Body); err == nil {
@@ -344,7 +362,7 @@ func CheckAWSMetadata(timeout int) (map[string]interface{}, error) {
 	}
 
 	// Try to get credentials
-	credsURL := "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+	credsURL := awsMetadataBaseURL + "/latest/meta-data/iam/security-credentials/"
 	if credsResp, err := client.Get(credsURL); err == nil {
 		defer credsResp.Body.Close()
 		if credsBody, err := io.ReadAll(credsResp.Body); err == nil {
@@ -362,7 +380,7 @@ func CheckGCPMetadata(timeout int) (map[string]interface{}, error) {
 		Timeout: time.Duration(timeout) * time.Second,
 	}
 
-	req, _ := http.NewRequest("GET", "http://169.254.169.254/computeMetadata/v1/", nil)
+	req, _ := http.NewRequest("GET", gcpMetadataBaseURL+"/computeMetadata/v1/", nil)
 	req.Header.Set("Metadata-Flavor", "Google")
 
 	resp, err := client.Do(req)
@@ -376,7 +394,7 @@ func CheckGCPMetadata(timeout int) (map[string]interface{}, error) {
 	}
 
 	// Get project info
-	projReq, _ := http.NewRequest("GET", "http://169.254.169.254/computeMetadata/v1/project/project-id", nil)
+	projReq, _ := http.NewRequest("GET", gcpMetadataBaseURL+"/computeMetadata/v1/project/project-id", nil)
 	projReq.Header.Set("Metadata-Flavor", "Google")
 	if projResp, err := client.Do(projReq); err == nil {
 		defer projResp.Body.Close()
@@ -386,7 +404,7 @@ func CheckGCPMetadata(timeout int) (map[string]interface{}, error) {
 	}
 
 	// Get service account
-	saReq, _ := http.NewRequest("GET", "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/", nil)
+	saReq, _ := http.NewRequest("GET", gcpMetadataBaseURL+"/computeMetadata/v1/instance/service-accounts/", nil)
 	saReq.Header.Set("Metadata-Flavor", "Google")
 	if saResp, err := client.Do(saReq); err == nil {
 		defer saResp.Body.Close()
@@ -404,7 +422,7 @@ func CheckAzureMetadata(timeout int) (map[string]interface{}, error) {
 		Timeout: time.Duration(timeout) * time.Second,
 	}
 
-	req, _ := http.NewRequest("GET", "http://169.254.169.254/metadata/instance?api-version=2021-02-01", nil)
+	req, _ := http.NewRequest("GET", azureMetadataBaseURL+"/metadata/instance?api-version=2021-02-01", nil)
 	req.Header.Set("Metadata", "true")
 
 	resp, err := client.Do(req)

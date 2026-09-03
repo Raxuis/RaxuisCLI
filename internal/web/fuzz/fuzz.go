@@ -359,6 +359,15 @@ func doFuzzRequest(client *http.Client, targetURL string, opts FuzzOptions) Fuzz
 	}
 
 	for key, value := range opts.Headers {
+		// net/http sends the wire Host header from req.Host (falling back to
+		// the URL's host), never from req.Header - Header.Set("Host", ...)
+		// alone is silently ignored by the transport. Without this, vhost
+		// fuzzing (FuzzVirtualHost) never actually varied the Host header it
+		// was probing with.
+		if strings.EqualFold(key, "Host") {
+			req.Host = value
+			continue
+		}
 		req.Header.Set(key, value)
 	}
 

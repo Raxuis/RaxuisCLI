@@ -60,6 +60,16 @@ type SecretFinding struct {
 	Content string
 }
 
+// rootPrefix lets tests sandbox every absolute filesystem path this package
+// probes (/.dockerenv, /proc/..., /dev/..., etc.) under a t.TempDir()
+// instead of the real machine's filesystem. Empty (the default) preserves
+// real behavior exactly - production code never sets this.
+var rootPrefix string
+
+func rootPath(p string) string {
+	return rootPrefix + p
+}
+
 // DetectContainer detects if running inside a container
 func DetectContainer() *ContainerInfo {
 	info := &ContainerInfo{
@@ -67,19 +77,19 @@ func DetectContainer() *ContainerInfo {
 	}
 
 	// Check /.dockerenv
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	if _, err := os.Stat(rootPath("/.dockerenv")); err == nil {
 		info.IsContainer = true
 		info.ContainerType = Docker
 	}
 
 	// Check /run/.containerenv (Podman)
-	if _, err := os.Stat("/run/.containerenv"); err == nil {
+	if _, err := os.Stat(rootPath("/run/.containerenv")); err == nil {
 		info.IsContainer = true
 		info.ContainerType = Podman
 	}
 
 	// Check cgroup
-	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+	if data, err := os.ReadFile(rootPath("/proc/1/cgroup")); err == nil {
 		content := string(data)
 		if strings.Contains(content, "docker") {
 			info.IsContainer = true
@@ -129,12 +139,12 @@ func DetectContainer() *ContainerInfo {
 // isPrivileged checks if container is running in privileged mode
 func isPrivileged() bool {
 	// Check for /dev access
-	if _, err := os.Stat("/dev/sda"); err == nil {
+	if _, err := os.Stat(rootPath("/dev/sda")); err == nil {
 		return true
 	}
 
 	// Check capabilities
-	if data, err := os.ReadFile("/proc/self/status"); err == nil {
+	if data, err := os.ReadFile(rootPath("/proc/self/status")); err == nil {
 		content := string(data)
 		// CapEff: ffffffffffffffff indicates all capabilities
 		if strings.Contains(content, "CapEff:\tffffffffffffffff") {
@@ -143,7 +153,7 @@ func isPrivileged() bool {
 	}
 
 	// Check if we can access host devices
-	if _, err := os.Stat("/dev/kmsg"); err == nil {
+	if _, err := os.Stat(rootPath("/dev/kmsg")); err == nil {
 		return true
 	}
 
@@ -159,7 +169,7 @@ func getCapabilities() []string {
 	}
 
 	// Parse /proc/self/status for capabilities
-	data, err := os.ReadFile("/proc/self/status")
+	data, err := os.ReadFile(rootPath("/proc/self/status"))
 	if err != nil {
 		return caps
 	}
@@ -181,7 +191,7 @@ func getCapabilities() []string {
 func getMounts() []MountInfo {
 	var mounts []MountInfo
 
-	file, err := os.Open("/proc/self/mounts")
+	file, err := os.Open(rootPath("/proc/self/mounts"))
 	if err != nil {
 		return mounts
 	}
@@ -231,7 +241,7 @@ func CheckEscapeVectors() []EscapeVector {
 	}
 
 	// Check Docker socket mount
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+	if _, err := os.Stat(rootPath("/var/run/docker.sock")); err == nil {
 		vectors = append(vectors, EscapeVector{
 			Name:        "Docker Socket Mount",
 			Description: "Docker socket is mounted inside container",
@@ -242,7 +252,7 @@ func CheckEscapeVectors() []EscapeVector {
 	}
 
 	// Check /proc/sys writable (CVE-2019-5736)
-	if f, err := os.OpenFile("/proc/sys/kernel/core_pattern", os.O_WRONLY, 0); err == nil {
+	if f, err := os.OpenFile(rootPath("/proc/sys/kernel/core_pattern"), os.O_WRONLY, 0); err == nil {
 		f.Close()
 		vectors = append(vectors, EscapeVector{
 			Name:        "Writable /proc/sys",
@@ -255,7 +265,7 @@ func CheckEscapeVectors() []EscapeVector {
 	}
 
 	// Check host PID namespace
-	if data, err := os.ReadFile("/proc/1/cmdline"); err == nil {
+	if data, err := os.ReadFile(rootPath("/proc/1/cmdline")); err == nil {
 		if !strings.Contains(string(data), "init") && !strings.Contains(string(data), "systemd") {
 			// Likely in container's own PID namespace
 		} else {
@@ -270,7 +280,7 @@ func CheckEscapeVectors() []EscapeVector {
 	}
 
 	// Check host network
-	if data, err := os.ReadFile("/proc/net/route"); err == nil {
+	if data, err := os.ReadFile(rootPath("/proc/net/route")); err == nil {
 		if strings.Contains(string(data), "eth0") || strings.Contains(string(data), "ens") {
 			// Could be host network
 			vectors = append(vectors, EscapeVector{
@@ -293,7 +303,7 @@ func CheckEscapeVectors() []EscapeVector {
 	}
 
 	for _, path := range sensitivePaths {
-		if _, err := os.Stat(path); err == nil {
+		if _, err := os.Stat(rootPath(path)); err == nil {
 			vectors = append(vectors, EscapeVector{
 				Name:        fmt.Sprintf("Sensitive Mount: %s", path),
 				Description: "Sensitive host path is mounted",
@@ -329,13 +339,20 @@ func CheckEscapeVectors() []EscapeVector {
 	return vectors
 }
 
+// capshOutput runs `capsh --print` to list capabilities. Overridable by
+// tests so they don't depend on capsh being installed on the test machine.
+var capshOutput = func() (string, error) {
+	out, err := exec.Command("capsh", "--print").Output()
+	return string(out), err
+}
+
 // hasCapability checks if a capability is present
 func hasCapability(cap string) bool {
-	out, err := exec.Command("capsh", "--print").Output()
+	out, err := capshOutput()
 	if err != nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(string(out)), cap)
+	return strings.Contains(strings.ToLower(out), cap)
 }
 
 // ScanSecrets scans for secrets in container
@@ -351,7 +368,7 @@ func ScanSecrets() []SecretFinding {
 	}
 
 	for _, basePath := range secretPaths {
-		filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		filepath.Walk(rootPath(basePath), func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return nil
 			}

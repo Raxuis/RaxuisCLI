@@ -20,15 +20,25 @@ type TaskList struct {
 	Tasks []Task `json:"tasks"`
 }
 
-func getDataFile() string {
+// dataDirOverride lets tests point Add/List/Complete/Incomplete at a temp
+// directory instead of the real user home directory. Empty (the default)
+// preserves real CLI behavior.
+var dataDirOverride string
+
+func dataDir() string {
+	if dataDirOverride != "" {
+		return dataDirOverride
+	}
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".raxuiscli", "todos.json")
+	return filepath.Join(homeDir, ".raxuiscli")
+}
+
+func getDataFile() string {
+	return filepath.Join(dataDir(), "todos.json")
 }
 
 func ensureDataDir() error {
-	homeDir, _ := os.UserHomeDir()
-	dataDir := filepath.Join(homeDir, ".raxuiscli")
-	return os.MkdirAll(dataDir, 0755)
+	return os.MkdirAll(dataDir(), 0755)
 }
 
 func loadTasks() (*TaskList, error) {

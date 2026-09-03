@@ -1,6 +1,10 @@
 package hash
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestHashKnownVectors(t *testing.T) {
 	tests := []struct {
@@ -94,5 +98,142 @@ func TestHashFileMissingFile(t *testing.T) {
 	_, err := Hash("/nonexistent/path/to/file", AlgoMD5, true)
 	if err == nil {
 		t.Error("Hash on missing file should return an error")
+	}
+}
+
+func writeWordlist(t *testing.T, words ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "wordlist.txt")
+	content := ""
+	for _, w := range words {
+		content += w + "\n"
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write wordlist: %v", err)
+	}
+	return path
+}
+
+func TestCrackFindsMatch(t *testing.T) {
+	wordlist := writeWordlist(t, "wrong1", "wrong2", "hello", "wrong3")
+
+	targetHash, err := Hash("hello", AlgoMD5, false)
+	if err != nil {
+		t.Fatalf("Hash returned error: %v", err)
+	}
+
+	result, err := Crack(targetHash.Hash, AlgoMD5, wordlist)
+	if err != nil {
+		t.Fatalf("Crack returned error: %v", err)
+	}
+	if !result.Found {
+		t.Fatal("Crack should have found the matching word")
+	}
+	if result.Plaintext != "hello" {
+		t.Errorf("Crack plaintext = %q, want %q", result.Plaintext, "hello")
+	}
+	if result.Attempts != 3 {
+		t.Errorf("Crack attempts = %d, want 3 (stops at the match)", result.Attempts)
+	}
+}
+
+func TestCrackNoMatch(t *testing.T) {
+	wordlist := writeWordlist(t, "wrong1", "wrong2")
+
+	result, err := Crack("deadbeefdeadbeefdeadbeefdeadbeef", AlgoMD5, wordlist)
+	if err != nil {
+		t.Fatalf("Crack returned error: %v", err)
+	}
+	if result.Found {
+		t.Error("Crack should not have found a match")
+	}
+	if result.Attempts != 2 {
+		t.Errorf("Crack attempts = %d, want 2", result.Attempts)
+	}
+}
+
+func TestCrackMissingWordlist(t *testing.T) {
+	if _, err := Crack("abc", AlgoMD5, "/nonexistent/wordlist.txt"); err == nil {
+		t.Error("Crack with a missing wordlist should return an error")
+	}
+}
+
+func TestCrackWithProgressReportsAndFinds(t *testing.T) {
+	words := make([]string, 0, 20001)
+	for i := 0; i < 20000; i++ {
+		words = append(words, "filler")
+	}
+	words = append(words, "target-word")
+	wordlist := writeWordlist(t, words...)
+
+	targetHash, err := Hash("target-word", AlgoSHA256, false)
+	if err != nil {
+		t.Fatalf("Hash returned error: %v", err)
+	}
+
+	var progressCalls int
+	result, err := CrackWithProgress(targetHash.Hash, AlgoSHA256, wordlist, func(attempts int) {
+		progressCalls++
+	})
+	if err != nil {
+		t.Fatalf("CrackWithProgress returned error: %v", err)
+	}
+	if !result.Found || result.Plaintext != "target-word" {
+		t.Errorf("CrackWithProgress result = %+v, want Found with plaintext target-word", result)
+	}
+	if progressCalls == 0 {
+		t.Error("expected the progress callback to be invoked at least once over 20000+ attempts")
+	}
+}
+
+func TestCrackWithProgressMissingWordlist(t *testing.T) {
+	if _, err := CrackWithProgress("abc", AlgoMD5, "/nonexistent/wordlist.txt", nil); err == nil {
+		t.Error("CrackWithProgress with a missing wordlist should return an error")
+	}
+}
+
+func TestHashFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("hello"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	got, err := HashFile(path, AlgoMD5)
+	if err != nil {
+		t.Fatalf("HashFile returned error: %v", err)
+	}
+	want := "5d41402abc4b2a76b9719d911017c592"
+	if got != want {
+		t.Errorf("HashFile(md5) = %q, want %q", got, want)
+	}
+}
+
+func TestHashFileAllAlgorithms(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	os.WriteFile(path, []byte("data"), 0644)
+
+	for _, algo := range GetSupportedAlgorithms() {
+		if _, err := HashFile(path, algo); err != nil {
+			t.Errorf("HashFile(%s) returned error: %v", algo, err)
+		}
+	}
+}
+
+func TestHashFileUnsupportedAlgorithm(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	os.WriteFile(path, []byte("data"), 0644)
+
+	if _, err := HashFile(path, "bogus"); err == nil {
+		t.Error("HashFile with an unsupported algorithm should return an error")
+	}
+}
+
+func TestHashFileMissing(t *testing.T) {
+	if _, err := HashFile("/nonexistent/file", AlgoMD5); err == nil {
+		t.Error("HashFile on a missing file should return an error")
 	}
 }

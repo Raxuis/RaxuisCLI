@@ -90,7 +90,17 @@ var IPWhoisServers = []string{
 }
 
 // ASNWhoisServer for ASN lookups
-const ASNWhoisServer = "whois.radb.net"
+var ASNWhoisServer = "whois.radb.net"
+
+// arinWhoisServer is the fallback server LookupASN retries against.
+var arinWhoisServer = "whois.arin.net"
+
+// whoisPort is the TCP port queryWhois connects to. It is a var (not a
+// hardcoded literal) purely so tests can point queryWhois at a local,
+// unprivileged listener instead of the real WHOIS port 43 (binding port 43
+// requires root, which test environments don't have). Real CLI usage never
+// overrides it, so behavior is unchanged.
+var whoisPort = "43"
 
 // LookupDomain performs WHOIS lookup for a domain
 func LookupDomain(domain string, timeout int) WhoisResult {
@@ -195,7 +205,7 @@ func LookupASN(asn string, timeout int) WhoisResult {
 	rawData, err := queryWhois(ASNWhoisServer, asn, timeout)
 	if err != nil {
 		// Try ARIN
-		rawData, err = queryWhois("whois.arin.net", asn, timeout)
+		rawData, err = queryWhois(arinWhoisServer, asn, timeout)
 		if err != nil {
 			result.Error = err
 			return result
@@ -210,7 +220,7 @@ func LookupASN(asn string, timeout int) WhoisResult {
 
 // queryWhois performs raw WHOIS query
 func queryWhois(server, query string, timeout int) (string, error) {
-	conn, err := net.DialTimeout("tcp", server+":43", time.Duration(timeout)*time.Second)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(server, whoisPort), time.Duration(timeout)*time.Second)
 	if err != nil {
 		return "", fmt.Errorf("connection failed: %v", err)
 	}
