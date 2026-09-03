@@ -196,7 +196,7 @@ func BannerGrab(host string, port int, timeout int, useTLS bool) ServiceResult {
 		Protocol: "tcp",
 	}
 
-	address := fmt.Sprintf("%s:%d", host, port)
+	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	start := time.Now()
 
 	var conn net.Conn

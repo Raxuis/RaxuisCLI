@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"raxuiscli/internal/shared/urlnorm"
 	"raxuiscli/internal/web/fuzz"
 )
 
@@ -41,9 +42,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		wordlist, _ := cmd.Flags().GetString("wordlist")
 		useCommon, _ := cmd.Flags().GetBool("common")
@@ -116,9 +115,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		wordlist, _ := cmd.Flags().GetString("wordlist")
 		useCommon, _ := cmd.Flags().GetBool("common")
@@ -190,9 +187,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		wordlist, _ := cmd.Flags().GetString("wordlist")
 		domain, _ := cmd.Flags().GetString("domain")

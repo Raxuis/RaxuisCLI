@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"raxuiscli/internal/shared/urlnorm"
 	"raxuiscli/internal/web/vuln"
 )
 
@@ -43,9 +44,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		threads, _ := cmd.Flags().GetInt("threads")
@@ -108,9 +107,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		threads, _ := cmd.Flags().GetInt("threads")
@@ -172,9 +169,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		threads, _ := cmd.Flags().GetInt("threads")
@@ -234,9 +229,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		threads, _ := cmd.Flags().GetInt("threads")
@@ -298,9 +291,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -396,9 +387,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -469,9 +458,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		threads, _ := cmd.Flags().GetInt("threads")
@@ -550,9 +537,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -628,9 +613,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -700,9 +683,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -772,9 +753,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")

@@ -287,7 +287,7 @@ Examples:
 		fmt.Println("\n[NONE ATTACK TOKENS]")
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println("Generated tokens with 'none' algorithm variations:")
-		fmt.Println("Test each token to see if the target accepts unsigned JWTs.\n")
+		fmt.Println("Test each token to see if the target accepts unsigned JWTs.")
 
 		for i, t := range tokens {
 			fmt.Printf("[%d] %s\n\n", i+1, t)

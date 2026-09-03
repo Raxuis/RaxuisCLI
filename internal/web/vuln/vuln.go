@@ -1,16 +1,14 @@
 package vuln
 
 import (
-	"crypto/tls"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"raxuiscli/internal/shared/constants"
+	"raxuiscli/internal/shared/httpclient"
 	"raxuiscli/internal/shared/models"
 	"raxuiscli/internal/shared/payloads"
 )
@@ -71,6 +69,18 @@ var (
 	LFISuccessPatterns   = payloads.LFISuccessPatterns
 )
 
+// quickScanTests holds the vulnerability checks QuickScan runs concurrently.
+// Every check shares the signature func(ScanOptions, chan<- VulnResult), so
+// adding a new one only means appending to this slice - QuickScan itself
+// doesn't need to change.
+var quickScanTests = []func(ScanOptions, chan<- VulnResult){
+	TestXSS,
+	TestSQLi,
+	TestLFI,
+	TestCommandInjection,
+	TestOpenRedirect,
+}
+
 // QuickScan performs a quick vulnerability scan
 func QuickScan(opts ScanOptions, resultChan chan<- VulnResult, doneChan chan<- bool) {
 	defer func() { doneChan <- true }()
@@ -82,34 +92,14 @@ func QuickScan(opts ScanOptions, resultChan chan<- VulnResult, doneChan chan<- b
 	}
 
 	var wg sync.WaitGroup
+	wg.Add(len(quickScanTests))
 
-	// Run all tests concurrently
-	wg.Add(5)
-
-	go func() {
-		defer wg.Done()
-		TestXSS(opts, resultChan)
-	}()
-
-	go func() {
-		defer wg.Done()
-		TestSQLi(opts, resultChan)
-	}()
-
-	go func() {
-		defer wg.Done()
-		TestLFI(opts, resultChan)
-	}()
-
-	go func() {
-		defer wg.Done()
-		TestCommandInjection(opts, resultChan)
-	}()
-
-	go func() {
-		defer wg.Done()
-		TestOpenRedirect(opts, resultChan)
-	}()
+	for _, test := range quickScanTests {
+		go func(test func(ScanOptions, chan<- VulnResult)) {
+			defer wg.Done()
+			test(opts, resultChan)
+		}(test)
+	}
 
 	wg.Wait()
 }
@@ -196,69 +186,24 @@ func GetPayloads(vulnType VulnType, level int) []string {
 }
 
 // Helper functions
+//
+// These delegate to internal/shared/httpclient so the whole vuln package
+// shares one HTTP client/request implementation instead of maintaining its
+// own copy. buildTestURL in particular must go through httpclient.BuildTestURL,
+// which clones the URL before mutating it - the test functions here call it
+// from many concurrent goroutines against the same parsed URL, and mutating
+// it in place caused a data race (found via `go test -race`).
 
 func createClient(opts ScanOptions) *http.Client {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: opts.Insecure,
-		},
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: opts.Threads,
-	}
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   time.Duration(opts.Timeout) * time.Second,
-	}
-
-	if !opts.FollowRedir {
-		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	}
-
-	return client
+	return httpclient.CreateClient(opts)
 }
 
 func doRequest(client *http.Client, targetURL string, opts ScanOptions) (*http.Response, string, error) {
-	method := opts.Method
-	if method == "" {
-		method = "GET"
-	}
-
-	req, err := http.NewRequest(method, targetURL, nil)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if opts.UserAgent != "" {
-		req.Header.Set("User-Agent", opts.UserAgent)
-	} else {
-		req.Header.Set("User-Agent", "RaxuisCLI-VulnScanner/1.0")
-	}
-
-	if opts.Cookie != "" {
-		req.Header.Set("Cookie", opts.Cookie)
-	}
-
-	for key, value := range opts.Headers {
-		req.Header.Set(key, value)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", err
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	return resp, string(body), nil
+	return httpclient.DoRequest(client, targetURL, opts)
 }
 
 func buildTestURL(parsedURL *url.URL, param, payload string) string {
-	query := parsedURL.Query()
-	query.Set(param, payload)
-	parsedURL.RawQuery = query.Encode()
-	return parsedURL.String()
+	return httpclient.BuildTestURL(parsedURL, param, payload)
 }
 
 func truncate(s string, maxLen int) string {

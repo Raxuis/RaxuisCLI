@@ -224,6 +224,9 @@ func FuzzParameter(opts FuzzOptions, resultChan chan<- FuzzResult, doneChan chan
 			defer wg.Done()
 			defer func() { <-sem }()
 
+			// Copy the URL so concurrent goroutines don't race on the shared parsedURL.
+			testURL := *parsedURL
+
 			// Add parameter to URL
 			query := url.Values{}
 			for k, v := range baseQuery {
@@ -231,8 +234,8 @@ func FuzzParameter(opts FuzzOptions, resultChan chan<- FuzzResult, doneChan chan
 			}
 			query.Set(param, "FUZZ")
 
-			parsedURL.RawQuery = query.Encode()
-			targetURL := parsedURL.String()
+			testURL.RawQuery = query.Encode()
+			targetURL := testURL.String()
 
 			result := doFuzzRequest(client, targetURL, opts)
 			result.Input = param

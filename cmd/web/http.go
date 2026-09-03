@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"raxuiscli/internal/shared/urlnorm"
 	httplib "raxuiscli/internal/web/http"
 )
 
@@ -109,9 +110,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -159,9 +158,7 @@ Examples:
 		}
 
 		url := args[0]
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			url = "https://" + url
-		}
+		url = urlnorm.EnsureScheme(url)
 
 		timeout, _ := cmd.Flags().GetInt("timeout")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -258,9 +255,7 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
 	}
 
 	url := args[0]
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		url = "https://" + url
-	}
+	url = urlnorm.EnsureScheme(url)
 
 	data, _ := cmd.Flags().GetString("data")
 	headersSlice, _ := cmd.Flags().GetStringSlice("header")

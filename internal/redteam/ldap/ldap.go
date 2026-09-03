@@ -119,7 +119,7 @@ type SimpleLDAPConn struct {
 
 // Connect establishes LDAP connection
 func Connect(opts LDAPOptions) (*SimpleLDAPConn, error) {
-	address := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	address := net.JoinHostPort(opts.Host, fmt.Sprintf("%d", opts.Port))
 
 	var conn net.Conn
 	var err error
@@ -247,7 +247,7 @@ func (c *SimpleLDAPConn) AnonymousBind() error {
 
 // TestConnection tests if LDAP port is accessible
 func TestConnection(host string, port int, timeout int) error {
-	address := fmt.Sprintf("%s:%d", host, port)
+	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	conn, err := net.DialTimeout("tcp", address, time.Duration(timeout)*time.Second)
 	if err != nil {
 		return err

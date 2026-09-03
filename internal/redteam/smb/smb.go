@@ -73,7 +73,7 @@ func Connect(opts SMBOptions) (*ScanResult, error) {
 		Port: opts.Port,
 	}
 
-	address := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	address := net.JoinHostPort(opts.Host, fmt.Sprintf("%d", opts.Port))
 
 	conn, err := net.DialTimeout("tcp", address, time.Duration(opts.Timeout)*time.Second)
 	if err != nil {
