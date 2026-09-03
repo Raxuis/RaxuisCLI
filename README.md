@@ -2,7 +2,20 @@
 
 **Offensive Cybersecurity CLI Toolkit written in Go**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 RaxuisCLI is a command-line tool designed for security professionals, pentesters, and CTF participants. It bundles many essential tools into a unified and portable interface.
+
+## ⚠️ Legal Disclaimer
+
+RaxuisCLI is built for **authorized security testing, CTF competitions, and educational use only**. It includes offensive tooling (network poisoning, credential attacks, exfiltration helpers, etc.) that can be illegal to use against systems you do not own or lack explicit written permission to test.
+
+By using this software you agree to:
+- Only target systems you own or have explicit authorization to test.
+- Comply with all applicable local, state, national, and international laws.
+- Accept full responsibility for how you use these tools.
+
+The author(s) assume no liability and are not responsible for any misuse or damage caused by this software.
 
 ## Installation
 
