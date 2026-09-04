@@ -20,3 +20,14 @@ bin/
 .idea/
 .vscode/
 *.swp
+
+# OS files
+.DS_Store
+*.DS_Store
+
+# Coverage
+coverage.txt
+coverage.html
+
+# GoReleaser
+dist/

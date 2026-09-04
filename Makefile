@@ -1,43 +1,61 @@
-.PHONY: build clean install test run-todo run-weather run-organize
+.PHONY: build build-all clean install test test-race cover lint tidy run help
 
-# Build the application
+BINARY      := raxuiscli
+PKG         := raxuiscli/cmd
+VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT      ?= $(shell git rev-parse --short HEAD 2>/dev/null)
+DATE        ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS     := -s -w \
+	-X $(PKG).version=$(VERSION) \
+	-X $(PKG).commit=$(COMMIT) \
+	-X $(PKG).date=$(DATE)
+
+## build: build the binary into bin/
 build:
-	go build -o bin/raxuiscli .
+	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) .
 
-# Build for multiple platforms
+## build-all: cross-compile for linux, windows and darwin
 build-all:
-	GOOS=linux GOARCH=amd64 go build -o bin/raxuiscli-linux-amd64 .
-	GOOS=windows GOARCH=amd64 go build -o bin/raxuiscli-windows-amd64.exe .
-	GOOS=darwin GOARCH=amd64 go build -o bin/raxuiscli-darwin-amd64 .
+	GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-amd64 .
+	GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-arm64 .
+	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-windows-amd64.exe .
+	GOOS=darwin  GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-darwin-amd64 .
+	GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-darwin-arm64 .
 
-# Clean build artifacts
+## clean: remove build artifacts
 clean:
-	rm -rf bin/
+	rm -rf bin/ dist/ coverage.txt coverage.html
 
-# Install to system (requires GOPATH/bin in PATH)
+## install: install the binary with version metadata
 install:
-	go install .
+	go install -trimpath -ldflags "$(LDFLAGS)" .
 
-# Run tests
+## test: run the test suite
 test:
 	go test ./...
 
-# Development helpers
-run-todo:
-	go run . todo --help
+## test-race: run the test suite with the race detector
+test-race:
+	go test -race ./...
 
-run-ports:
-	go run . ports --help
+## cover: run tests with coverage and write coverage.html
+cover:
+	go test -covermode=atomic -coverprofile=coverage.txt ./...
+	go tool cover -html=coverage.txt -o coverage.html
+	go tool cover -func=coverage.txt | tail -1
 
-run-pwgen:
-	go run . pwgen --help
+## lint: run golangci-lint (install: https://golangci-lint.run/usage/install/)
+lint:
+	golangci-lint run ./...
 
-# Initialize go mod
-init:
-	go mod init raxuiscli
+## tidy: sync go.mod / go.sum
+tidy:
 	go mod tidy
 
-# Download dependencies
-deps:
-	go mod download
-	go mod tidy
+## run: build and run (use ARGS="..." to pass flags)
+run: build
+	./bin/$(BINARY) $(ARGS)
+
+## help: list available targets
+help:
+	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## //'

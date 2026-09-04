@@ -26,7 +26,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-
+          install-mode: goinstall
   test:
     strategy:
       fail-fast: false
@@ -42,7 +42,7 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test (race + coverage)
-        run: go test -race -covermode=atomic -coverprofile coverage.txt ./...
+        run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
