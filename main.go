@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"os"
 
 	"raxuiscli/cmd"
 
@@ -15,7 +15,5 @@ import (
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	os.Exit(cmd.Execute())
 }
