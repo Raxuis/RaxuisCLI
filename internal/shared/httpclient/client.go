@@ -1,7 +1,9 @@
 package httpclient
 
 import (
+	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -74,16 +76,34 @@ func CreateClientFromRequest(opts models.RequestOptions) *http.Client {
 	return client
 }
 
-// DoRequest performs an HTTP request and returns the response with body
+// DoRequest performs an HTTP request and returns the response with body. It is
+// kept for compatibility with callers that do not need cancellation or a body
+// limit.
 func DoRequest(client *http.Client, targetURL string, opts models.ScanOptions) (*http.Response, string, error) {
+	resp, body, _, err := DoRequestContext(context.Background(), client, targetURL, opts, 0)
+	return resp, body, err
+}
+
+// DoRequestContext performs an HTTP request with cancellation and an optional
+// response-body limit. A positive maxBodyBytes limits the returned body and
+// reports whether it was truncated. A non-positive limit preserves DoRequest's
+// unbounded behavior.
+func DoRequestContext(ctx context.Context, client *http.Client, targetURL string, opts models.ScanOptions, maxBodyBytes int64) (*http.Response, string, bool, error) {
+	if ctx == nil {
+		return nil, "", false, fmt.Errorf("request context must not be nil")
+	}
+	if client == nil {
+		return nil, "", false, fmt.Errorf("HTTP client must not be nil")
+	}
+
 	method := opts.Method
 	if method == "" {
 		method = "GET"
 	}
 
-	req, err := http.NewRequest(method, targetURL, nil)
+	req, err := http.NewRequestWithContext(ctx, method, targetURL, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 
 	if opts.UserAgent != "" {
@@ -102,11 +122,31 @@ func DoRequest(client *http.Client, targetURL string, opts models.ScanOptions) (
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
+	}
+	defer resp.Body.Close()
+
+	body, truncated, err := readResponseBody(resp.Body, maxBodyBytes)
+	if err != nil {
+		return resp, "", false, fmt.Errorf("failed to read response: %w", err)
+	}
+	return resp, string(body), truncated, nil
+}
+
+func readResponseBody(body io.Reader, maxBodyBytes int64) ([]byte, bool, error) {
+	if maxBodyBytes <= 0 {
+		contents, err := io.ReadAll(body)
+		return contents, false, err
 	}
 
-	body, _ := io.ReadAll(resp.Body)
-	return resp, string(body), nil
+	contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(contents)) > maxBodyBytes {
+		return contents[:maxBodyBytes], true, nil
+	}
+	return contents, false, nil
 }
 
 // BuildTestURL builds a URL with a test payload for a parameter

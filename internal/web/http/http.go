@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -37,6 +38,7 @@ type Response struct {
 	Duration      time.Duration
 	RedirectChain []string
 	TLS           *TLSInfo
+	Truncated     bool
 }
 
 // TLSInfo holds TLS connection information
@@ -66,8 +68,21 @@ type HeaderAnalysis struct {
 	Missing  []string
 }
 
-// DoRequest performs an HTTP request
+// DoRequest performs an HTTP request. It is kept for compatibility with
+// callers that do not need cancellation or a response-body limit.
 func DoRequest(opts RequestOptions) (*Response, error) {
+	return DoRequestContext(context.Background(), opts, 0)
+}
+
+// DoRequestContext performs an HTTP request with cancellation and an optional
+// response-body limit. A positive maxBodyBytes limits the returned body and
+// sets Response.Truncated when more data was available. A non-positive limit
+// preserves the unbounded behavior of DoRequest.
+func DoRequestContext(ctx context.Context, opts RequestOptions, maxBodyBytes int64) (*Response, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("request context must not be nil")
+	}
+
 	if opts.Method == "" {
 		opts.Method = "GET"
 	}
@@ -86,10 +101,11 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 	}
 
 	if opts.Proxy != "" {
-		proxyURL, err := url.Parse(opts.Proxy)
-		if err == nil {
-			transport.Proxy = http.ProxyURL(proxyURL)
+		proxyURL, err := url.ParseRequestURI(opts.Proxy)
+		if err != nil || proxyURL.Host == "" || (proxyURL.Scheme != "http" && proxyURL.Scheme != "https") {
+			return nil, fmt.Errorf("invalid proxy URL %q", opts.Proxy)
 		}
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
 	client := &http.Client{
@@ -120,9 +136,9 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 		bodyReader = strings.NewReader(opts.Body)
 	}
 
-	req, err := http.NewRequest(opts.Method, opts.URL, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, opts.Method, opts.URL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -158,14 +174,14 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 	duration := time.Since(start)
 
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Read body
-	body, err := io.ReadAll(resp.Body)
+	body, truncated, err := readResponseBody(resp.Body, maxBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	response := &Response{
@@ -176,6 +192,7 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 		ContentLength: resp.ContentLength,
 		Duration:      duration,
 		RedirectChain: redirectChain,
+		Truncated:     truncated,
 	}
 
 	// TLS info
@@ -188,6 +205,24 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 	}
 
 	return response, nil
+}
+
+func readResponseBody(body io.Reader, maxBodyBytes int64) ([]byte, bool, error) {
+	if maxBodyBytes <= 0 {
+		contents, err := io.ReadAll(body)
+		return contents, false, err
+	}
+
+	// Reading one byte beyond the configured limit makes truncation explicit
+	// without retaining unbounded response data.
+	contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(contents)) > maxBodyBytes {
+		return contents[:maxBodyBytes], true, nil
+	}
+	return contents, false, nil
 }
 
 // tlsVersionString converts TLS version to string

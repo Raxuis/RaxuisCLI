@@ -1,13 +1,120 @@
 package httpclient
 
 import (
+	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"raxuiscli/internal/shared/models"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (body *trackingReadCloser) Close() error {
+	body.closed = true
+	return nil
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("interrupted body")
+}
+
+func TestDoRequestContextHonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, _, err := DoRequestContext(ctx, CreateClient(models.ScanOptions{}), "http://example.com", models.ScanOptions{}, 1024)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+	}
+}
+
+func TestDoRequestContextTruncatesBodyAtConfiguredCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("abcdef"))
+	}))
+	defer srv.Close()
+
+	resp, body, truncated, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 4)
+	if err != nil {
+		t.Fatalf("DoRequestContext returned error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("DoRequestContext returned a nil response")
+	}
+	if body != "abcd" {
+		t.Errorf("body = %q, want %q", body, "abcd")
+	}
+	if !truncated {
+		t.Error("truncated = false, want true")
+	}
+}
+
+func TestDoRequestContextReturnsInterruptedBodyError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("response writer does not support hijacking")
+		}
+		conn, buf, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatalf("Hijack: %v", err)
+		}
+		_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nshort")
+		_ = buf.Flush()
+		_ = conn.Close()
+	}))
+	defer srv.Close()
+
+	_, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for an interrupted response body")
+	}
+}
+
+func TestDoRequestContextClosesBodyAfterReadSuccessAndFailure(t *testing.T) {
+	tests := []struct {
+		name    string
+		reader  io.Reader
+		wantErr bool
+	}{
+		{name: "success", reader: strings.NewReader("ok")},
+		{name: "read failure", reader: failingReader{}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := &trackingReadCloser{Reader: tt.reader}
+			client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+			})}
+
+			_, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("DoRequestContext error = %v, want error=%t", err, tt.wantErr)
+			}
+			if !body.closed {
+				t.Fatal("response body was not closed")
+			}
+		})
+	}
+}
 
 func TestCreateClientAppliesTimeoutDefault(t *testing.T) {
 	client := CreateClient(models.ScanOptions{})

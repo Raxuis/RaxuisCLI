@@ -2,6 +2,8 @@ package http
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -10,6 +12,66 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestDoRequestContextHonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := DoRequestContext(ctx, RequestOptions{URL: "http://example.com"}, 1024)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+	}
+}
+
+func TestDoRequestContextTruncatesBodyAtConfiguredCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("abcdef"))
+	}))
+	defer srv.Close()
+
+	resp, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 4)
+	if err != nil {
+		t.Fatalf("DoRequestContext returned error: %v", err)
+	}
+	if resp.Body != "abcd" {
+		t.Errorf("Body = %q, want %q", resp.Body, "abcd")
+	}
+	if !resp.Truncated {
+		t.Error("Truncated = false, want true")
+	}
+}
+
+func TestDoRequestContextReturnsInterruptedBodyError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("response writer does not support hijacking")
+		}
+		conn, buf, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatalf("Hijack: %v", err)
+		}
+		_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nshort")
+		_ = buf.Flush()
+		_ = conn.Close()
+	}))
+	defer srv.Close()
+
+	_, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 1024)
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for an interrupted response body")
+	}
+}
+
+func TestDoRequestContextRejectsMalformedProxy(t *testing.T) {
+	_, err := DoRequestContext(context.Background(), RequestOptions{
+		URL:   "http://example.com",
+		Proxy: "://not-a-valid-proxy",
+	}, 1024)
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for a malformed proxy URL")
+	}
+}
 
 func TestDoRequestBasicGET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
