@@ -191,7 +191,7 @@ func TestDoRequestContextClosesBodyAfterReadSuccessAndFailure(t *testing.T) {
 
 			resp, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
 			if resp != nil && resp.Body != nil {
-				_ = resp.Body.Close()
+				defer resp.Body.Close()
 			}
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("DoRequestContext error = %v, want error=%t", err, tt.wantErr)
