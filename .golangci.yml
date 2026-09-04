@@ -1,0 +1,67 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errcheck
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+    misspell:
+      locale: US
+      # Real WHOIS field keys and French-language comments, not typos.
+      ignore-rules:
+        - organisation
+        - originas
+        - individuel
+    staticcheck:
+      checks:
+        - all
+        # Opinionated "quick-fix" refactor hints — not defects.
+        - -QF1003
+        - -QF1001
+        - -QF1006
+        - -QF1012
+        # Naming style (ALL_CAPS / initialisms) — deliberate in a few
+        # protocol-oriented identifiers here.
+        - -ST1003
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    rules:
+      # Test files may be looser.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unparam
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - raxuiscli
