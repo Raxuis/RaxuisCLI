@@ -3,6 +3,7 @@ package redteam
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/smb"
 
@@ -28,7 +29,7 @@ Examples:
   raxuiscli smb shares //10.0.0.1          # List shares
   raxuiscli smb null 10.0.0.1              # Test null session`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

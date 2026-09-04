@@ -3,6 +3,7 @@ package redteam
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/ntlm"
 
@@ -24,7 +25,7 @@ Examples:
   raxuiscli ntlm parse "user:1001:lm:nt:::"   # Parse dump format
   raxuiscli ntlm pth -u admin -H <hash> -t 10.0.0.1`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

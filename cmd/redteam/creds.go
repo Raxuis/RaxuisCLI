@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/creds"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +31,7 @@ Examples:
   raxuiscli creds decode "YWRtaW46cGFzc3dvcmQ="
   raxuiscli creds combo -u users.txt -p passwords.txt`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

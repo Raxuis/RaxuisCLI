@@ -2,6 +2,7 @@ package redteam
 
 import (
 	"fmt"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/privesc"
 
@@ -33,7 +34,7 @@ Examples:
   raxuiscli privesc sudo               # Check sudo config only
   raxuiscli privesc check --thorough   # Thorough scan`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

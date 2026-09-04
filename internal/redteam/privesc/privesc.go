@@ -176,7 +176,7 @@ func CheckSUID() []CheckResult {
 	searchPaths := []string{"/usr/bin", "/usr/sbin", "/bin", "/sbin", "/usr/local/bin"}
 
 	for _, searchPath := range searchPaths {
-		filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info == nil {
 				return nil
 			}
@@ -349,7 +349,7 @@ func CheckCron() []CheckResult {
 	// Check cron.d directory
 	for _, cronPath := range cronPaths {
 		if info, err := os.Stat(cronPath); err == nil && info.IsDir() {
-			filepath.Walk(cronPath, func(path string, info os.FileInfo, err error) error {
+			_ = filepath.Walk(cronPath, func(path string, info os.FileInfo, err error) error {
 				if err != nil || info.IsDir() {
 					return nil
 				}
@@ -494,7 +494,7 @@ func CheckSSHKeys() []CheckResult {
 	for _, pattern := range sshDirs {
 		matches, _ := filepath.Glob(pattern)
 		for _, sshDir := range matches {
-			filepath.Walk(sshDir, func(path string, info os.FileInfo, err error) error {
+			_ = filepath.Walk(sshDir, func(path string, info os.FileInfo, err error) error {
 				if err != nil || info.IsDir() {
 					return nil
 				}

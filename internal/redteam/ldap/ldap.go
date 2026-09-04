@@ -170,7 +170,7 @@ func (c *SimpleLDAPConn) Bind(username, password, domain string) error {
 	// Build simple bind request
 	bindRequest := buildBindRequest(bindDN, password)
 
-	c.conn.SetDeadline(time.Now().Add(time.Duration(c.timeout) * time.Second))
+	_ = c.conn.SetDeadline(time.Now().Add(time.Duration(c.timeout) * time.Second))
 
 	_, err := c.conn.Write(bindRequest)
 	if err != nil {
@@ -280,10 +280,8 @@ func EnumerateUsers(opts LDAPOptions, filter string) ([]User, error) {
 			return nil, err
 		}
 	} else {
-		err = conn.AnonymousBind()
-		if err != nil {
-			// Anonymous bind might fail, that's ok
-		}
+		// Anonymous bind may fail; that is acceptable for enumeration.
+		_ = conn.AnonymousBind()
 	}
 
 	// In a real implementation, we would send LDAP search requests

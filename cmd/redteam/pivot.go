@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/pivot"
-	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ Examples:
   raxuiscli pivot forward --local :8080 --remote internal:80
   raxuiscli pivot test --remote 10.0.0.1:445      # Test connectivity`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -67,7 +68,7 @@ Traffic can be routed through this proxy to access internal networks.`,
 		<-sigChan
 
 		fmt.Println("\nStopping proxy...")
-		server.Stop()
+		_ = server.Stop()
 	},
 }
 
@@ -102,7 +103,7 @@ Forwards local traffic to a remote destination.`,
 		<-sigChan
 
 		fmt.Println("\nStopping forward...")
-		forward.Stop()
+		_ = forward.Stop()
 	},
 }
 

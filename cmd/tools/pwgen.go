@@ -2,9 +2,10 @@ package tools
 
 import (
 	"fmt"
+	"strings"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/pwgen"
-	"strings"
 
 	"github.com/spf13/cobra"
 )

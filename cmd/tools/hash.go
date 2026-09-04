@@ -3,9 +3,10 @@ package tools
 import (
 	"fmt"
 	"os"
+	"strings"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/hash"
-	"strings"
 
 	"github.com/spf13/cobra"
 )

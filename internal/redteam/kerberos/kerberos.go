@@ -104,7 +104,7 @@ func ParseHashcatOutput(line string) (*KerberosTicket, error) {
 	// TGS format: $krb5tgs$23$*user$realm$spn*$hash
 	tgsPattern := regexp.MustCompile(`\$krb5tgs\$(\d+)\$\*([^$]+)\$([^$]+)\$([^*]+)\*\$(.+)`)
 	if matches := tgsPattern.FindStringSubmatch(line); len(matches) == 6 {
-		fmt.Sscanf(matches[1], "%d", &ticket.EncType)
+		_, _ = fmt.Sscanf(matches[1], "%d", &ticket.EncType)
 		ticket.Username = matches[2]
 		ticket.Domain = matches[3]
 		ticket.SPN = matches[4]
@@ -116,7 +116,7 @@ func ParseHashcatOutput(line string) (*KerberosTicket, error) {
 	// AS-REP format: $krb5asrep$23$user@domain:hash
 	asrepPattern := regexp.MustCompile(`\$krb5asrep\$(\d+)\$([^@]+)@([^:]+):(.+)`)
 	if matches := asrepPattern.FindStringSubmatch(line); len(matches) == 5 {
-		fmt.Sscanf(matches[1], "%d", &ticket.EncType)
+		_, _ = fmt.Sscanf(matches[1], "%d", &ticket.EncType)
 		ticket.Username = matches[2]
 		ticket.Domain = matches[3]
 		ticket.Hash = matches[4]

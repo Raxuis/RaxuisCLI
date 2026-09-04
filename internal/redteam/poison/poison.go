@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -47,7 +46,6 @@ type PoisonSession struct {
 	Packets   int
 	Hashes    []CapturedHash
 	Running   bool
-	mu        sync.Mutex
 }
 
 // ProtocolInfo describes a poisoning protocol
@@ -123,7 +121,7 @@ func listenForTraffic(network, address string, timeoutSec int) bool {
 	}
 	defer conn.Close()
 
-	conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutSec) * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutSec) * time.Second))
 
 	buf := make([]byte, 1024)
 	_, _, err = conn.ReadFrom(buf)

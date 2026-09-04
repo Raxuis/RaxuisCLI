@@ -3,6 +3,7 @@ package redteam
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/kerberos"
 
@@ -26,7 +27,7 @@ Examples:
   raxuiscli kerberos parse '$krb5tgs$23$*user...'
   raxuiscli kerberos golden -d corp.local --sid S-1-5-... --hash <krbtgt>`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

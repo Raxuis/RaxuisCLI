@@ -3,10 +3,11 @@ package tools
 import (
 	"fmt"
 	"os"
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/metadata"
 	"sort"
 	"strings"
+
+	"raxuiscli/cmd"
+	"raxuiscli/internal/tools/metadata"
 
 	"github.com/spf13/cobra"
 )

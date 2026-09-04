@@ -2,6 +2,7 @@ package redteam
 
 import (
 	"fmt"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/poison"
 
@@ -25,7 +26,7 @@ Examples:
   raxuiscli poison llmnr -i eth0             # LLMNR poisoning commands
   raxuiscli poison arp -i eth0               # ARP poisoning commands`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
