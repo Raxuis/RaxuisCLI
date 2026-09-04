@@ -43,3 +43,24 @@ func TestRedactStringRemovesSecretsEmbeddedInErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactStringRemovesExtendedSecretKeysAndFTPURLCredentials(t *testing.T) {
+	errText := "upload failed for ftp://alice:ftp-secret@example.com/report client_secret=client-value; client-secret: dashed-secret; client.secret = dotted-secret; client secret: spaced-secret; credential=credential-secret"
+	got := RedactString(errText)
+
+	for _, secret := range []string{"ftp-secret", "client-value", "dashed-secret", "dotted-secret", "spaced-secret", "credential-secret"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("RedactString exposed %q in %q", secret, got)
+		}
+	}
+	if !strings.Contains(got, "ftp://example.com/report") {
+		t.Errorf("RedactString() = %q, want redacted FTP URL preserved", got)
+	}
+}
+
+func TestRedactStringPreservesOrdinaryText(t *testing.T) {
+	const ordinary = "request timed out while collecting TLS observations"
+	if got := RedactString(ordinary); got != ordinary {
+		t.Errorf("RedactString() = %q, want ordinary text unchanged", got)
+	}
+}

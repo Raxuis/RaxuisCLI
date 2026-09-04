@@ -123,6 +123,12 @@ func NormalizeFinding(finding models.VulnResult) models.VulnResult {
 	if finding.Title == "" && finding.Type != "" {
 		finding.Title = finding.Type.Description()
 	}
+	if finding.RuleID == "" && finding.Type != "" {
+		finding.RuleID = legacyRuleID(string(finding.Type))
+	}
+	if finding.Status == "" {
+		finding.Status = "open"
+	}
 	if finding.RuleID != "" {
 		finding.ID = FindingID(finding.RuleID, resource)
 	}
@@ -132,6 +138,21 @@ func NormalizeFinding(finding models.VulnResult) models.VulnResult {
 	finding.Description = RedactString(finding.Description)
 	finding.Remediation = RedactString(finding.Remediation)
 	return finding
+}
+
+func legacyRuleID(vulnType string) string {
+	var builder strings.Builder
+	lastWasSeparator := true
+	for _, character := range strings.ToLower(strings.TrimSpace(vulnType)) {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
+			builder.WriteRune(character)
+			lastWasSeparator = false
+		} else if !lastWasSeparator {
+			builder.WriteByte('-')
+			lastWasSeparator = true
+		}
+	}
+	return "legacy." + strings.Trim(builder.String(), "-")
 }
 
 // FindingID derives a stable finding identity from its stable rule and canonical
@@ -158,8 +179,14 @@ func sortFindings(findings []models.VulnResult) {
 			{left.Resource, right.Resource},
 			{left.Status, right.Status},
 			{left.Title, right.Title},
+			{string(left.Type), string(right.Type)},
 			{string(left.Severity), string(right.Severity)},
+			{left.Parameter, right.Parameter},
+			{left.Payload, right.Payload},
 			{left.Evidence, right.Evidence},
+			{left.Description, right.Description},
+			{left.Remediation, right.Remediation},
+			{left.URL, right.URL},
 		} {
 			if pair[0] != pair[1] {
 				return pair[0] < pair[1]

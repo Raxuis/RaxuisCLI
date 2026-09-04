@@ -14,8 +14,8 @@ import (
 const RedactedValue = "<redacted>"
 
 var (
-	urlInText = regexp.MustCompile(`(?i)https?://[^\s"'<>]+`)
-	secretKV  = regexp.MustCompile(`(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd)\s*([=:])\s*([^\s;,]+)`)
+	urlInText = regexp.MustCompile(`(?i)[a-z][a-z0-9+.-]*://[^\s"'<>]+`)
+	secretKV  = regexp.MustCompile(`(?i)\b(api[_. -]?key|access[_. -]?token|refresh[_. -]?token|client[_. -]?secret|credential(?:s)?|token|secret|password|passwd)\s*([=:])\s*([^\s;,]+)`)
 	bearer    = regexp.MustCompile(`(?i)\bbearer\s+[^\s;,]+`)
 	header    = regexp.MustCompile(`(?im)\b(authorization|proxy-authorization|cookie|set-cookie)\s*:\s*[^\r\n]*`)
 )

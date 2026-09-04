@@ -105,3 +105,57 @@ func TestFindingIDUsesRuleAndCanonicalResourceOnly(t *testing.T) {
 		t.Errorf("ID %q did not change when the rule ID changed", first)
 	}
 }
+
+func TestNormalizeFindingBackfillsLegacyVulnResultFields(t *testing.T) {
+	legacy := models.VulnResult{
+		Type: constants.VulnHeaders,
+		URL:  "HTTPS://Example.COM:443/login?session=legacy-secret",
+	}
+
+	got := NormalizeFinding(legacy)
+	const wantRuleID = "legacy.security-headers"
+	const wantResource = "https://example.com/login?session=<redacted>"
+	if got.RuleID != wantRuleID {
+		t.Errorf("RuleID = %q, want %q", got.RuleID, wantRuleID)
+	}
+	if got.Resource != wantResource {
+		t.Errorf("Resource = %q, want %q", got.Resource, wantResource)
+	}
+	if got.ID != FindingID(wantRuleID, wantResource) {
+		t.Errorf("ID = %q, want ID derived from the legacy type and URL", got.ID)
+	}
+	if got.Status != "open" {
+		t.Errorf("Status = %q, want default open", got.Status)
+	}
+}
+
+func TestNewReportTotallyOrdersEquivalentFindingIdentities(t *testing.T) {
+	base := models.VulnResult{
+		RuleID:   "http.header.example",
+		Resource: "https://example.com/",
+		Evidence: "same evidence",
+	}
+
+	for _, test := range []struct {
+		name string
+		set  func(*models.VulnResult, string)
+		get  func(models.VulnResult) string
+	}{
+		{"type", func(f *models.VulnResult, value string) { f.Type = constants.VulnType(value) }, func(f models.VulnResult) string { return string(f.Type) }},
+		{"parameter", func(f *models.VulnResult, value string) { f.Parameter = value }, func(f models.VulnResult) string { return f.Parameter }},
+		{"payload", func(f *models.VulnResult, value string) { f.Payload = value }, func(f models.VulnResult) string { return f.Payload }},
+		{"description", func(f *models.VulnResult, value string) { f.Description = value }, func(f models.VulnResult) string { return f.Description }},
+		{"remediation", func(f *models.VulnResult, value string) { f.Remediation = value }, func(f models.VulnResult) string { return f.Remediation }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			first, second := base, base
+			test.set(&first, "alpha")
+			test.set(&second, "beta")
+
+			report := NewReport(ToolInfo{}, AuditInfo{}, []models.VulnResult{second, first}, nil, nil)
+			if got := test.get(report.Findings[0]); got != "alpha" {
+				t.Errorf("first finding %s = %q, want alpha after deterministic tie-breaking", test.name, got)
+			}
+		})
+	}
+}
