@@ -3,6 +3,8 @@ package web
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,13 +37,7 @@ func HTTPHeaderFindings(resource string, results []models.VulnResult) []models.V
 		result.Status = "open"
 		findings = append(findings, result)
 	}
-	sort.SliceStable(findings, func(i, j int) bool {
-		if findings[i].RuleID != findings[j].RuleID {
-			return findings[i].RuleID < findings[j].RuleID
-		}
-		return findings[i].Evidence < findings[j].Evidence
-	})
-	return findings
+	return aggregateAndSortFindings(findings)
 }
 
 func headerRule(parameter string) (string, string) {
@@ -96,9 +92,6 @@ func ruleComponent(value string) string {
 // free.
 func CertificateFindings(resource string, chain certinfo.ChainInfo, validations []certinfo.ValidationResult) []models.VulnResult {
 	findings := make([]models.VulnResult, 0, len(validations)*2+1)
-	if !chain.Valid && chain.Error != "" {
-		findings = append(findings, tlsFinding(resource, "tls.certificate.chain-validation", "Certificate chain validation failed", chain.Error, "Install the complete chain issued by a trusted certificate authority."))
-	}
 
 	for _, validation := range validations {
 		if validation.Expired {
@@ -116,8 +109,90 @@ func CertificateFindings(resource string, chain certinfo.ChainInfo, validations 
 			}
 		}
 	}
+	if finding := verificationFinding(resource, chain, findings); finding != nil {
+		findings = append(findings, *finding)
+	}
 
-	return uniqueAndSortFindings(findings)
+	return aggregateAndSortFindings(findings)
+}
+
+func verificationFinding(resource string, chain certinfo.ChainInfo, findings []models.VulnResult) *models.VulnResult {
+	if chain.Valid || chain.Error == "" {
+		return nil
+	}
+
+	if verificationErrorIsTimeValidity(chain.VerificationError) {
+		if hasFindingRule(findings, "tls.certificate.expired") || hasFindingRule(findings, "tls.certificate.not-yet-valid") {
+			return nil
+		}
+		if strings.Contains(strings.ToLower(chain.Error), "not yet valid") {
+			finding := tlsFinding(resource, "tls.certificate.not-yet-valid", "Certificate is not yet valid", chain.Error, "Deploy a certificate whose validity period has begun.")
+			return &finding
+		}
+		finding := tlsFinding(resource, "tls.certificate.expired", "Certificate has expired", chain.Error, "Replace the certificate with one valid for the current time.")
+		return &finding
+	}
+
+	var hostnameError x509.HostnameError
+	if errors.As(chain.VerificationError, &hostnameError) || strings.Contains(strings.ToLower(chain.Error), "not valid for") {
+		finding := tlsFinding(resource, "tls.certificate.hostname-mismatch", "Certificate does not match the audited host", chain.Error, "Use a certificate whose DNS names or IP addresses cover the audited host.")
+		return &finding
+	}
+
+	var invalidError x509.CertificateInvalidError
+	if errors.As(chain.VerificationError, &invalidError) {
+		switch invalidError.Reason {
+		case x509.IncompatibleUsage, x509.CANotAuthorizedForExtKeyUsage:
+			finding := tlsFinding(resource, "tls.certificate.incompatible-usage", "Certificate is not authorized for TLS server authentication", chain.Error, "Use a certificate authorized for TLS server authentication.")
+			return &finding
+		case x509.NoValidChains, x509.NameMismatch, x509.NotAuthorizedToSign:
+			finding := tlsFinding(resource, "tls.certificate.chain-validation", "Certificate chain validation failed", chain.Error, "Install the complete chain issued by a trusted certificate authority.")
+			return &finding
+		default:
+			finding := tlsFinding(resource, "tls.certificate.validation-failed", "Certificate validation failed", chain.Error, "Correct the certificate validation error reported by the verifier.")
+			return &finding
+		}
+	}
+
+	var authorityError x509.UnknownAuthorityError
+	if errors.As(chain.VerificationError, &authorityError) || isTrustOrChainError(chain.Error) {
+		finding := tlsFinding(resource, "tls.certificate.chain-validation", "Certificate chain validation failed", chain.Error, "Install the complete chain issued by a trusted certificate authority.")
+		return &finding
+	}
+
+	if strings.Contains(strings.ToLower(chain.Error), "incompatible key usage") {
+		finding := tlsFinding(resource, "tls.certificate.incompatible-usage", "Certificate is not authorized for TLS server authentication", chain.Error, "Use a certificate authorized for TLS server authentication.")
+		return &finding
+	}
+	if strings.Contains(strings.ToLower(chain.Error), "not yet valid") {
+		finding := tlsFinding(resource, "tls.certificate.not-yet-valid", "Certificate is not yet valid", chain.Error, "Deploy a certificate whose validity period has begun.")
+		return &finding
+	}
+	if strings.Contains(strings.ToLower(chain.Error), "certificate has expired") {
+		finding := tlsFinding(resource, "tls.certificate.expired", "Certificate has expired", chain.Error, "Replace the certificate with one valid for the current time.")
+		return &finding
+	}
+	finding := tlsFinding(resource, "tls.certificate.validation-failed", "Certificate validation failed", chain.Error, "Correct the certificate validation error reported by the verifier.")
+	return &finding
+}
+
+func verificationErrorIsTimeValidity(err error) bool {
+	var invalidError x509.CertificateInvalidError
+	return errors.As(err, &invalidError) && invalidError.Reason == x509.Expired
+}
+
+func hasFindingRule(findings []models.VulnResult, ruleID string) bool {
+	for _, finding := range findings {
+		if finding.RuleID == ruleID {
+			return true
+		}
+	}
+	return false
+}
+
+func isTrustOrChainError(message string) bool {
+	message = strings.ToLower(message)
+	return strings.Contains(message, "unknown authority") || strings.Contains(message, "no valid chains") || strings.Contains(message, "signed by unknown")
 }
 
 func validationEvidence(values []string, fallback string) string {
@@ -143,24 +218,59 @@ func tlsFinding(resource, ruleID, title, evidence, remediation string) models.Vu
 	}
 }
 
-func uniqueAndSortFindings(findings []models.VulnResult) []models.VulnResult {
-	seen := make(map[string]struct{}, len(findings))
-	unique := make([]models.VulnResult, 0, len(findings))
+// aggregateAndSortFindings gives each rule/resource identity exactly one
+// finding. Report IDs are derived from those two fields, so keeping multiple
+// rows would make output unstable and ambiguous. Evidence and remediation are
+// deduplicated and sorted before being joined.
+func aggregateAndSortFindings(findings []models.VulnResult) []models.VulnResult {
+	aggregated := make(map[string]models.VulnResult, len(findings))
 	for _, finding := range findings {
-		key := finding.RuleID + "\x00" + finding.Evidence
-		if _, exists := seen[key]; exists {
+		key := finding.RuleID + "\x00" + finding.Resource
+		current, exists := aggregated[key]
+		if !exists {
+			aggregated[key] = finding
 			continue
 		}
-		seen[key] = struct{}{}
-		unique = append(unique, finding)
-	}
-	sort.SliceStable(unique, func(i, j int) bool {
-		if unique[i].RuleID != unique[j].RuleID {
-			return unique[i].RuleID < unique[j].RuleID
+		current.Parameter = joinUnique(current.Parameter, finding.Parameter)
+		current.Evidence = joinUnique(current.Evidence, finding.Evidence)
+		current.Remediation = joinUnique(current.Remediation, finding.Remediation)
+		if finding.Severity.Rank() > current.Severity.Rank() {
+			current.Severity = finding.Severity
 		}
-		return unique[i].Evidence < unique[j].Evidence
+		aggregated[key] = current
+	}
+
+	result := make([]models.VulnResult, 0, len(aggregated))
+	for _, finding := range aggregated {
+		result = append(result, finding)
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].RuleID != result[j].RuleID {
+			return result[i].RuleID < result[j].RuleID
+		}
+		if result[i].Resource != result[j].Resource {
+			return result[i].Resource < result[j].Resource
+		}
+		return result[i].Evidence < result[j].Evidence
 	})
-	return unique
+	return result
+}
+
+func joinUnique(values ...string) string {
+	unique := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		for _, part := range strings.Split(value, "; ") {
+			if part != "" {
+				unique[part] = struct{}{}
+			}
+		}
+	}
+	result := make([]string, 0, len(unique))
+	for value := range unique {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return strings.Join(result, "; ")
 }
 
 // TLSObservations returns stable, non-finding facts from a completed TLS

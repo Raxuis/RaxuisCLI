@@ -201,6 +201,9 @@ func TestGetCertFromHostLocalTLSServer(t *testing.T) {
 	if chain.Valid == false && chain.Error == "" {
 		t.Error("expected either Valid=true or a non-empty Error explaining why verification failed")
 	}
+	if chain.Error != "" && chain.VerificationError == nil {
+		t.Error("expected the concrete certificate verification error to be retained")
+	}
 }
 
 func TestGetCertFromHostDefaultPort(t *testing.T) {

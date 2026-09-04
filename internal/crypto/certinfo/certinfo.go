@@ -40,8 +40,12 @@ type ChainInfo struct {
 	Port         int
 	Valid        bool
 	Error        string
-	TLSVersion   uint16
-	CipherSuite  uint16
+	// VerificationError preserves the concrete x509 error for callers that
+	// need to distinguish trust-chain failures from hostname, validity, and
+	// key-usage failures. It is runtime-only and never serialized.
+	VerificationError error `json:"-"`
+	TLSVersion        uint16
+	CipherSuite       uint16
 }
 
 // ValidationResult holds validation results
@@ -107,6 +111,7 @@ func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainI
 		chain.Valid = err == nil
 		if err != nil {
 			chain.Error = err.Error()
+			chain.VerificationError = err
 		}
 	}
 

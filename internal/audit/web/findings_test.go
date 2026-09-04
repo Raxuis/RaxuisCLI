@@ -2,12 +2,15 @@ package web
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"reflect"
 	"testing"
 	"time"
 
 	"raxuiscli/internal/crypto/certinfo"
 	"raxuiscli/internal/shared/constants"
 	"raxuiscli/internal/shared/models"
+	"raxuiscli/internal/shared/report"
 )
 
 func TestHTTPHeaderFindingsMapsEveryInsecureHeaderState(t *testing.T) {
@@ -179,11 +182,124 @@ func TestHTTPHeaderFindingsIgnoresUnrelatedLegacyFindings(t *testing.T) {
 	}
 }
 
+func TestHTTPHeaderFindingsAggregateCookiesIntoOneStableReportIdentity(t *testing.T) {
+	const resource = "https://example.test/"
+	cookies := []models.VulnResult{
+		{Type: constants.VulnHeaders, Severity: constants.SeverityMedium, Parameter: "Cookie: session", Evidence: "missing Secure flag", Remediation: "Set Secure, HttpOnly, and SameSite=Strict flags on sensitive cookies."},
+		{Type: constants.VulnHeaders, Severity: constants.SeverityMedium, Parameter: "Cookie: preferences", Evidence: "missing Secure flag", Remediation: "Set Secure, HttpOnly, and SameSite=Strict flags on sensitive cookies."},
+		{Type: constants.VulnHeaders, Severity: constants.SeverityMedium, Parameter: "Cookie: cart", Evidence: "missing HttpOnly flag", Remediation: "Set Secure, HttpOnly, and SameSite=Strict flags on sensitive cookies."},
+	}
+
+	rawForward := HTTPHeaderFindings(resource, cookies)
+	if len(rawForward) != 1 {
+		t.Fatalf("raw findings length = %d, want 1", len(rawForward))
+	}
+	if got, want := rawForward[0].Parameter, "Cookie: cart; Cookie: preferences; Cookie: session"; got != want {
+		t.Errorf("raw parameter = %q, want %q", got, want)
+	}
+	forward := report.NewReport(report.ToolInfo{}, report.AuditInfo{}, rawForward, nil, nil)
+	reversed := report.NewReport(report.ToolInfo{}, report.AuditInfo{}, HTTPHeaderFindings(resource, []models.VulnResult{cookies[2], cookies[1], cookies[0]}), nil, nil)
+	if len(forward.Findings) != 1 {
+		t.Fatalf("normalized findings length = %d, want 1", len(forward.Findings))
+	}
+	if forward.Findings[0].ID == "" || forward.Findings[0].RuleID != "http.cookie.security-flags" {
+		t.Errorf("aggregated finding = %#v, want one identified cookie finding", forward.Findings[0])
+	}
+	if got, want := forward.Findings[0].Parameter, "Cookie: <redacted>"; got != want {
+		t.Errorf("normalized parameter = %q, want %q", got, want)
+	}
+	if got, want := forward.Findings[0].Evidence, "missing HttpOnly flag; missing Secure flag"; got != want {
+		t.Errorf("evidence = %q, want %q", got, want)
+	}
+	if !reflect.DeepEqual(forward.Findings, reversed.Findings) {
+		t.Errorf("normalized findings depend on input order:\nforward=%#v\nreversed=%#v", forward.Findings, reversed.Findings)
+	}
+}
+
 func TestCertificateFindingsFindsWeakSignatureByExistingWarning(t *testing.T) {
 	validation := certinfo.ValidationResult{Warnings: []string{"Certificate expires in 10 days", "Weak signature algorithm: MD5-RSA"}}
 	findings := CertificateFindings("https://example.test/", certinfo.ChainInfo{}, []certinfo.ValidationResult{validation})
 	if len(findings) != 1 || findings[0].RuleID != "tls.certificate.weak-signature" {
 		t.Errorf("findings = %#v, want weak signature finding", findings)
+	}
+}
+
+func TestCertificateFindingsAggregateWeakSignaturesIntoOneStableReportIdentity(t *testing.T) {
+	const resource = "https://example.test/"
+	validations := []certinfo.ValidationResult{
+		{Warnings: []string{"Weak signature algorithm: SHA1-RSA"}},
+		{Warnings: []string{"Weak signature algorithm: MD5-RSA"}},
+		{Warnings: []string{"Weak signature algorithm: SHA1-RSA"}},
+	}
+
+	forward := report.NewReport(report.ToolInfo{}, report.AuditInfo{}, CertificateFindings(resource, certinfo.ChainInfo{}, validations), nil, nil)
+	reversed := report.NewReport(report.ToolInfo{}, report.AuditInfo{}, CertificateFindings(resource, certinfo.ChainInfo{}, []certinfo.ValidationResult{validations[2], validations[1], validations[0]}), nil, nil)
+	if len(forward.Findings) != 1 {
+		t.Fatalf("normalized findings length = %d, want 1", len(forward.Findings))
+	}
+	if got, want := forward.Findings[0].Evidence, "Weak signature algorithm: MD5-RSA; Weak signature algorithm: SHA1-RSA"; got != want {
+		t.Errorf("evidence = %q, want %q", got, want)
+	}
+	if forward.Findings[0].ID == "" || !reflect.DeepEqual(forward.Findings, reversed.Findings) {
+		t.Errorf("weak signature finding identity/output is not stable: forward=%#v reversed=%#v", forward.Findings, reversed.Findings)
+	}
+}
+
+func TestCertificateFindingsClassifyVerifyFailuresWithoutMisleadingChainDuplicates(t *testing.T) {
+	const resource = "https://example.test/"
+
+	tests := []struct {
+		name        string
+		chain       certinfo.ChainInfo
+		validation  certinfo.ValidationResult
+		wantRule    string
+		wantRemedy  string
+		wantFinding int
+	}{
+		{
+			name:       "expired",
+			chain:      certinfo.ChainInfo{Valid: false, Error: "x509: certificate has expired", VerificationError: x509.CertificateInvalidError{Reason: x509.Expired}},
+			validation: certinfo.ValidationResult{Expired: true, ChainErrors: []string{"Certificate has expired"}},
+			wantRule:   "tls.certificate.expired", wantRemedy: "Replace the certificate with one valid for the current time.", wantFinding: 1,
+		},
+		{
+			name:       "not yet valid",
+			chain:      certinfo.ChainInfo{Valid: false, Error: "x509: certificate is not yet valid", VerificationError: x509.CertificateInvalidError{Reason: x509.Expired}},
+			validation: certinfo.ValidationResult{NotYetValid: true, ChainErrors: []string{"Certificate is not yet valid"}},
+			wantRule:   "tls.certificate.not-yet-valid", wantRemedy: "Deploy a certificate whose validity period has begun.", wantFinding: 1,
+		},
+		{
+			name:     "hostname mismatch",
+			chain:    certinfo.ChainInfo{Valid: false, Error: "x509: certificate is not valid for example.test", VerificationError: x509.HostnameError{Certificate: &x509.Certificate{}, Host: "example.test"}},
+			wantRule: "tls.certificate.hostname-mismatch", wantRemedy: "Use a certificate whose DNS names or IP addresses cover the audited host.", wantFinding: 1,
+		},
+		{
+			name:     "incompatible key usage",
+			chain:    certinfo.ChainInfo{Valid: false, Error: "x509: certificate specifies an incompatible key usage", VerificationError: x509.CertificateInvalidError{Reason: x509.IncompatibleUsage}},
+			wantRule: "tls.certificate.incompatible-usage", wantRemedy: "Use a certificate authorized for TLS server authentication.", wantFinding: 1,
+		},
+		{
+			name:     "unknown authority chain failure",
+			chain:    certinfo.ChainInfo{Valid: false, Error: "x509: certificate signed by unknown authority", VerificationError: x509.UnknownAuthorityError{Cert: &x509.Certificate{}}},
+			wantRule: "tls.certificate.chain-validation", wantRemedy: "Install the complete chain issued by a trusted certificate authority.", wantFinding: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := CertificateFindings(resource, tt.chain, []certinfo.ValidationResult{tt.validation})
+			if len(findings) != tt.wantFinding {
+				t.Fatalf("findings length = %d, want %d: %#v", len(findings), tt.wantFinding, findings)
+			}
+			if got := findings[0]; got.RuleID != tt.wantRule || got.Remediation != tt.wantRemedy {
+				t.Errorf("finding = %#v, want rule=%q remediation=%q", got, tt.wantRule, tt.wantRemedy)
+			}
+			for _, finding := range findings {
+				if finding.RuleID == "tls.certificate.chain-validation" && tt.wantRule != finding.RuleID {
+					t.Errorf("unexpected generic chain finding for %s: %#v", tt.name, finding)
+				}
+			}
+		})
 	}
 }
 
