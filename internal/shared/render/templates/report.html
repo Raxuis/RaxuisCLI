@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaxuisCLI Audit Report</title>
+  <style>
+{{ .EmbeddedCSS }}
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="hero">
+      <p class="eyebrow">RaxuisCLI · Audit report</p>
+      <h1>{{ .Report.Audit.Kind }} audit</h1>
+      <p class="target">{{ .Report.Audit.Target }}</p>
+      <p class="status status-{{ .Report.Audit.Status }}">{{ .Report.Audit.Status }}</p>
+    </header>
+
+    <section class="summary" aria-label="Finding summary">
+      <h2>Summary</h2>
+      <div class="counts">
+{{- range .Counts }}
+        <div class="count {{ .Class }}"><span>{{ .Name }}</span><strong>{{ .Count }}</strong></div>
+{{- end }}
+      </div>
+    </section>
+
+    <section>
+      <h2>Findings</h2>
+{{- if .Report.Findings }}
+      <div class="findings">
+{{- range .Report.Findings }}
+        <article class="finding">
+          <div class="finding-heading"><span class="badge {{ severityClass .Severity }}">{{ .Severity }}</span><h3>{{ .Title }}</h3></div>
+          <dl>
+            <dt>Rule</dt><dd>{{ .RuleID }}</dd>
+            <dt>Status</dt><dd>{{ .Status }}</dd>
+            <dt>Resource</dt><dd>{{ .Resource }}</dd>
+{{- if .Parameter }}
+            <dt>Parameter</dt><dd>{{ .Parameter }}</dd>
+{{- end }}
+{{- if .Evidence }}
+            <dt>Evidence</dt><dd>{{ .Evidence }}</dd>
+{{- end }}
+{{- if .Remediation }}
+            <dt>Remediation</dt><dd>{{ .Remediation }}</dd>
+{{- end }}
+          </dl>
+        </article>
+{{- end }}
+      </div>
+{{- else }}
+      <p class="empty">No findings were recorded.</p>
+{{- end }}
+    </section>
+
+    <section class="two-column">
+      <div>
+        <h2>Observations</h2>
+{{- if .Report.Observations }}
+        <dl class="facts">
+{{- range .Report.Observations }}
+          <dt>{{ .Key }}</dt><dd>{{ .Value }}</dd>
+{{- end }}
+        </dl>
+{{- else }}
+        <p class="empty">No observations were recorded.</p>
+{{- end }}
+      </div>
+      <div>
+        <h2>Partial errors</h2>
+{{- if .Report.Errors }}
+        <dl class="facts">
+{{- range .Report.Errors }}
+          <dt>{{ .Code }}</dt><dd>{{ .Message }}</dd>
+{{- end }}
+        </dl>
+{{- else }}
+        <p class="empty">No partial errors were recorded.</p>
+{{- end }}
+      </div>
+    </section>
+
+    <section class="metadata">
+      <h2>Execution metadata</h2>
+      <dl class="facts">
+        <dt>Audit ID</dt><dd>{{ .Report.Audit.ID }}</dd>
+        <dt>Started</dt><dd>{{ .Report.Audit.StartedAt.UTC.Format "2006-01-02T15:04:05Z07:00" }}</dd>
+        <dt>Duration</dt><dd>{{ .Report.Audit.Duration }}</dd>
+        <dt>Tool</dt><dd>{{ .Report.Tool.Name }} {{ .Report.Tool.Version }}</dd>
+        <dt>Build</dt><dd>{{ .Report.Tool.Commit }} · {{ .Report.Tool.GoVersion }} · {{ .Report.Tool.Platform }}</dd>
+        <dt>Schema</dt><dd>v{{ .Report.SchemaVersion }}</dd>
+      </dl>
+    </section>
+
+    <aside class="disclaimer"><strong>Disclaimer:</strong> This report records the checks performed during this audit. It is not a guarantee that the target is free from security issues.</aside>
+  </main>
+  <footer>Created by Raxuis · <a href="https://github.com/raxuis">github.com/raxuis</a></footer>
+</body>
+</html>

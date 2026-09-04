@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "raxuiscli",
+    "version": "1.2.3",
+    "commit": "abc1234",
+    "go_version": "go1.25.13",
+    "platform": "linux/amd64"
+  },
+  "audit": {
+    "id": "audit-demo-001",
+    "kind": "web",
+    "target": "https://example.com/login",
+    "started_at": "2026-09-04T12:30:00Z",
+    "duration": 1250000000,
+    "status": "partial"
+  },
+  "findings": [
+    {
+      "id": "6a66c8ff3b8fd6a7e5ad54d6e13fbb65196c916037d49f90592b7e22f6b6cfd2",
+      "rule_id": "tls.protocol.deprecated",
+      "title": "Deprecated TLS protocol accepted",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "https://example.com/login",
+      "evidence": "TLS 1.0 was accepted during the handshake.",
+      "remediation": "Disable TLS 1.0 and TLS 1.1."
+    },
+    {
+      "id": "7fa5b56d9b9d18aa0d33f72d96dcefa9033d8b29d990873ec053b7e276955d1d",
+      "rule_id": "http.header.hsts",
+      "title": "HSTS header is missing",
+      "severity": "HIGH",
+      "status": "open",
+      "resource": "https://example.com/login",
+      "evidence": "Strict-Transport-Security response header was absent.",
+      "remediation": "Set Strict-Transport-Security with an appropriate max-age."
+    }
+  ],
+  "observations": [
+    {
+      "key": "http.status",
+      "value": "200"
+    },
+    {
+      "key": "tls.version",
+      "value": "TLS 1.3"
+    }
+  ],
+  "errors": [
+    {
+      "code": "tls.chain",
+      "message": "certificate chain could not be fully verified"
+    }
+  ]
+}
