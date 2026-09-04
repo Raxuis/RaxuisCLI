@@ -121,15 +121,11 @@ func verificationFinding(resource string, chain certinfo.ChainInfo, findings []m
 		return nil
 	}
 
-	if verificationErrorIsTimeValidity(chain.VerificationError) {
+	if verificationErrorIsTimeValidity(chain.VerificationError) || isAmbiguousValidityError(chain.Error) {
 		if hasFindingRule(findings, "tls.certificate.expired") || hasFindingRule(findings, "tls.certificate.not-yet-valid") {
 			return nil
 		}
-		if strings.Contains(strings.ToLower(chain.Error), "not yet valid") {
-			finding := tlsFinding(resource, "tls.certificate.not-yet-valid", "Certificate is not yet valid", chain.Error, "Deploy a certificate whose validity period has begun.")
-			return &finding
-		}
-		finding := tlsFinding(resource, "tls.certificate.expired", "Certificate has expired", chain.Error, "Replace the certificate with one valid for the current time.")
+		finding := tlsFinding(resource, "tls.certificate.invalid-validity-period", "Certificate validity period is invalid", chain.Error, "Use a certificate whose validity period includes the time of the audit.")
 		return &finding
 	}
 
@@ -195,6 +191,10 @@ func isTrustOrChainError(message string) bool {
 	return strings.Contains(message, "unknown authority") || strings.Contains(message, "no valid chains") || strings.Contains(message, "signed by unknown")
 }
 
+func isAmbiguousValidityError(message string) bool {
+	return strings.Contains(strings.ToLower(message), "has expired or is not yet valid")
+}
+
 func validationEvidence(values []string, fallback string) string {
 	for _, value := range values {
 		if value == fallback {
@@ -223,26 +223,22 @@ func tlsFinding(resource, ruleID, title, evidence, remediation string) models.Vu
 // rows would make output unstable and ambiguous. Evidence and remediation are
 // deduplicated and sorted before being joined.
 func aggregateAndSortFindings(findings []models.VulnResult) []models.VulnResult {
-	aggregated := make(map[string]models.VulnResult, len(findings))
+	aggregated := make(map[string]*findingAggregate, len(findings))
 	for _, finding := range findings {
+		finding.Resource = report.CanonicalizeResource(finding.Resource)
+		finding.URL = finding.Resource
 		key := finding.RuleID + "\x00" + finding.Resource
 		current, exists := aggregated[key]
 		if !exists {
-			aggregated[key] = finding
+			aggregated[key] = newFindingAggregate(finding)
 			continue
 		}
-		current.Parameter = joinUnique(current.Parameter, finding.Parameter)
-		current.Evidence = joinUnique(current.Evidence, finding.Evidence)
-		current.Remediation = joinUnique(current.Remediation, finding.Remediation)
-		if finding.Severity.Rank() > current.Severity.Rank() {
-			current.Severity = finding.Severity
-		}
-		aggregated[key] = current
+		current.add(finding)
 	}
 
 	result := make([]models.VulnResult, 0, len(aggregated))
-	for _, finding := range aggregated {
-		result = append(result, finding)
+	for _, aggregate := range aggregated {
+		result = append(result, aggregate.finding())
 	}
 	sort.SliceStable(result, func(i, j int) bool {
 		if result[i].RuleID != result[j].RuleID {
@@ -256,21 +252,67 @@ func aggregateAndSortFindings(findings []models.VulnResult) []models.VulnResult 
 	return result
 }
 
-func joinUnique(values ...string) string {
-	unique := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		for _, part := range strings.Split(value, "; ") {
-			if part != "" {
-				unique[part] = struct{}{}
-			}
-		}
+type findingAggregate struct {
+	base        models.VulnResult
+	parameters  map[string]struct{}
+	evidence    map[string]struct{}
+	remediation map[string]struct{}
+}
+
+func newFindingAggregate(finding models.VulnResult) *findingAggregate {
+	aggregate := &findingAggregate{
+		base:        finding,
+		parameters:  make(map[string]struct{}),
+		evidence:    make(map[string]struct{}),
+		remediation: make(map[string]struct{}),
 	}
-	result := make([]string, 0, len(unique))
-	for value := range unique {
+	aggregate.add(finding)
+	return aggregate
+}
+
+func (aggregate *findingAggregate) add(finding models.VulnResult) {
+	addAtomic(aggregate.parameters, finding.Parameter)
+	addAtomic(aggregate.evidence, finding.Evidence)
+	addAtomic(aggregate.remediation, finding.Remediation)
+	if finding.Severity.Rank() > aggregate.base.Severity.Rank() {
+		aggregate.base.Severity = finding.Severity
+	}
+	aggregate.base.Title = stableValue(aggregate.base.Title, finding.Title)
+	aggregate.base.Description = stableValue(aggregate.base.Description, finding.Description)
+	aggregate.base.Status = stableValue(aggregate.base.Status, finding.Status)
+	if aggregate.base.Type == "" || (finding.Type != "" && string(finding.Type) < string(aggregate.base.Type)) {
+		aggregate.base.Type = finding.Type
+	}
+}
+
+func (aggregate *findingAggregate) finding() models.VulnResult {
+	finding := aggregate.base
+	finding.Parameter = joinAtomic(aggregate.parameters)
+	finding.Evidence = joinAtomic(aggregate.evidence)
+	finding.Remediation = joinAtomic(aggregate.remediation)
+	return finding
+}
+
+func addAtomic(values map[string]struct{}, value string) {
+	if value != "" {
+		values[value] = struct{}{}
+	}
+}
+
+func joinAtomic(values map[string]struct{}) string {
+	result := make([]string, 0, len(values))
+	for value := range values {
 		result = append(result, value)
 	}
 	sort.Strings(result)
 	return strings.Join(result, "; ")
+}
+
+func stableValue(current, candidate string) string {
+	if current == "" || (candidate != "" && candidate < current) {
+		return candidate
+	}
+	return current
 }
 
 // TLSObservations returns stable, non-finding facts from a completed TLS

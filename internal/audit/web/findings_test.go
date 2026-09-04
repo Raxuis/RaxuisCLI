@@ -216,6 +216,45 @@ func TestHTTPHeaderFindingsAggregateCookiesIntoOneStableReportIdentity(t *testin
 	}
 }
 
+func TestAggregateAndSortFindingsUsesReportCanonicalIdentityAndAtomicValues(t *testing.T) {
+	findings := []models.VulnResult{
+		{
+			RuleID: "http.cookie.security-flags", Resource: "https://EXAMPLE.test:443/", Severity: constants.SeverityMedium,
+			Parameter: "Cookie: first; Cookie: second", Evidence: "evidence; with delimiter", Remediation: "remediation; with delimiter",
+		},
+		{
+			RuleID: "http.cookie.security-flags", Resource: "https://example.test/", Severity: constants.SeverityMedium,
+			Parameter: "Cookie: first", Evidence: "evidence", Remediation: "remediation",
+		},
+	}
+
+	forward := aggregateAndSortFindings(findings)
+	reversed := aggregateAndSortFindings([]models.VulnResult{findings[1], findings[0]})
+	if len(forward) != 1 {
+		t.Fatalf("aggregated findings length = %d, want 1", len(forward))
+	}
+	if got, want := forward[0].Resource, report.CanonicalizeResource("https://example.test/"); got != want {
+		t.Errorf("resource = %q, want canonical %q", got, want)
+	}
+	if got, want := forward[0].Parameter, "Cookie: first; Cookie: first; Cookie: second"; got != want {
+		t.Errorf("parameter = %q, want atomic values joined once as %q", got, want)
+	}
+	if got, want := forward[0].Evidence, "evidence; evidence; with delimiter"; got != want {
+		t.Errorf("evidence = %q, want atomic values joined once as %q", got, want)
+	}
+	if got, want := forward[0].Remediation, "remediation; remediation; with delimiter"; got != want {
+		t.Errorf("remediation = %q, want atomic values joined once as %q", got, want)
+	}
+	if !reflect.DeepEqual(forward, reversed) {
+		t.Errorf("aggregation depends on input order:\nforward=%#v\nreversed=%#v", forward, reversed)
+	}
+
+	normalized := report.NewReport(report.ToolInfo{}, report.AuditInfo{}, forward, nil, nil)
+	if len(normalized.Findings) != 1 || normalized.Findings[0].ID == "" {
+		t.Errorf("normalized findings = %#v, want one stable identity", normalized.Findings)
+	}
+}
+
 func TestCertificateFindingsFindsWeakSignatureByExistingWarning(t *testing.T) {
 	validation := certinfo.ValidationResult{Warnings: []string{"Certificate expires in 10 days", "Weak signature algorithm: MD5-RSA"}}
 	findings := CertificateFindings("https://example.test/", certinfo.ChainInfo{}, []certinfo.ValidationResult{validation})
@@ -298,6 +337,52 @@ func TestCertificateFindingsClassifyVerifyFailuresWithoutMisleadingChainDuplicat
 				if finding.RuleID == "tls.certificate.chain-validation" && tt.wantRule != finding.RuleID {
 					t.Errorf("unexpected generic chain finding for %s: %#v", tt.name, finding)
 				}
+			}
+		})
+	}
+}
+
+func TestCertificateFindingsUseValidationFactsForAmbiguousValidityErrors(t *testing.T) {
+	const resource = "https://example.test/"
+	const ambiguous = "x509: certificate has expired or is not yet valid"
+	tests := []struct {
+		name       string
+		chain      certinfo.ChainInfo
+		validation []certinfo.ValidationResult
+		wantRule   string
+		wantRemedy string
+	}{
+		{
+			name:       "expired supplied by validation",
+			chain:      certinfo.ChainInfo{Error: ambiguous, VerificationError: x509.CertificateInvalidError{Reason: x509.Expired}},
+			validation: []certinfo.ValidationResult{{Expired: true, ChainErrors: []string{"Certificate has expired"}}},
+			wantRule:   "tls.certificate.expired", wantRemedy: "Replace the certificate with one valid for the current time.",
+		},
+		{
+			name:       "not yet valid supplied by validation",
+			chain:      certinfo.ChainInfo{Error: ambiguous, VerificationError: x509.CertificateInvalidError{Reason: x509.Expired}},
+			validation: []certinfo.ValidationResult{{NotYetValid: true, ChainErrors: []string{"Certificate is not yet valid"}}},
+			wantRule:   "tls.certificate.not-yet-valid", wantRemedy: "Deploy a certificate whose validity period has begun.",
+		},
+		{
+			name:     "typed error without direction",
+			chain:    certinfo.ChainInfo{Error: ambiguous, VerificationError: x509.CertificateInvalidError{Reason: x509.Expired}},
+			wantRule: "tls.certificate.invalid-validity-period", wantRemedy: "Use a certificate whose validity period includes the time of the audit.",
+		},
+		{
+			name:     "string fallback without direction",
+			chain:    certinfo.ChainInfo{Error: ambiguous},
+			wantRule: "tls.certificate.invalid-validity-period", wantRemedy: "Use a certificate whose validity period includes the time of the audit.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := CertificateFindings(resource, tt.chain, tt.validation)
+			if len(findings) != 1 {
+				t.Fatalf("findings length = %d, want 1: %#v", len(findings), findings)
+			}
+			if got := findings[0]; got.RuleID != tt.wantRule || got.Remediation != tt.wantRemedy {
+				t.Errorf("finding = %#v, want rule=%q remediation=%q", got, tt.wantRule, tt.wantRemedy)
 			}
 		})
 	}
