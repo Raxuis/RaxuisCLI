@@ -4,14 +4,20 @@ import "raxuiscli/internal/shared/constants"
 
 // VulnResult represents a vulnerability finding
 type VulnResult struct {
-	Type        constants.VulnType
-	Severity    constants.Severity
-	URL         string
-	Parameter   string
-	Payload     string
-	Evidence    string
-	Description string
-	Remediation string
+	// ID is derived from RuleID and Resource when the result is included in a report.
+	ID          string             `json:"id,omitempty"`
+	RuleID      string             `json:"rule_id,omitempty"`
+	Title       string             `json:"title,omitempty"`
+	Type        constants.VulnType `json:"type,omitempty"`
+	Severity    constants.Severity `json:"severity,omitempty"`
+	Status      string             `json:"status,omitempty"`
+	Resource    string             `json:"resource,omitempty"`
+	URL         string             `json:"-"`
+	Parameter   string             `json:"parameter,omitempty"`
+	Payload     string             `json:"payload,omitempty"`
+	Evidence    string             `json:"evidence,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Remediation string             `json:"remediation,omitempty"`
 }
 
 // CORSResult holds CORS test results with additional fields
