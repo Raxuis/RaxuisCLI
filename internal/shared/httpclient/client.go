@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -103,7 +104,7 @@ func DoRequestContext(ctx context.Context, client *http.Client, targetURL string
 
 	req, err := http.NewRequestWithContext(ctx, method, targetURL, nil)
 	if err != nil {
-		return nil, "", false, err
+		return nil, "", false, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	if opts.UserAgent != "" {
@@ -122,7 +123,7 @@ func DoRequestContext(ctx context.Context, client *http.Client, targetURL string
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, "", false, err
+		return nil, "", false, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -136,6 +137,10 @@ func DoRequestContext(ctx context.Context, client *http.Client, targetURL string
 func readResponseBody(body io.Reader, maxBodyBytes int64) ([]byte, bool, error) {
 	if maxBodyBytes <= 0 {
 		contents, err := io.ReadAll(body)
+		return contents, false, err
+	}
+	if maxBodyBytes == math.MaxInt64 {
+		contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes))
 		return contents, false, err
 	}
 

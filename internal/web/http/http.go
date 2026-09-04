@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -210,6 +211,11 @@ func DoRequestContext(ctx context.Context, opts RequestOptions, maxBodyBytes int
 func readResponseBody(body io.Reader, maxBodyBytes int64) ([]byte, bool, error) {
 	if maxBodyBytes <= 0 {
 		contents, err := io.ReadAll(body)
+		return contents, false, err
+	}
+	if maxBodyBytes == math.MaxInt64 {
+		// maxBodyBytes+1 would overflow, so retain the maximum safe limit.
+		contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes))
 		return contents, false, err
 	}
 

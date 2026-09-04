@@ -5,21 +5,68 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDoRequestContextHonorsCancellation(t *testing.T) {
+	started := make(chan struct{})
+	handlerDone := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		close(handlerDone)
+	}))
+	defer srv.Close()
+
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		_, err := DoRequestContext(ctx, RequestOptions{URL: srv.URL}, 1024)
+		errs <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("request did not reach the blocking handler")
+	}
 	cancel()
 
-	_, err := DoRequestContext(ctx, RequestOptions{URL: "http://example.com"}, 1024)
-	if !errors.Is(err, context.Canceled) {
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("DoRequestContext did not return after cancellation")
+	}
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not observe request cancellation")
+	}
+}
+
+func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("body"))
+	}))
+	defer srv.Close()
+
+	resp, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, math.MaxInt64)
+	if err != nil {
 		t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+	}
+	if resp.Body != "body" || resp.Truncated {
+		t.Errorf("response = %+v, want body without truncation", resp)
 	}
 }
 
