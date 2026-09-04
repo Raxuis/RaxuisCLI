@@ -2,9 +2,10 @@ package crypto
 
 import (
 	"fmt"
-	"raxuiscli/cmd"
 	"strconv"
 	"strings"
+
+	"raxuiscli/cmd"
 
 	"github.com/spf13/cobra"
 

@@ -92,7 +92,7 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	// Set timeout
-	conn.SetDeadline(time.Now().Add(30 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// Read version and methods
 	buf := make([]byte, 256)
@@ -109,7 +109,7 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 	// Authentication
 	if s.username != "" {
 		// Require username/password auth
-		conn.Write([]byte{0x05, 0x02}) // Username/password auth
+		_, _ = conn.Write([]byte{0x05, 0x02}) // Username/password auth
 
 		// Read auth request
 		n, err = conn.Read(buf)
@@ -134,18 +134,18 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 
 		// Verify credentials
 		if user != s.username || pass != s.password {
-			conn.Write([]byte{0x01, 0x01}) // Auth failed
+			_, _ = conn.Write([]byte{0x01, 0x01}) // Auth failed
 			return
 		}
 
-		conn.Write([]byte{0x01, 0x00}) // Auth success
+		_, _ = conn.Write([]byte{0x01, 0x00}) // Auth success
 	} else {
 		// No auth required
-		conn.Write([]byte{0x05, 0x00})
+		_, _ = conn.Write([]byte{0x05, 0x00})
 	}
 
 	// Read request
-	conn.SetDeadline(time.Now().Add(30 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	n, err = conn.Read(buf)
 	if err != nil || n < 7 {
 		return
@@ -154,7 +154,7 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 	// Parse request
 	if buf[0] != 0x05 || buf[1] != 0x01 {
 		// Only support CONNECT
-		conn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = conn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 
@@ -176,24 +176,24 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 		port := int(buf[20])<<8 | int(buf[21])
 		targetAddr = fmt.Sprintf("[%s]:%d", ip.String(), port)
 	default:
-		conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 
 	// Connect to target
 	targetConn, err := net.DialTimeout("tcp", targetAddr, 10*time.Second)
 	if err != nil {
-		conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 	defer targetConn.Close()
 
 	// Send success response
-	conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+	_, _ = conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 
 	// Clear deadline for proxying
-	conn.SetDeadline(time.Time{})
-	targetConn.SetDeadline(time.Time{})
+	_ = conn.SetDeadline(time.Time{})
+	_ = targetConn.SetDeadline(time.Time{})
 
 	// Proxy data
 	var wg sync.WaitGroup
@@ -201,12 +201,12 @@ func (s *SOCKS5Server) handleConnection(conn net.Conn) {
 
 	go func() {
 		defer wg.Done()
-		io.Copy(targetConn, conn)
+		_, _ = io.Copy(targetConn, conn)
 	}()
 
 	go func() {
 		defer wg.Done()
-		io.Copy(conn, targetConn)
+		_, _ = io.Copy(conn, targetConn)
 	}()
 
 	wg.Wait()
@@ -276,12 +276,12 @@ func (p *PortForward) handleForward(clientConn net.Conn) {
 
 	go func() {
 		defer wg.Done()
-		io.Copy(targetConn, clientConn)
+		_, _ = io.Copy(targetConn, clientConn)
 	}()
 
 	go func() {
 		defer wg.Done()
-		io.Copy(clientConn, targetConn)
+		_, _ = io.Copy(clientConn, targetConn)
 	}()
 
 	wg.Wait()
@@ -303,8 +303,6 @@ func (p *PortForward) Stop() error {
 type ReversePortForward struct {
 	controlAddr string
 	localPort   int
-	running     bool
-	mu          sync.Mutex
 }
 
 // NewReversePortForward creates a reverse port forward

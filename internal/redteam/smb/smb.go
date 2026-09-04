@@ -82,7 +82,7 @@ func Connect(opts SMBOptions) (*ScanResult, error) {
 	}
 	defer conn.Close()
 
-	conn.SetDeadline(time.Now().Add(time.Duration(opts.Timeout) * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(opts.Timeout) * time.Second))
 
 	// Send SMB negotiate request
 	negPacket := buildSMBNegotiateRequest()

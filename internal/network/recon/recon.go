@@ -239,7 +239,7 @@ func BannerGrab(host string, port int, timeout int, useTLS bool) ServiceResult {
 	result.ResponseTime = time.Since(start)
 
 	// Set read deadline
-	conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 
 	// Try to get banner based on port type
 	banner := grabBanner(conn, port)
@@ -258,7 +258,7 @@ func grabBanner(conn net.Conn, port int) string {
 	// Some services require us to send data first
 	probe := getProbe(port)
 	if probe != "" {
-		conn.Write([]byte(probe))
+		_, _ = conn.Write([]byte(probe))
 	}
 
 	// Read response
@@ -266,7 +266,7 @@ func grabBanner(conn net.Conn, port int) string {
 	var response strings.Builder
 
 	// Read with timeout
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 
 	for {
 		n, err := conn.Read(buf)

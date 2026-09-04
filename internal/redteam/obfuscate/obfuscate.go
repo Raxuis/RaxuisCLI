@@ -7,13 +7,8 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"time"
 	"unicode"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // ObfuscationType represents the type of obfuscation
 type ObfuscationType string

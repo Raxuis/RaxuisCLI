@@ -15,6 +15,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // KeyPair holds generated key pair
@@ -275,26 +277,40 @@ func generateSSHECDSA(bits int) (*KeyPair, error) {
 	}, nil
 }
 
-// formatSSHRSAPublicKey formats RSA public key in SSH format
+// sshAuthorizedKey renders a crypto public key as an OpenSSH
+// "authorized_keys" line (e.g. "ssh-ed25519 AAAA... "). Returns an empty
+// string if the key type is unsupported by golang.org/x/crypto/ssh.
+func sshAuthorizedKey(pub any) string {
+	sshPub, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimRight(string(ssh.MarshalAuthorizedKey(sshPub)), "\n")
+}
+
+// formatSSHRSAPublicKey formats an RSA public key in OpenSSH format.
 func formatSSHRSAPublicKey(pubKey *rsa.PublicKey) string {
-	// Simplified SSH format
-	return fmt.Sprintf("ssh-rsa ... (RSA %d-bit public key)", pubKey.N.BitLen())
+	return sshAuthorizedKey(pubKey)
 }
 
-// formatSSHEd25519PublicKey formats Ed25519 public key in SSH format
+// formatSSHEd25519PublicKey formats an Ed25519 public key in OpenSSH format.
 func formatSSHEd25519PublicKey(pubKey ed25519.PublicKey) string {
-	return fmt.Sprintf("ssh-ed25519 ... (Ed25519 public key)")
+	return sshAuthorizedKey(pubKey)
 }
 
-// formatSSHECDSAPublicKey formats ECDSA public key in SSH format
-func formatSSHECDSAPublicKey(pubKey *ecdsa.PublicKey, curveName string) string {
-	return fmt.Sprintf("ecdsa-sha2-%s ... (ECDSA public key)", curveName)
+// formatSSHECDSAPublicKey formats an ECDSA public key in OpenSSH format.
+func formatSSHECDSAPublicKey(pubKey *ecdsa.PublicKey, _ string) string {
+	return sshAuthorizedKey(pubKey)
 }
 
-// marshalOpenSSHPrivateKey creates OpenSSH format private key
-func marshalOpenSSHPrivateKey(privateKey ed25519.PrivateKey, publicKey ed25519.PublicKey) []byte {
-	// Simplified - in production use golang.org/x/crypto/ssh
-	return privateKey
+// marshalOpenSSHPrivateKey encodes an Ed25519 private key in the OpenSSH
+// private key format. Falls back to the raw key bytes if marshaling fails.
+func marshalOpenSSHPrivateKey(privateKey ed25519.PrivateKey, _ ed25519.PublicKey) []byte {
+	block, err := ssh.MarshalPrivateKey(privateKey, "")
+	if err != nil {
+		return privateKey
+	}
+	return block.Bytes
 }
 
 // GenerateSelfSignedCert generates a self-signed certificate

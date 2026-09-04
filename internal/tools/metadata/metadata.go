@@ -227,6 +227,7 @@ func extractPNGMetadata(file *os.File, meta *Metadata) {
 	}
 
 	// Read chunks
+pngLoop:
 	for {
 		// Read chunk length and type
 		var length uint32
@@ -235,7 +236,7 @@ func extractPNGMetadata(file *os.File, meta *Metadata) {
 		}
 
 		chunkType := make([]byte, 4)
-		if _, err := file.Read(chunkType); err != nil {
+		if _, err := io.ReadFull(file, chunkType); err != nil {
 			break
 		}
 
@@ -246,26 +247,38 @@ func extractPNGMetadata(file *os.File, meta *Metadata) {
 		case "IHDR":
 			// Image header
 			var width, height uint32
-			binary.Read(file, binary.BigEndian, &width)
-			binary.Read(file, binary.BigEndian, &height)
+			if err := binary.Read(file, binary.BigEndian, &width); err != nil {
+				break pngLoop
+			}
+			if err := binary.Read(file, binary.BigEndian, &height); err != nil {
+				break pngLoop
+			}
 			meta.Properties["width"] = fmt.Sprintf("%d", width)
 			meta.Properties["height"] = fmt.Sprintf("%d", height)
 
 			bitDepth := make([]byte, 1)
-			file.Read(bitDepth)
+			if _, err := io.ReadFull(file, bitDepth); err != nil {
+				break pngLoop
+			}
 			meta.Properties["bit_depth"] = fmt.Sprintf("%d", bitDepth[0])
 
 			colorType := make([]byte, 1)
-			file.Read(colorType)
+			if _, err := io.ReadFull(file, colorType); err != nil {
+				break pngLoop
+			}
 			meta.Properties["color_type"] = fmt.Sprintf("%d", colorType[0])
 
 			// Skip rest of IHDR
-			file.Seek(int64(length-10+4), io.SeekCurrent) // +4 for CRC
+			if _, err := file.Seek(int64(length-10+4), io.SeekCurrent); err != nil { // +4 for CRC
+				break pngLoop
+			}
 
 		case "tEXt", "iTXt":
 			// Text chunks may contain metadata
 			textData := make([]byte, length)
-			file.Read(textData)
+			if _, err := io.ReadFull(file, textData); err != nil {
+				break pngLoop
+			}
 
 			// Split on null byte
 			parts := bytes.SplitN(textData, []byte{0}, 2)
@@ -276,14 +289,18 @@ func extractPNGMetadata(file *os.File, meta *Metadata) {
 			}
 
 			// Skip CRC
-			file.Seek(4, io.SeekCurrent)
+			if _, err := file.Seek(4, io.SeekCurrent); err != nil {
+				break pngLoop
+			}
 
 		case "IEND":
-			break
+			// End of PNG stream — handled by the check below.
 
 		default:
 			// Skip chunk data and CRC
-			file.Seek(int64(length+4), io.SeekCurrent)
+			if _, err := file.Seek(int64(length+4), io.SeekCurrent); err != nil {
+				break pngLoop
+			}
 		}
 
 		if chunkName == "IEND" {

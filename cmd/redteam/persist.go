@@ -3,9 +3,10 @@ package redteam
 import (
 	"fmt"
 	"os"
+	"runtime"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/persist"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -28,7 +29,7 @@ Examples:
   raxuiscli persist systemd --name backdoor --command /tmp/beacon
   raxuiscli persist check                    # Check existing persistence`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

@@ -3,6 +3,7 @@ package cloud
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/cloud/cloud"
 
@@ -26,7 +27,7 @@ Examples:
   raxuiscli cloud gcp bucket companyname   # Enumerate GCP buckets
   raxuiscli cloud metadata aws             # Check AWS metadata`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -36,7 +37,7 @@ var cloudAwsCmd = &cobra.Command{
 	Short: "AWS enumeration",
 	Long:  `AWS cloud resource enumeration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -80,7 +81,7 @@ var cloudAzureCmd = &cobra.Command{
 	Short: "Azure enumeration",
 	Long:  `Azure cloud resource enumeration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -124,7 +125,7 @@ var cloudGcpCmd = &cobra.Command{
 	Short: "GCP enumeration",
 	Long:  `GCP cloud resource enumeration.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

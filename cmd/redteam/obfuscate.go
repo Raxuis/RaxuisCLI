@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/obfuscate"
 
@@ -25,7 +26,7 @@ Examples:
   raxuiscli obfuscate string "malicious" --method base64
   raxuiscli obfuscate shellcode shellcode.bin --method xor`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

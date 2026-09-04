@@ -328,7 +328,7 @@ func TestDisplayFrequencyAnalysis(t *testing.T) {
 }
 
 func TestDisplayXORResults(t *testing.T) {
-	results := XORBruteForce([]byte(XOREncrypt([]byte("hello world"), []byte{0x42})))
+	results := XORBruteForce(XOREncrypt([]byte("hello world"), []byte{0x42}))
 	out := captureStdout(t, func() {
 		DisplayXORResults(results, 3)
 	})

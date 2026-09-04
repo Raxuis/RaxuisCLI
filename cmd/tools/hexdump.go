@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/tools/hexdump"
 

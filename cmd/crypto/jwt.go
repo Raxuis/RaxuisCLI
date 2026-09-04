@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"raxuiscli/cmd"
 	"strings"
+
+	"raxuiscli/cmd"
 
 	"github.com/spf13/cobra"
 

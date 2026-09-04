@@ -20,7 +20,7 @@ Examples:
   raxuiscli container secrets                # Find secrets
   raxuiscli container check                  # Full assessment`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

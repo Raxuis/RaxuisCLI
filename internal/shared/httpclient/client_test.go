@@ -123,10 +123,11 @@ func TestDoRequestDefaultMethodAndUserAgent(t *testing.T) {
 	defer srv.Close()
 
 	client := CreateClient(models.ScanOptions{Timeout: 5})
-	_, _, err := DoRequest(client, srv.URL, models.ScanOptions{})
+	resp, _, err := DoRequest(client, srv.URL, models.ScanOptions{})
 	if err != nil {
 		t.Fatalf("DoRequest returned error: %v", err)
 	}
+	defer resp.Body.Close()
 
 	if gotMethod != "GET" {
 		t.Errorf("default method = %q, want GET", gotMethod)
@@ -138,7 +139,11 @@ func TestDoRequestDefaultMethodAndUserAgent(t *testing.T) {
 
 func TestDoRequestInvalidURL(t *testing.T) {
 	client := CreateClient(models.ScanOptions{Timeout: 5})
-	_, _, err := DoRequest(client, "://not-a-valid-url", models.ScanOptions{})
+	resp, _, err := DoRequest(client, "://not-a-valid-url", models.ScanOptions{})
+	if resp != nil {
+		defer resp.Body.Close()
+		t.Error("DoRequest with a malformed URL should not return a response")
+	}
 	if err == nil {
 		t.Error("DoRequest with a malformed URL should return an error")
 	}

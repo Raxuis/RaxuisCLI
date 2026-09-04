@@ -3,9 +3,10 @@ package network
 import (
 	"fmt"
 	"os"
+	"strings"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/network/dns"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ Examples:
   raxuiscli dns axfr example.com --server ns1.example.com
   raxuiscli dns brute example.com --wordlist subdomains.txt`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -157,11 +158,11 @@ func init() {
 	// AXFR subcommand
 	dnsCmd.AddCommand(dnsAXFRCmd)
 	dnsAXFRCmd.Flags().StringVar(&dnsAXFRServer, "server", "", "DNS server for zone transfer (required)")
-	dnsAXFRCmd.MarkFlagRequired("server")
+	dnsAXFRCmd.MarkFlagRequired("server") //nolint:errcheck // flag is defined just above
 
 	// Brute subcommand
 	dnsCmd.AddCommand(dnsBruteCmd)
 	dnsBruteCmd.Flags().StringVarP(&dnsBruteWordlist, "wordlist", "w", "", "Path to subdomain wordlist (required)")
 	dnsBruteCmd.Flags().IntVar(&dnsBruteThreads, "threads", 20, "Number of concurrent threads")
-	dnsBruteCmd.MarkFlagRequired("wordlist")
+	dnsBruteCmd.MarkFlagRequired("wordlist") //nolint:errcheck // flag is defined just above
 }

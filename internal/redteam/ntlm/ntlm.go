@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"golang.org/x/crypto/md4"
+	"golang.org/x/crypto/md4" //nolint:staticcheck // SA1019: NT hashes require MD4 for legacy NTLM compatibility.
 )
 
 // NTLMHash represents an NTLM hash

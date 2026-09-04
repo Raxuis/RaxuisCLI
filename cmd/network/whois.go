@@ -2,10 +2,11 @@ package network
 
 import (
 	"net"
-	"raxuiscli/cmd"
-	"raxuiscli/internal/network/whois"
 	"regexp"
 	"strings"
+
+	"raxuiscli/cmd"
+	"raxuiscli/internal/network/whois"
 
 	"github.com/spf13/cobra"
 )

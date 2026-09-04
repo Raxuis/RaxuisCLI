@@ -110,7 +110,6 @@ func Find(paths []string, opts FindOptions) error {
 // matchesFilters vérifie si un fichier correspond aux filtres
 func matchesFilters(path string, info os.FileInfo, namePattern, contentPattern *regexp.Regexp,
 	sizeFilter func(int64) bool, mtimeFilter func(time.Time) bool, opts FindOptions) bool {
-
 	// Filtre par nom
 	if namePattern != nil {
 		basename := filepath.Base(path)

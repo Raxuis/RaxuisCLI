@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/container/k8s"
 
@@ -25,7 +26,7 @@ Examples:
   raxuiscli k8s privesc                      # Check privilege escalation
   raxuiscli k8s commands                     # Show useful kubectl commands`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

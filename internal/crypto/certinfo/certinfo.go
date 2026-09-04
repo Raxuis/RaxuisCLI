@@ -297,7 +297,7 @@ func DisplayCertInfo(info *CertInfo) {
 	fmt.Printf("Not Before: %s\n", info.NotBefore.Format(time.RFC3339))
 	fmt.Printf("Not After:  %s\n", info.NotAfter.Format(time.RFC3339))
 
-	daysLeft := int(info.NotAfter.Sub(time.Now()).Hours() / 24)
+	daysLeft := int(time.Until(info.NotAfter).Hours() / 24)
 	if daysLeft > 0 {
 		fmt.Printf("Days Left:  %d\n", daysLeft)
 	} else {
@@ -378,7 +378,7 @@ func DisplayChain(chain *ChainInfo) {
 			cert.NotBefore.Format("2006-01-02"),
 			cert.NotAfter.Format("2006-01-02"))
 
-		daysLeft := int(cert.NotAfter.Sub(time.Now()).Hours() / 24)
+		daysLeft := int(time.Until(cert.NotAfter).Hours() / 24)
 		if daysLeft > 0 {
 			fmt.Printf("Expires: in %d days\n", daysLeft)
 		} else {

@@ -3,13 +3,13 @@ package redteam
 import (
 	"fmt"
 	"os"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/ldap"
 
 	"github.com/spf13/cobra"
 )
 
-var ldapHost string
 var ldapPort int
 var ldapUser string
 var ldapPass string
@@ -33,7 +33,7 @@ Examples:
   raxuiscli ldap computers dc.corp.local -u user -p pass
   raxuiscli ldap groups dc.corp.local -u user -p pass`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

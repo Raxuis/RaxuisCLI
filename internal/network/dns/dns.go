@@ -226,7 +226,7 @@ func AttemptAXFR(domain, server string, timeout int) AXFRResult {
 	defer conn.Close()
 
 	// Set deadline
-	conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 
 	// Build AXFR query
 	query := buildAXFRQuery(domain)

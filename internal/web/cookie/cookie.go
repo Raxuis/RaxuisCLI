@@ -110,7 +110,7 @@ func ParseCookieString(cookieStr string) *CookieInfo {
 				cookie.Expires = t
 			}
 		case "max-age":
-			fmt.Sscanf(value, "%d", &cookie.MaxAge)
+			_, _ = fmt.Sscanf(value, "%d", &cookie.MaxAge)
 		case "secure":
 			cookie.Secure = true
 		case "httponly":
@@ -165,7 +165,6 @@ func DecodeCookieValue(value string) *DecodedCookie {
 	if decoded, err := hex.DecodeString(value); err == nil && isPrintable(string(decoded)) {
 		result.Decoded = string(decoded)
 		result.Encoding = "Hex"
-		value = string(decoded)
 	}
 
 	// Try to decompress (gzip/zlib)
