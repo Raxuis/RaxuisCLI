@@ -59,6 +59,32 @@ func TestWriteFileRefusesOverwriteWithoutForce(t *testing.T) {
 	assertNoTemporaryFiles(t, directory)
 }
 
+func TestWriteFileNoForcePreservesInterposedDestination(t *testing.T) {
+	directory := t.TempDir()
+	destination := filepath.Join(directory, "report.json")
+
+	originalBeforePublish := beforeNoReplacePublish
+	t.Cleanup(func() { beforeNoReplacePublish = originalBeforePublish })
+	beforeNoReplacePublish = func(path string) {
+		if err := os.WriteFile(path, []byte("interposed creator"), 0o600); err != nil {
+			t.Fatalf("interpose destination creation: %v", err)
+		}
+	}
+
+	err := WriteFile(destination, Report{}, testRenderer{content: "replacement"}, false)
+	if !errors.Is(err, ErrDestinationExists) {
+		t.Fatalf("WriteFile error = %v, want ErrDestinationExists", err)
+	}
+	got, readErr := os.ReadFile(destination)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(got) != "interposed creator" {
+		t.Errorf("destination = %q, want interposed creator preserved", got)
+	}
+	assertNoTemporaryFiles(t, directory)
+}
+
 func TestWriteFileForceReplacesExistingFile(t *testing.T) {
 	directory := t.TempDir()
 	destination := filepath.Join(directory, "report.json")
@@ -92,26 +118,16 @@ func TestWriteFileCleansTemporaryFileAfterRenderFailure(t *testing.T) {
 	assertNoTemporaryFiles(t, directory)
 }
 
-func TestWriteFileRestoresDestinationWhenWindowsStyleReplacementFails(t *testing.T) {
+func TestWriteFileForcePreservesDestinationWhenPublicationFails(t *testing.T) {
 	directory := t.TempDir()
 	destination := filepath.Join(directory, "report.json")
 	if err := os.WriteFile(destination, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	originalRename := renameFile
-	t.Cleanup(func() { renameFile = originalRename })
-	backupMoved := false
-	renameFile = func(oldPath, newPath string) error {
-		if oldPath == destination && strings.Contains(filepath.Base(newPath), ".backup-") {
-			backupMoved = true
-			return os.Rename(oldPath, newPath)
-		}
-		if backupMoved && newPath == destination && strings.Contains(filepath.Base(oldPath), ".tmp-") {
-			return errors.New("simulated Windows replacement failure")
-		}
-		return os.Rename(oldPath, newPath)
-	}
+	originalPublishReplace := publishReplace
+	t.Cleanup(func() { publishReplace = originalPublishReplace })
+	publishReplace = func(_, _ string) error { return errors.New("simulated replacement failure") }
 
 	err := WriteFile(destination, Report{}, testRenderer{content: "replacement"}, true)
 	if err == nil || !strings.Contains(err.Error(), "replacement failure") {

@@ -19,7 +19,11 @@ type Renderer interface {
 // explicit permission.
 var ErrDestinationExists = errors.New("output destination already exists")
 
-var renameFile = os.Rename
+var (
+	linkFile               = os.Link
+	publishReplace         = replaceFile
+	beforeNoReplacePublish func(string)
+)
 
 // WriteFile renders value to a sibling temporary file and publishes it only
 // after rendering, syncing, and closing succeed. Existing paths require force.
@@ -59,19 +63,23 @@ func WriteFile(path string, value Report, renderer Renderer, force bool) error {
 		return fmt.Errorf("close output temporary file: %w", err)
 	}
 
-	exists, err = destinationExists(path)
-	if err != nil {
-		return err
-	}
-	if exists && !force {
-		return fmt.Errorf("%w: %s", ErrDestinationExists, path)
-	}
-	if exists {
-		if err := replaceExistingFile(temporaryPath, path); err != nil {
-			return err
+	if force {
+		if err := publishReplace(temporaryPath, path); err != nil {
+			return fmt.Errorf("publish output replacement: %w", err)
 		}
-	} else if err := renameFile(temporaryPath, path); err != nil {
-		return fmt.Errorf("publish output file: %w", err)
+	} else {
+		if beforeNoReplacePublish != nil {
+			beforeNoReplacePublish(path)
+		}
+		if err := linkFile(temporaryPath, path); err != nil {
+			if os.IsExist(err) {
+				return fmt.Errorf("%w: %s", ErrDestinationExists, path)
+			}
+			return fmt.Errorf("publish output file without replacement: %w", err)
+		}
+		if err := os.Remove(temporaryPath); err != nil {
+			return fmt.Errorf("remove published output temporary file: %w", err)
+		}
 	}
 	temporaryPath = ""
 
@@ -93,44 +101,6 @@ func destinationExists(path string) (bool, error) {
 		return false, fmt.Errorf("output destination is a directory: %s", path)
 	}
 	return true, nil
-}
-
-func replaceExistingFile(temporaryPath, destination string) error {
-	backupPath, err := reserveBackupPath(destination)
-	if err != nil {
-		return err
-	}
-
-	if err := renameFile(destination, backupPath); err != nil {
-		return fmt.Errorf("prepare output replacement: %w", err)
-	}
-	if err := renameFile(temporaryPath, destination); err != nil {
-		restoreErr := renameFile(backupPath, destination)
-		if restoreErr != nil {
-			return fmt.Errorf("publish output replacement: %w; restore original from %s: %v", err, backupPath, restoreErr)
-		}
-		return fmt.Errorf("publish output replacement: %w", err)
-	}
-	if err := os.Remove(backupPath); err != nil {
-		return fmt.Errorf("remove replaced output backup: %w", err)
-	}
-	return nil
-}
-
-func reserveBackupPath(destination string) (string, error) {
-	backup, err := os.CreateTemp(filepath.Dir(destination), "."+filepath.Base(destination)+".backup-")
-	if err != nil {
-		return "", fmt.Errorf("create output backup placeholder: %w", err)
-	}
-	backupPath := backup.Name()
-	if err := backup.Close(); err != nil {
-		_ = os.Remove(backupPath)
-		return "", fmt.Errorf("close output backup placeholder: %w", err)
-	}
-	if err := os.Remove(backupPath); err != nil {
-		return "", fmt.Errorf("prepare output backup path: %w", err)
-	}
-	return backupPath, nil
 }
 
 func syncDirectory(directory string) error {
