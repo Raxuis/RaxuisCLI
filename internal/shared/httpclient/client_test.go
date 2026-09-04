@@ -51,7 +51,10 @@ func TestDoRequestContextHonorsCancellation(t *testing.T) {
 	defer cancel()
 	errs := make(chan error, 1)
 	go func() {
-		_, _, _, err := DoRequestContext(ctx, CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+		resp, _, _, err := DoRequestContext(ctx, CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 		errs <- err
 	}()
 
@@ -84,6 +87,9 @@ func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
 	defer srv.Close()
 
 	resp, body, truncated, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, math.MaxInt64)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatalf("DoRequestContext returned error: %v", err)
 	}
@@ -93,7 +99,10 @@ func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
 }
 
 func TestDoRequestContextWrapsRequestConstructionError(t *testing.T) {
-	_, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), "://not-a-valid-url", models.ScanOptions{}, 1024)
+	resp, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), "://not-a-valid-url", models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err == nil || !strings.Contains(err.Error(), "failed to create request:") {
 		t.Fatalf("DoRequestContext error = %v, want wrapped request-construction error", err)
 	}
@@ -105,7 +114,10 @@ func TestDoRequestContextWrapsTransportError(t *testing.T) {
 		return nil, want
 	})}
 
-	_, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+	resp, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err == want || !errors.Is(err, want) || !strings.Contains(err.Error(), "request failed:") {
 		t.Fatalf("DoRequestContext error = %v, want wrapped transport error", err)
 	}
@@ -118,6 +130,9 @@ func TestDoRequestContextTruncatesBodyAtConfiguredCap(t *testing.T) {
 	defer srv.Close()
 
 	resp, body, truncated, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 4)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatalf("DoRequestContext returned error: %v", err)
 	}
@@ -148,7 +163,10 @@ func TestDoRequestContextReturnsInterruptedBodyError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+	resp, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err == nil {
 		t.Fatal("DoRequestContext returned nil error for an interrupted response body")
 	}
@@ -171,7 +189,10 @@ func TestDoRequestContextClosesBodyAfterReadSuccessAndFailure(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
 			})}
 
-			_, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+			resp, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+			if resp != nil && resp.Body != nil {
+				_ = resp.Body.Close()
+			}
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("DoRequestContext error = %v, want error=%t", err, tt.wantErr)
 			}
