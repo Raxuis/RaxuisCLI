@@ -95,7 +95,8 @@ golden fixtures.
 
 The HTML renderer produces one self-contained file with embedded CSS, a summary,
 severity counts, observations, findings, remediation, execution metadata, and a
-clear disclaimer. It contains no JavaScript or remote resources.
+clear disclaimer. Its footer contains the visible, clickable credit `Created by
+Raxuis · github.com/raxuis`. It contains no JavaScript or remote resources.
 
 ## Passive Web Audit
 
@@ -152,10 +153,28 @@ The first release contains four screens:
 4. Results: show summary cards, filterable findings, remediation, and the saved
    report path.
 
+The approved visual direction is a dark, restrained command palette rather than
+a dashboard-first interface. The left column groups searchable actions; the
+right column explains the selected action, its safety level, required input,
+expected duration, output, and equivalent CLI command. The selected row uses a
+subtle background and brighter icon, with no decorative side border. `Ctrl+K`
+opens the palette from other views. Result screens may use denser dashboard-style
+cards while retaining the same typography, spacing, and muted mint accent.
+
+The initial interface language is English to remain consistent with existing
+commands and help. All user-facing strings remain centralized so localization
+can be added without changing business logic.
+
 Keyboard navigation works without a mouse. Narrow terminals fall back to a
 single-column layout. `NO_COLOR`, `TERM=dumb`, redirected output, and
 `--no-color` are respected. The interface never starts implicitly; normal CLI
 behavior remains stable for scripts.
+
+The terminal footer and About view credit `Raxuis` and display
+`github.com/raxuis`. Terminals that support hyperlinks make the address
+clickable; other terminals show it as plain text. The root help includes the
+same author credit. Machine-readable JSON and quiet command output never include
+decorative credit text; report metadata identifies the tool separately.
 
 ## Demonstration Mode
 

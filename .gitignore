@@ -31,3 +31,6 @@ coverage.html
 
 # GoReleaser
 dist/
+
+# Local visual brainstorming artifacts
+.superpowers/
