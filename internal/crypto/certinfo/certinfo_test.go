@@ -1,11 +1,13 @@
 package certinfo
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http/httptest"
@@ -214,6 +216,58 @@ func TestGetCertFromHostUnreachable(t *testing.T) {
 	_, err := GetCertFromHost("127.0.0.1", 1, 1)
 	if err == nil {
 		t.Error("GetCertFromHost against a closed port should return an error")
+	}
+}
+
+func TestGetCertFromHostContextHonorsCancelledContext(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		close(accepted)
+		defer conn.Close()
+		<-time.After(2 * time.Second)
+	}()
+
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split address: %v", err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		_, callErr := GetCertFromHostContext(ctx, host, port)
+		errs <- callErr
+	}()
+
+	select {
+	case <-accepted:
+		cancel()
+	case <-time.After(time.Second):
+		t.Fatal("TLS client did not connect")
+	}
+
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("GetCertFromHostContext did not stop after cancellation")
 	}
 }
 

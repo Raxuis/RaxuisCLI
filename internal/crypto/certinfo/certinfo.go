@@ -1,12 +1,14 @@
 package certinfo
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +40,8 @@ type ChainInfo struct {
 	Port         int
 	Valid        bool
 	Error        string
+	TLSVersion   uint16
+	CipherSuite  uint16
 }
 
 // ValidationResult holds validation results
@@ -53,30 +57,44 @@ type ValidationResult struct {
 
 // GetCertFromHost retrieves certificate from a remote host
 func GetCertFromHost(host string, port int, timeout int) (*ChainInfo, error) {
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
+	return GetCertFromHostContext(ctx, host, port)
+}
+
+// GetCertFromHostContext retrieves a host's certificate chain while honoring
+// cancellation and deadlines supplied by the caller. GetCertFromHost remains
+// available for existing timeout-based callers.
+func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainInfo, error) {
 	if port == 0 {
 		port = 443
 	}
 
-	address := fmt.Sprintf("%s:%d", host, port)
-
-	dialer := &net.Dialer{
-		Timeout: time.Duration(timeout) * time.Second,
-	}
-
-	conn, err := tls.DialWithDialer(dialer, "tcp", address, &tls.Config{
-		InsecureSkipVerify: true,
-	})
+	address := net.JoinHostPort(host, strconv.Itoa(port))
+	dialer := &net.Dialer{}
+	rawConnection, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %v", err)
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
+	conn := tls.Client(rawConnection, &tls.Config{InsecureSkipVerify: true, ServerName: host})
 	defer conn.Close()
+	if err := conn.HandshakeContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
 
 	chain := &ChainInfo{
 		Host: host,
 		Port: port,
 	}
 
-	certs := conn.ConnectionState().PeerCertificates
+	state := conn.ConnectionState()
+	chain.TLSVersion = state.Version
+	chain.CipherSuite = state.CipherSuite
+	certs := state.PeerCertificates
 	for _, cert := range certs {
 		chain.Certificates = append(chain.Certificates, parseCertificate(cert))
 	}
