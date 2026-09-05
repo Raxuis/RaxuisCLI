@@ -2,8 +2,14 @@ package web
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -223,6 +229,31 @@ func TestAuditUsesCapturedClockForCertificateValidation(t *testing.T) {
 	}
 	if countFindings(report.Findings, "tls.certificate.expired") != 1 || countFindings(report.Findings, "tls.certificate.not-yet-valid") != 1 {
 		t.Errorf("findings = %#v, want distinct expired and not-yet-valid results at the audit clock", report.Findings)
+	}
+}
+
+func TestAuditDefaultTLSVerificationUsesCapturedClock(t *testing.T) {
+	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusOK)
+	}))
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{selfSignedServerCertificate(t, fixed.Add(-time.Hour), fixed.Add(time.Hour))}}
+	server.StartTLS()
+	defer server.Close()
+
+	report, err := Audit(context.Background(), server.URL, Options{
+		InsecureTLS: true,
+		Now:         sequenceClock(fixed, fixed),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countFindings(report.Findings, "tls.certificate.expired"); got != 0 {
+		t.Errorf("expired findings = %d, want none at the captured audit time: %#v", got, report.Findings)
+	}
+	if got := countFindings(report.Findings, "tls.certificate.chain-validation"); got != 1 {
+		t.Errorf("chain-validation findings = %d, want one untrusted-chain finding", got)
 	}
 }
 
@@ -489,6 +520,29 @@ func validChainAt(now time.Time) *certinfo.ChainInfo {
 	return &certinfo.ChainInfo{Valid: true, Certificates: []certinfo.CertInfo{{
 		Subject: "leaf", Issuer: "issuer", NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
 	}}}
+}
+
+func selfSignedServerCertificate(t *testing.T, notBefore, notAfter time.Time) tls.Certificate {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "127.0.0.1"},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
 
 func sequenceClock(values ...time.Time) func() time.Time {

@@ -74,6 +74,16 @@ func GetCertFromHost(host string, port int, timeout int) (*ChainInfo, error) {
 // cancellation and deadlines supplied by the caller. GetCertFromHost remains
 // available for existing timeout-based callers.
 func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainInfo, error) {
+	return GetCertFromHostContextAt(ctx, host, port, time.Now())
+}
+
+// GetCertFromHostContextAt retrieves a host's certificate chain and verifies
+// it at at. A zero instant retains the compatibility behavior of using the
+// current time.
+func GetCertFromHostContextAt(ctx context.Context, host string, port int, at time.Time) (*ChainInfo, error) {
+	if at.IsZero() {
+		at = time.Now()
+	}
 	if port == 0 {
 		port = 443
 	}
@@ -105,9 +115,7 @@ func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainI
 
 	// Check if chain is valid
 	if len(certs) > 0 {
-		_, err := certs[0].Verify(x509.VerifyOptions{
-			DNSName: host,
-		})
+		err := verifyPeerCertificates(certs, host, at, nil)
 		chain.Valid = err == nil
 		if err != nil {
 			chain.Error = err.Error()
@@ -116,6 +124,30 @@ func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainI
 	}
 
 	return chain, nil
+}
+
+// verifyPeerCertificates verifies the leaf using the peer-provided
+// intermediates. roots is nil in production, which deliberately retains the
+// system trust store; the parameter makes chain construction testable without
+// adding a production trust bypass.
+func verifyPeerCertificates(certs []*x509.Certificate, host string, at time.Time, roots *x509.CertPool) error {
+	if len(certs) == 0 {
+		return fmt.Errorf("no peer certificates")
+	}
+	if at.IsZero() {
+		at = time.Now()
+	}
+	intermediates := x509.NewCertPool()
+	for _, certificate := range certs[1:] {
+		intermediates.AddCert(certificate)
+	}
+	_, err := certs[0].Verify(x509.VerifyOptions{
+		DNSName:       host,
+		CurrentTime:   at,
+		Intermediates: intermediates,
+		Roots:         roots,
+	})
+	return err
 }
 
 // GetCertFromFile reads certificate from a file

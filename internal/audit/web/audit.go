@@ -94,7 +94,7 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 	}
 	tlsCollector := options.TLSCollector
 	if tlsCollector == nil {
-		tlsCollector = defaultTLSCollector{}
+		tlsCollector = defaultTLSCollector{at: startedAt}
 	}
 
 	resource := target.String()
@@ -270,10 +270,12 @@ func collectorTimeoutSeconds(timeout time.Duration) int {
 	return int(math.Ceil(timeout.Seconds())) + 1
 }
 
-type defaultTLSCollector struct{}
+type defaultTLSCollector struct {
+	at time.Time
+}
 
-func (defaultTLSCollector) CollectTLS(ctx context.Context, host string, port int) (*certinfo.ChainInfo, error) {
-	return certinfo.GetCertFromHostContext(ctx, host, port)
+func (collector defaultTLSCollector) CollectTLS(ctx context.Context, host string, port int) (*certinfo.ChainInfo, error) {
+	return certinfo.GetCertFromHostContextAt(ctx, host, port, collector.at)
 }
 
 // headerResults adapts the existing passive header checks without performing a
