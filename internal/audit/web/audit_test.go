@@ -1,0 +1,356 @@
+package web
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"reflect"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"raxuiscli/internal/crypto/certinfo"
+	"raxuiscli/internal/shared/models"
+	sharedreport "raxuiscli/internal/shared/report"
+)
+
+func TestAuditHTTPSCollectsHTTPAndTLS(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	started := time.Date(2026, time.September, 5, 10, 0, 0, 0, time.UTC)
+	report, err := Audit(context.Background(), server.URL, Options{
+		Timeout:      time.Second,
+		MaxBodyBytes: 128,
+		InsecureTLS:  true,
+		Now:          sequenceClock(started, started.Add(250*time.Millisecond)),
+	})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if got, want := report.Audit.Status, "success"; got != want {
+		t.Errorf("status = %q, want %q", got, want)
+	}
+	if got, want := report.Audit.StartedAt, started; !got.Equal(want) {
+		t.Errorf("started at = %s, want %s", got, want)
+	}
+	if got, want := report.Audit.Duration, 250*time.Millisecond; got != want {
+		t.Errorf("duration = %s, want %s", got, want)
+	}
+	if got := observationValue(report.Observations, "http.status"); got != "204" {
+		t.Errorf("http.status = %q, want 204", got)
+	}
+	if got := observationValue(report.Observations, "tls.chain_valid"); got == "" {
+		t.Error("TLS chain observation is missing")
+	}
+	if got := observationValue(report.Observations, "tls.version"); got == "" {
+		t.Error("TLS version observation is missing")
+	}
+	if len(report.Errors) != 0 {
+		t.Errorf("errors = %#v, want none", report.Errors)
+	}
+}
+
+func TestAuditHTTPSValidatesEveryCollectedCertificate(t *testing.T) {
+	target := "https://example.test/"
+	collector := tlsCollectorFunc(func(context.Context, string, int) (*certinfo.ChainInfo, error) {
+		return &certinfo.ChainInfo{Certificates: []certinfo.CertInfo{
+			{Subject: "one", Issuer: "one", NotAfter: time.Now().Add(time.Hour)},
+			{Subject: "two", Issuer: "two", NotAfter: time.Now().Add(time.Hour)},
+		}}, nil
+	})
+	report, err := Audit(context.Background(), target, Options{
+		HTTPCollector: httpCollectorFunc(func(context.Context, *url.URL, Options) (HTTPCollection, error) {
+			return HTTPCollection{StatusCode: http.StatusOK, Headers: secureHeaders()}, nil
+		}),
+		TLSCollector: collector,
+		Now:          sequenceClock(time.Now(), time.Now()),
+	})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if got := countFindings(report.Findings, "tls.certificate.self-signed"); got != 1 {
+		t.Errorf("self-signed findings = %d, want one aggregated finding from both certificates", got)
+	}
+}
+
+func TestAuditHTTPSkipsTLSForHTTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tlsCalled := false
+	report, err := Audit(context.Background(), server.URL, Options{
+		TLSCollector: tlsCollectorFunc(func(context.Context, string, int) (*certinfo.ChainInfo, error) {
+			tlsCalled = true
+			return nil, errors.New("TLS collector must not run for HTTP")
+		}),
+	})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if tlsCalled {
+		t.Error("TLS collector ran for an HTTP target")
+	}
+	if got, want := report.Audit.Status, "success"; got != want {
+		t.Errorf("status = %q, want %q", got, want)
+	}
+	if got, want := observationValue(report.Observations, "tls.skipped"), "target scheme is http"; got != want {
+		t.Errorf("tls.skipped = %q, want %q", got, want)
+	}
+}
+
+func TestAuditRejectsInvalidScheme(t *testing.T) {
+	_, err := Audit(context.Background(), "ftp://example.test/file", Options{})
+	if err == nil {
+		t.Fatal("Audit accepted an FTP target")
+	}
+	if !strings.Contains(err.Error(), "http or https") {
+		t.Errorf("error = %q, want invalid-scheme explanation", err)
+	}
+}
+
+func TestAuditUsesOneOverallTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	report, err := Audit(context.Background(), server.URL, Options{Timeout: 20 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if got, want := report.Audit.Status, "partial"; got != want {
+		t.Errorf("status = %q, want %q", got, want)
+	}
+	if got := reportError(report.Errors, "http.collect"); got == "" {
+		t.Errorf("errors = %#v, want HTTP timeout error", report.Errors)
+	}
+}
+
+func TestAuditCapsResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSecureHeaders(w)
+		_, _ = w.Write([]byte(strings.Repeat("x", 512)))
+	}))
+	defer server.Close()
+
+	report, err := Audit(context.Background(), server.URL, Options{MaxBodyBytes: 16})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if got, want := report.Audit.Status, "success"; got != want {
+		t.Errorf("status = %q, want %q", got, want)
+	}
+	if got, want := observationValue(report.Observations, "http.body_truncated"), "true"; got != want {
+		t.Errorf("http.body_truncated = %q, want %q", got, want)
+	}
+}
+
+func TestAuditReturnsRedactedPartialResults(t *testing.T) {
+	target := "https://example.test/path?token=secret"
+	report, err := Audit(context.Background(), target, Options{
+		HTTPCollector: httpCollectorFunc(func(context.Context, *url.URL, Options) (HTTPCollection, error) {
+			return HTTPCollection{StatusCode: http.StatusOK, Headers: secureHeaders()}, nil
+		}),
+		TLSCollector: tlsCollectorFunc(func(context.Context, string, int) (*certinfo.ChainInfo, error) {
+			return nil, errors.New("tls failed for https://user:password@example.test/path?token=secret; Authorization: Bearer secret")
+		}),
+	})
+	if err != nil {
+		t.Fatalf("Audit returned error: %v", err)
+	}
+	if got, want := report.Audit.Status, "partial"; got != want {
+		t.Errorf("status = %q, want %q", got, want)
+	}
+	message := reportError(report.Errors, "tls.collect")
+	if message == "" {
+		t.Fatalf("errors = %#v, want TLS collector error", report.Errors)
+	}
+	for _, secret := range []string{"password", "token=secret", "Bearer secret"} {
+		if strings.Contains(message, secret) {
+			t.Errorf("partial error leaked %q: %q", secret, message)
+		}
+	}
+	if got := observationValue(report.Observations, "http.status"); got != "200" {
+		t.Errorf("HTTP result was lost after TLS failure: status=%q", got)
+	}
+}
+
+func TestAuditDoesNotFollowRedirectsUnlessAllowed(t *testing.T) {
+	var destinationCalls atomic.Int32
+	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		destinationCalls.Add(1)
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer destination.Close()
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, destination.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+
+	first, err := Audit(context.Background(), origin.URL, Options{})
+	if err != nil {
+		t.Fatalf("Audit without redirects returned error: %v", err)
+	}
+	if got, want := observationValue(first.Observations, "http.status"), "302"; got != want {
+		t.Errorf("non-following status = %q, want %q", got, want)
+	}
+	if got := destinationCalls.Load(); got != 0 {
+		t.Fatalf("redirect contacted a second target %d times without permission", got)
+	}
+
+	second, err := Audit(context.Background(), origin.URL, Options{AllowRedirects: true})
+	if err != nil {
+		t.Fatalf("Audit with redirects returned error: %v", err)
+	}
+	if got, want := observationValue(second.Observations, "http.status"), "200"; got != want {
+		t.Errorf("following status = %q, want %q", got, want)
+	}
+	if got := destinationCalls.Load(); got != 1 {
+		t.Errorf("redirect destination calls = %d, want 1 after permission", got)
+	}
+}
+
+func TestAuditProducesStableSortedReportCollections(t *testing.T) {
+	started := time.Date(2026, time.September, 5, 11, 0, 0, 0, time.UTC)
+	options := Options{
+		HTTPCollector: httpCollectorFunc(func(context.Context, *url.URL, Options) (HTTPCollection, error) {
+			return HTTPCollection{StatusCode: http.StatusOK, Headers: http.Header{
+				"X-Powered-By": []string{"PHP/8.3"},
+				"Server":       []string{"nginx/1.24"},
+			}}, nil
+		}),
+		TLSCollector: tlsCollectorFunc(func(context.Context, string, int) (*certinfo.ChainInfo, error) {
+			return &certinfo.ChainInfo{Valid: true, TLSVersion: tls.VersionTLS13, CipherSuite: tls.TLS_AES_128_GCM_SHA256}, nil
+		}),
+	}
+
+	options.Now = sequenceClock(started, started)
+	first, err := Audit(context.Background(), "https://example.test/", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.Now = sequenceClock(started, started)
+	second, err := Audit(context.Background(), "https://example.test/", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Errorf("reports are not deterministic:\nfirst=%#v\nsecond=%#v", first, second)
+	}
+	for index := 1; index < len(first.Findings); index++ {
+		if first.Findings[index-1].ID > first.Findings[index].ID {
+			t.Errorf("findings are not sorted: %#v", first.Findings)
+			break
+		}
+	}
+	for index := 1; index < len(first.Observations); index++ {
+		if first.Observations[index-1].Key > first.Observations[index].Key {
+			t.Errorf("observations are not sorted: %#v", first.Observations)
+			break
+		}
+	}
+}
+
+type httpCollectorFunc func(context.Context, *url.URL, Options) (HTTPCollection, error)
+
+func (fn httpCollectorFunc) CollectHTTP(ctx context.Context, target *url.URL, options Options) (HTTPCollection, error) {
+	return fn(ctx, target, options)
+}
+
+type tlsCollectorFunc func(context.Context, string, int) (*certinfo.ChainInfo, error)
+
+func (fn tlsCollectorFunc) CollectTLS(ctx context.Context, host string, port int) (*certinfo.ChainInfo, error) {
+	return fn(ctx, host, port)
+}
+
+func secureHeaders() http.Header {
+	headers := make(http.Header)
+	setSecureHeaderValues(headers)
+	return headers
+}
+
+func setSecureHeaders(w interface{ Header() http.Header }) {
+	setSecureHeaderValues(w.Header())
+}
+
+func setSecureHeaderValues(headers http.Header) {
+	headers.Set("Strict-Transport-Security", "max-age=31536000")
+	headers.Set("Content-Security-Policy", "default-src 'self'")
+	headers.Set("X-Content-Type-Options", "nosniff")
+	headers.Set("X-Frame-Options", "DENY")
+	headers.Set("X-XSS-Protection", "1; mode=block")
+	headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	headers.Set("Permissions-Policy", "geolocation=()")
+}
+
+func observationValue(observations []sharedreport.Observation, key string) string {
+	for _, observation := range observations {
+		if observation.Key == key {
+			return observation.Value
+		}
+	}
+	return ""
+}
+
+func reportError(errors []sharedreport.ReportError, code string) string {
+	for _, reportError := range errors {
+		if reportError.Code == code {
+			return reportError.Message
+		}
+	}
+	return ""
+}
+
+func countFindings(findings []models.VulnResult, ruleID string) int {
+	count := 0
+	for _, finding := range findings {
+		if finding.RuleID == ruleID {
+			count++
+		}
+	}
+	return count
+}
+
+func sequenceClock(values ...time.Time) func() time.Time {
+	index := 0
+	return func() time.Time {
+		if index >= len(values) {
+			return values[len(values)-1]
+		}
+		value := values[index]
+		index++
+		return value
+	}
+}
+
+func TestAuditNormalizesTLSDefaultPort(t *testing.T) {
+	var gotPort int
+	_, err := Audit(context.Background(), "https://example.test/", Options{
+		HTTPCollector: httpCollectorFunc(func(context.Context, *url.URL, Options) (HTTPCollection, error) {
+			return HTTPCollection{StatusCode: http.StatusOK, Headers: secureHeaders()}, nil
+		}),
+		TLSCollector: tlsCollectorFunc(func(_ context.Context, _ string, port int) (*certinfo.ChainInfo, error) {
+			gotPort = port
+			return &certinfo.ChainInfo{Valid: true}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := gotPort, 443; got != want {
+		t.Errorf("TLS port = %d, want %d", got, want)
+	}
+}
