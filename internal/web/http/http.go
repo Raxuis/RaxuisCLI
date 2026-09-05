@@ -100,6 +100,9 @@ func DoRequestContext(ctx context.Context, opts RequestOptions, maxBodyBytes int
 			InsecureSkipVerify: opts.Insecure,
 		},
 	}
+	// Each request constructs a transport, so do not retain idle sockets after
+	// this call returns (including proxy/request/client error paths).
+	defer transport.CloseIdleConnections()
 
 	if opts.Proxy != "" {
 		proxyURL, err := url.ParseRequestURI(opts.Proxy)

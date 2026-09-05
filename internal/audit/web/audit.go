@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 
 	"raxuiscli/internal/crypto/certinfo"
 	"raxuiscli/internal/shared/constants"
@@ -118,12 +121,12 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 		chain, tlsErr := tlsCollector.CollectTLS(auditContext, target.Hostname(), targetPort(target))
 		if tlsErr != nil {
 			reportErrors = append(reportErrors, report.ReportError{Code: "tls.collect", Message: tlsErr.Error()})
-		} else if chain == nil {
-			reportErrors = append(reportErrors, report.ReportError{Code: "tls.collect", Message: "TLS collector returned no certificate chain"})
+		} else if chain == nil || len(chain.Certificates) == 0 {
+			reportErrors = append(reportErrors, report.ReportError{Code: "tls.collect", Message: "TLS collector returned no certificates"})
 		} else {
 			validations := make([]certinfo.ValidationResult, 0, len(chain.Certificates))
 			for index := range chain.Certificates {
-				validation := certinfo.ValidateCertificate(&chain.Certificates[index])
+				validation := certinfo.ValidateCertificateAt(&chain.Certificates[index], startedAt)
 				if validation != nil {
 					validations = append(validations, *validation)
 				}
@@ -153,20 +156,81 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 
 func parseTarget(rawTarget string) (*url.URL, error) {
 	target, err := url.ParseRequestURI(rawTarget)
-	if err != nil || target.Scheme == "" || target.Host == "" {
+	if err != nil || target.Scheme == "" || target.Host == "" || target.Hostname() == "" {
 		return nil, fmt.Errorf("audit target must be an absolute http or https URL")
 	}
+	target.Scheme = strings.ToLower(target.Scheme)
 	if target.Scheme != "http" && target.Scheme != "https" {
 		return nil, fmt.Errorf("audit target scheme must be http or https")
+	}
+	port, hasPort, err := auditTargetPort(target)
+	if err != nil {
+		return nil, err
+	}
+	host, err := normalizeHostname(target.Hostname())
+	if err != nil {
+		return nil, err
+	}
+	if hasPort {
+		target.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	} else if strings.Contains(host, ":") {
+		target.Host = "[" + host + "]"
+	} else {
+		target.Host = host
 	}
 	return target, nil
 }
 
 func targetPort(target *url.URL) int {
-	if value, err := strconv.Atoi(target.Port()); err == nil && value > 0 {
-		return value
+	port, _, err := auditTargetPort(target)
+	if err == nil {
+		return port
 	}
-	return 443
+	return 0
+}
+
+func auditTargetPort(target *url.URL) (int, bool, error) {
+	host := target.Host
+	var rawPort string
+	hasPort := false
+	if strings.HasPrefix(host, "[") {
+		end := strings.LastIndexByte(host, ']')
+		if end == -1 {
+			return 0, false, fmt.Errorf("audit target has an invalid IPv6 host")
+		}
+		suffix := host[end+1:]
+		if suffix != "" {
+			if !strings.HasPrefix(suffix, ":") {
+				return 0, false, fmt.Errorf("audit target has an invalid port")
+			}
+			hasPort, rawPort = true, suffix[1:]
+		}
+	} else if separator := strings.LastIndexByte(host, ':'); separator >= 0 {
+		hasPort, rawPort = true, host[separator+1:]
+	}
+	if !hasPort {
+		return 443, false, nil
+	}
+	port, err := strconv.Atoi(rawPort)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, true, fmt.Errorf("audit target port must be between 1 and 65535")
+	}
+	return port, true, nil
+}
+
+func normalizeHostname(host string) (string, error) {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "" {
+		return "", fmt.Errorf("audit target hostname must not be empty")
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.String(), nil
+	}
+	normalized, err := idna.Lookup.ToASCII(host)
+	if err != nil || normalized == "" {
+		return "", fmt.Errorf("audit target hostname is invalid")
+	}
+	return strings.ToLower(normalized), nil
 }
 
 type defaultHTTPCollector struct{}

@@ -120,6 +120,38 @@ func TestDoRequestContextRejectsMalformedProxy(t *testing.T) {
 	}
 }
 
+func TestDoRequestContextClosesFreshTransportIdleConnections(t *testing.T) {
+	closed := make(chan struct{}, 2)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			select {
+			case closed <- struct{}{}:
+			default:
+			}
+		}
+	}
+	srv.Start()
+	defer srv.Close()
+
+	for request := 0; request < 2; request++ {
+		response, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 1024)
+		if err != nil {
+			t.Fatalf("request %d returned error: %v", request, err)
+		}
+		if response.Body != "ok" {
+			t.Fatalf("request %d body = %q, want ok", request, response.Body)
+		}
+		select {
+		case <-closed:
+		case <-time.After(time.Second):
+			t.Fatalf("request %d left the fresh transport connection idle", request)
+		}
+	}
+}
+
 func TestDoRequestBasicGET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

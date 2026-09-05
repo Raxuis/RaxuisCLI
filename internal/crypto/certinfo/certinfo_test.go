@@ -310,6 +310,20 @@ func TestValidateCertificateNotYetValid(t *testing.T) {
 	}
 }
 
+func TestValidateCertificateAtUsesSuppliedInstant(t *testing.T) {
+	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	info := &CertInfo{
+		Subject: "CN=a", Issuer: "CN=b",
+		NotBefore: fixed.Add(24 * time.Hour),
+		NotAfter:  fixed.Add(48 * time.Hour),
+	}
+
+	result := ValidateCertificateAt(info, fixed)
+	if result.Expired || !result.NotYetValid {
+		t.Errorf("validation at %s = %#v, want not-yet-valid only", fixed, result)
+	}
+}
+
 func TestValidateCertificateSelfSigned(t *testing.T) {
 	info := &CertInfo{
 		Subject:            "CN=self",

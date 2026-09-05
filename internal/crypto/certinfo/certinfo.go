@@ -249,11 +249,16 @@ func parseExtKeyUsage(usages []x509.ExtKeyUsage) []string {
 
 // ValidateCertificate performs validation checks
 func ValidateCertificate(info *CertInfo) *ValidationResult {
+	return ValidateCertificateAt(info, time.Now())
+}
+
+// ValidateCertificateAt performs validation checks at the supplied instant.
+// It lets callers make certificate findings deterministic for one audit while
+// ValidateCertificate retains the legacy wall-clock behavior.
+func ValidateCertificateAt(info *CertInfo, now time.Time) *ValidationResult {
 	result := &ValidationResult{
 		Valid: true,
 	}
-
-	now := time.Now()
 
 	// Check expiration
 	if now.After(info.NotAfter) {
