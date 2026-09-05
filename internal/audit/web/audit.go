@@ -81,6 +81,11 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 		now = time.Now
 	}
 	startedAt := now()
+	if startedAt.IsZero() {
+		// A test or caller clock may deliberately return zero. Capture one
+		// effective instant so report metadata and every TLS decision agree.
+		startedAt = time.Now()
+	}
 	timeout := options.Timeout
 	if timeout <= 0 {
 		timeout = defaultTimeout
@@ -141,6 +146,9 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 		status = "partial"
 	}
 	finishedAt := now()
+	if finishedAt.IsZero() {
+		finishedAt = startedAt
+	}
 	duration := finishedAt.Sub(startedAt)
 	if duration < 0 {
 		duration = 0

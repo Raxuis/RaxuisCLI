@@ -257,6 +257,33 @@ func TestAuditDefaultTLSVerificationUsesCapturedClock(t *testing.T) {
 	}
 }
 
+func TestAuditNormalizesZeroClockToOneEffectiveInstant(t *testing.T) {
+	now := time.Now()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusOK)
+	}))
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{selfSignedServerCertificate(t, now.Add(-time.Hour), now.Add(time.Hour))}}
+	server.StartTLS()
+	defer server.Close()
+
+	report, err := Audit(context.Background(), server.URL, Options{
+		InsecureTLS: true,
+		Now:         func() time.Time { return time.Time{} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Audit.StartedAt.IsZero() {
+		t.Fatal("zero injected clock produced a zero audit timestamp")
+	}
+	for _, ruleID := range []string{"tls.certificate.expired", "tls.certificate.not-yet-valid"} {
+		if got := countFindings(report.Findings, ruleID); got != 0 {
+			t.Errorf("%s findings = %d, want no wall/zero-clock validity diagnostic: %#v", ruleID, got, report.Findings)
+		}
+	}
+}
+
 func TestAuditTreatsMissingTLSCertificatesAsPartial(t *testing.T) {
 	for _, chain := range []*certinfo.ChainInfo{nil, {Valid: true}} {
 		report, err := Audit(context.Background(), "https://example.test/", Options{
