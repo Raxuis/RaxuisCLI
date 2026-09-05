@@ -5,6 +5,7 @@ import (
 
 	"raxuiscli/cmd"
 
+	_ "raxuiscli/cmd/audit"
 	_ "raxuiscli/cmd/cloud"
 	_ "raxuiscli/cmd/container"
 	_ "raxuiscli/cmd/crypto"
