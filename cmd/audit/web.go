@@ -21,7 +21,7 @@ func newWebCommand(runner auditRunner) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "web <http-or-https-url>",
 		Short: "Passively inspect HTTP security headers and TLS certificates",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactlyOneAuditTarget,
 		RunE: func(command *cobra.Command, args []string) error {
 			return runWebAudit(command, args[0], runner)
 		},
@@ -35,6 +35,15 @@ func newWebCommand(runner auditRunner) *cobra.Command {
 	command.Flags().String("cookie", "", "Cookie header to include with the request")
 	command.Flags().String("user-agent", "", "User-Agent header to include with the request")
 	return command
+}
+
+// exactlyOneAuditTarget preserves Cobra's familiar arity message while making
+// malformed command input an OperationalError for deterministic exit handling.
+func exactlyOneAuditTarget(command *cobra.Command, args []string) error {
+	if err := cobra.ExactArgs(1)(command, args); err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	return nil
 }
 
 func runWebAudit(command *cobra.Command, target string, runner auditRunner) error {

@@ -26,15 +26,41 @@ import (
 )
 
 func TestWebRequiresExactlyOneTarget(t *testing.T) {
-	root := newTestRoot(t, webaudit.Audit)
-	root.SetArgs([]string{"audit", "web"})
-
-	err := root.Execute()
-	if err == nil {
-		t.Fatal("audit web accepted no target")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "missing target", args: []string{"audit", "web"}},
+		{name: "extra target", args: []string{"audit", "web", "http://fixture.test", "unexpected"}},
 	}
-	if !strings.Contains(err.Error(), "accepts 1 arg(s)") {
-		t.Fatalf("error = %q, want exact-argument error", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			root := newTestRoot(t, func(context.Context, string, webaudit.Options) (report.Report, error) {
+				called = true
+				return report.Report{}, nil
+			})
+			root.SetArgs(tt.args)
+
+			err := root.Execute()
+			if err == nil {
+				t.Fatal("audit web accepted invalid arity")
+			}
+			if called {
+				t.Fatal("audit runner was called for invalid arity")
+			}
+			if !strings.Contains(err.Error(), "accepts 1 arg(s)") {
+				t.Fatalf("error = %q, want exact-argument error", err)
+			}
+			var operational *sharedcommand.OperationalError
+			if !errors.As(err, &operational) || !errors.Is(err, sharedcommand.ErrOperational) {
+				t.Fatalf("error = %T %v, want typed operational error", err, err)
+			}
+			if code := sharedcommand.ExitCode(err); code != 1 {
+				t.Fatalf("ExitCode(error) = %d, want 1", code)
+			}
+		})
 	}
 }
 
