@@ -2,133 +2,65 @@ package crypto
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
-	"raxuiscli/cmd"
-
 	"github.com/spf13/cobra"
 
+	"raxuiscli/cmd"
 	"raxuiscli/internal/crypto/certinfo"
+	sharedcommand "raxuiscli/internal/shared/command"
 )
 
-var certinfoCmd = &cobra.Command{
-	Use:   "certinfo [host|file]",
-	Short: "Analyze X.509 certificates",
-	Long: `Retrieve and analyze X.509 certificates from servers or files.
+const defaultCertinfoPort = 443
+
+var (
+	getCertFromFile = certinfo.GetCertFromFile
+	getCertFromHost = certinfo.GetCertFromHost
+
+	certinfoCmd = newCertinfoCommand()
+)
+
+func newCertinfoCommand() *cobra.Command {
+	command := &cobra.Command{
+		Use:   "certinfo [host|file]",
+		Short: "Analyze X.509 certificates",
+		Long: `Retrieve and analyze X.509 certificates from servers or files.
 
 Examples:
   raxuiscli certinfo example.com
   raxuiscli certinfo example.com:8443
   raxuiscli certinfo cert.pem
   raxuiscli certinfo example.com --chain`,
-	Run: func(cmd *cobra.Command, args []string) {
-		chain, _ := cmd.Flags().GetBool("chain")
-		validate, _ := cmd.Flags().GetBool("validate")
-		timeout, _ := cmd.Flags().GetInt("timeout")
+		Args: exactCertinfoArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			return runCertinfo(command, args[0])
+		},
+	}
+	command.Flags().BoolP("chain", "c", false, "Show full certificate chain")
+	command.Flags().Bool("validate", false, "Validate certificate")
+	command.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
-		if len(args) == 0 {
-			fmt.Println("Please provide a host or certificate file")
-			return
-		}
-
-		target := args[0]
-
-		// Check if it's a file
-		if strings.HasSuffix(target, ".pem") || strings.HasSuffix(target, ".crt") ||
-			strings.HasSuffix(target, ".cer") || strings.HasSuffix(target, ".der") {
-			chainInfo, err := certinfo.GetCertFromFile(target)
-			if err != nil {
-				fmt.Printf("Error reading certificate: %v\n", err)
-				return
-			}
-
-			if chain {
-				certinfo.DisplayChain(chainInfo)
-			} else if len(chainInfo.Certificates) > 0 {
-				certinfo.DisplayCertInfo(&chainInfo.Certificates[0])
-			}
-
-			if validate && len(chainInfo.Certificates) > 0 {
-				result := certinfo.ValidateCertificate(&chainInfo.Certificates[0])
-				certinfo.DisplayValidation(result)
-			}
-			return
-		}
-
-		// Parse host and port
-		host := target
-		port := 443
-
-		if strings.Contains(target, ":") {
-			parts := strings.Split(target, ":")
-			host = parts[0]
-			if p, err := strconv.Atoi(parts[1]); err == nil {
-				port = p
-			}
-		}
-
-		chainInfo, err := certinfo.GetCertFromHost(host, port, timeout)
-		if err != nil {
-			fmt.Printf("Error connecting to %s: %v\n", target, err)
-			return
-		}
-
-		if chain {
-			certinfo.DisplayChain(chainInfo)
-		} else if len(chainInfo.Certificates) > 0 {
-			certinfo.DisplayCertInfo(&chainInfo.Certificates[0])
-		}
-
-		if validate && len(chainInfo.Certificates) > 0 {
-			result := certinfo.ValidateCertificate(&chainInfo.Certificates[0])
-			certinfo.DisplayValidation(result)
-		}
-	},
-}
-
-var certinfoChainCmd = &cobra.Command{
-	Use:   "chain [host]",
-	Short: "Display full certificate chain",
-	Long: `Retrieve and display the complete certificate chain from a server.
+	chainCommand := &cobra.Command{
+		Use:   "chain [host]",
+		Short: "Display full certificate chain",
+		Long: `Retrieve and display the complete certificate chain from a server.
 
 Examples:
   raxuiscli certinfo chain example.com
   raxuiscli certinfo chain example.com:8443`,
-	Run: func(cmd *cobra.Command, args []string) {
-		timeout, _ := cmd.Flags().GetInt("timeout")
+		Args: exactCertinfoArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			return runCertinfoChain(command, args[0])
+		},
+	}
+	chainCommand.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
-		if len(args) == 0 {
-			fmt.Println("Please provide a host")
-			return
-		}
-
-		target := args[0]
-		host := target
-		port := 443
-
-		if strings.Contains(target, ":") {
-			parts := strings.Split(target, ":")
-			host = parts[0]
-			if p, err := strconv.Atoi(parts[1]); err == nil {
-				port = p
-			}
-		}
-
-		chainInfo, err := certinfo.GetCertFromHost(host, port, timeout)
-		if err != nil {
-			fmt.Printf("Error connecting to %s: %v\n", target, err)
-			return
-		}
-
-		certinfo.DisplayChain(chainInfo)
-	},
-}
-
-var certinfoValidateCmd = &cobra.Command{
-	Use:   "validate [host|file]",
-	Short: "Validate certificate",
-	Long: `Validate a certificate for common issues.
+	validateCommand := &cobra.Command{
+		Use:   "validate [host|file]",
+		Short: "Validate certificate",
+		Long: `Validate a certificate for common issues.
 
 Checks for:
 - Expiration
@@ -139,220 +71,248 @@ Checks for:
 Examples:
   raxuiscli certinfo validate example.com
   raxuiscli certinfo validate cert.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
-		timeout, _ := cmd.Flags().GetInt("timeout")
+		Args: exactCertinfoArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			return runCertinfoValidate(command, args[0])
+		},
+	}
+	validateCommand.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
-		if len(args) == 0 {
-			fmt.Println("Please provide a host or certificate file")
-			return
-		}
-
-		target := args[0]
-
-		var chainInfo *certinfo.ChainInfo
-		var err error
-
-		// Check if it's a file
-		if strings.HasSuffix(target, ".pem") || strings.HasSuffix(target, ".crt") ||
-			strings.HasSuffix(target, ".cer") || strings.HasSuffix(target, ".der") {
-			chainInfo, err = certinfo.GetCertFromFile(target)
-		} else {
-			host := target
-			port := 443
-			if strings.Contains(target, ":") {
-				parts := strings.Split(target, ":")
-				host = parts[0]
-				if p, err := strconv.Atoi(parts[1]); err == nil {
-					port = p
-				}
-			}
-			chainInfo, err = certinfo.GetCertFromHost(host, port, timeout)
-		}
-
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-
-		if len(chainInfo.Certificates) == 0 {
-			fmt.Println("No certificates found")
-			return
-		}
-
-		// Validate each certificate in chain
-		for i, cert := range chainInfo.Certificates {
-			fmt.Printf("\n[Certificate %d]", i+1)
-			if i == 0 {
-				fmt.Print(" (End Entity)")
-			}
-			fmt.Println()
-
-			result := certinfo.ValidateCertificate(&cert)
-			certinfo.DisplayValidation(result)
-		}
-	},
-}
-
-var certinfoCompareCmd = &cobra.Command{
-	Use:   "compare [host1|file1] [host2|file2]",
-	Short: "Compare two certificates",
-	Long: `Compare two certificates side by side.
+	compareCommand := &cobra.Command{
+		Use:   "compare [host1|file1] [host2|file2]",
+		Short: "Compare two certificates",
+		Long: `Compare two certificates side by side.
 
 Examples:
   raxuiscli certinfo compare example.com test.example.com
   raxuiscli certinfo compare cert1.pem cert2.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
-		timeout, _ := cmd.Flags().GetInt("timeout")
+		Args: exactCertinfoArgs(2),
+		RunE: func(command *cobra.Command, args []string) error {
+			return runCertinfoCompare(command, args[0], args[1])
+		},
+	}
+	compareCommand.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
-		if len(args) < 2 {
-			fmt.Println("Please provide two hosts or certificate files to compare")
-			return
-		}
-
-		getCert := func(target string) (*certinfo.CertInfo, error) {
-			var chainInfo *certinfo.ChainInfo
-			var err error
-
-			if strings.HasSuffix(target, ".pem") || strings.HasSuffix(target, ".crt") ||
-				strings.HasSuffix(target, ".cer") || strings.HasSuffix(target, ".der") {
-				chainInfo, err = certinfo.GetCertFromFile(target)
-			} else {
-				host := target
-				port := 443
-				if strings.Contains(target, ":") {
-					parts := strings.Split(target, ":")
-					host = parts[0]
-					if p, err := strconv.Atoi(parts[1]); err == nil {
-						port = p
-					}
-				}
-				chainInfo, err = certinfo.GetCertFromHost(host, port, timeout)
-			}
-
-			if err != nil {
-				return nil, err
-			}
-
-			if len(chainInfo.Certificates) == 0 {
-				return nil, fmt.Errorf("no certificates found")
-			}
-
-			return &chainInfo.Certificates[0], nil
-		}
-
-		cert1, err := getCert(args[0])
-		if err != nil {
-			fmt.Printf("Error getting certificate 1: %v\n", err)
-			return
-		}
-
-		cert2, err := getCert(args[1])
-		if err != nil {
-			fmt.Printf("Error getting certificate 2: %v\n", err)
-			return
-		}
-
-		certinfo.CompareCertificates(cert1, cert2)
-	},
-}
-
-var certinfoSANCmd = &cobra.Command{
-	Use:   "san [host|file]",
-	Short: "Extract Subject Alternative Names",
-	Long: `Extract and display Subject Alternative Names (SANs) from a certificate.
+	sanCommand := &cobra.Command{
+		Use:   "san [host|file]",
+		Short: "Extract Subject Alternative Names",
+		Long: `Extract and display Subject Alternative Names (SANs) from a certificate.
 
 Examples:
   raxuiscli certinfo san example.com
   raxuiscli certinfo san cert.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
-		timeout, _ := cmd.Flags().GetInt("timeout")
+		Args: exactCertinfoArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			return runCertinfoSAN(command, args[0])
+		},
+	}
+	sanCommand.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 
-		if len(args) == 0 {
-			fmt.Println("Please provide a host or certificate file")
-			return
+	command.AddCommand(chainCommand, validateCommand, compareCommand, sanCommand)
+	return command
+}
+
+func exactCertinfoArgs(count int) cobra.PositionalArgs {
+	return func(command *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(count)(command, args); err != nil {
+			return sharedcommand.NewOperationalError(err)
 		}
+		return nil
+	}
+}
 
-		target := args[0]
+func runCertinfo(command *cobra.Command, target string) error {
+	chain, err := command.Flags().GetBool("chain")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	validate, err := command.Flags().GetBool("validate")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	timeout, err := command.Flags().GetInt("timeout")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
 
-		var chainInfo *certinfo.ChainInfo
-		var err error
+	chainInfo, err := loadCertinfoTarget(target, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	if err := requireCertificates(chainInfo); err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	if chain {
+		certinfo.DisplayChain(chainInfo)
+	} else {
+		certinfo.DisplayCertInfo(&chainInfo.Certificates[0])
+	}
+	if validate {
+		certinfo.DisplayValidation(certinfo.ValidateCertificate(&chainInfo.Certificates[0]))
+	}
+	return nil
+}
 
-		if strings.HasSuffix(target, ".pem") || strings.HasSuffix(target, ".crt") ||
-			strings.HasSuffix(target, ".cer") || strings.HasSuffix(target, ".der") {
-			chainInfo, err = certinfo.GetCertFromFile(target)
-		} else {
-			host := target
-			port := 443
-			if strings.Contains(target, ":") {
-				parts := strings.Split(target, ":")
-				host = parts[0]
-				if p, err := strconv.Atoi(parts[1]); err == nil {
-					port = p
-				}
-			}
-			chainInfo, err = certinfo.GetCertFromHost(host, port, timeout)
+func runCertinfoChain(command *cobra.Command, target string) error {
+	timeout, err := command.Flags().GetInt("timeout")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	chainInfo, err := loadCertinfoHost(target, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	if err := requireCertificates(chainInfo); err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	certinfo.DisplayChain(chainInfo)
+	return nil
+}
+
+func runCertinfoValidate(command *cobra.Command, target string) error {
+	timeout, err := command.Flags().GetInt("timeout")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	chainInfo, err := loadCertinfoTarget(target, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	if err := requireCertificates(chainInfo); err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	for i, certificate := range chainInfo.Certificates {
+		fmt.Printf("\n[Certificate %d]", i+1)
+		if i == 0 {
+			fmt.Print(" (End Entity)")
 		}
+		fmt.Println()
+		certinfo.DisplayValidation(certinfo.ValidateCertificate(&certificate))
+	}
+	return nil
+}
 
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
+func runCertinfoCompare(command *cobra.Command, firstTarget, secondTarget string) error {
+	timeout, err := command.Flags().GetInt("timeout")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	first, err := firstCertinfoCertificate(firstTarget, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(fmt.Errorf("getting certificate 1: %w", err))
+	}
+	second, err := firstCertinfoCertificate(secondTarget, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(fmt.Errorf("getting certificate 2: %w", err))
+	}
+	certinfo.CompareCertificates(first, second)
+	return nil
+}
+
+func runCertinfoSAN(command *cobra.Command, target string) error {
+	timeout, err := command.Flags().GetInt("timeout")
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	chainInfo, err := loadCertinfoTarget(target, timeout)
+	if err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+	if err := requireCertificates(chainInfo); err != nil {
+		return sharedcommand.NewOperationalError(err)
+	}
+
+	certificate := chainInfo.Certificates[0]
+	fmt.Println("\n[SUBJECT ALTERNATIVE NAMES]")
+	fmt.Println(strings.Repeat("=", 60))
+	if len(certificate.DNSNames) > 0 {
+		fmt.Println("\nDNS Names:")
+		for _, name := range certificate.DNSNames {
+			fmt.Printf("  - %s\n", name)
 		}
-
-		if len(chainInfo.Certificates) == 0 {
-			fmt.Println("No certificates found")
-			return
+	}
+	if len(certificate.IPAddresses) > 0 {
+		fmt.Println("\nIP Addresses:")
+		for _, ip := range certificate.IPAddresses {
+			fmt.Printf("  - %s\n", ip)
 		}
-
-		cert := chainInfo.Certificates[0]
-
-		fmt.Println("\n[SUBJECT ALTERNATIVE NAMES]")
-		fmt.Println(strings.Repeat("=", 60))
-
-		if len(cert.DNSNames) > 0 {
-			fmt.Println("\nDNS Names:")
-			for _, name := range cert.DNSNames {
-				fmt.Printf("  - %s\n", name)
-			}
+	}
+	if len(certificate.EmailAddresses) > 0 {
+		fmt.Println("\nEmail Addresses:")
+		for _, email := range certificate.EmailAddresses {
+			fmt.Printf("  - %s\n", email)
 		}
+	}
+	if len(certificate.DNSNames) == 0 && len(certificate.IPAddresses) == 0 && len(certificate.EmailAddresses) == 0 {
+		fmt.Println("No SANs found in certificate")
+	}
+	return nil
+}
 
-		if len(cert.IPAddresses) > 0 {
-			fmt.Println("\nIP Addresses:")
-			for _, ip := range cert.IPAddresses {
-				fmt.Printf("  - %s\n", ip)
-			}
-		}
+func firstCertinfoCertificate(target string, timeout int) (*certinfo.CertInfo, error) {
+	chainInfo, err := loadCertinfoTarget(target, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireCertificates(chainInfo); err != nil {
+		return nil, err
+	}
+	return &chainInfo.Certificates[0], nil
+}
 
-		if len(cert.EmailAddresses) > 0 {
-			fmt.Println("\nEmail Addresses:")
-			for _, email := range cert.EmailAddresses {
-				fmt.Printf("  - %s\n", email)
-			}
-		}
+func loadCertinfoTarget(target string, timeout int) (*certinfo.ChainInfo, error) {
+	if isCertinfoFile(target) {
+		return getCertFromFile(target)
+	}
+	return loadCertinfoHost(target, timeout)
+}
 
-		if len(cert.DNSNames) == 0 && len(cert.IPAddresses) == 0 && len(cert.EmailAddresses) == 0 {
-			fmt.Println("No SANs found in certificate")
-		}
-	},
+func loadCertinfoHost(target string, timeout int) (*certinfo.ChainInfo, error) {
+	host, port, err := parseCertinfoTarget(target)
+	if err != nil {
+		return nil, err
+	}
+	return getCertFromHost(host, port, timeout)
+}
+
+func isCertinfoFile(target string) bool {
+	target = strings.ToLower(target)
+	return strings.HasSuffix(target, ".pem") || strings.HasSuffix(target, ".crt") ||
+		strings.HasSuffix(target, ".cer") || strings.HasSuffix(target, ".der")
+}
+
+func parseCertinfoTarget(target string) (string, int, error) {
+	if target == "" {
+		return "", 0, fmt.Errorf("certificate host must not be empty")
+	}
+	if net.ParseIP(target) != nil {
+		return target, defaultCertinfoPort, nil
+	}
+	if !strings.Contains(target, ":") {
+		return target, defaultCertinfoPort, nil
+	}
+
+	host, portText, err := net.SplitHostPort(target)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid certificate host/port %q: %w", target, err)
+	}
+	if host == "" {
+		return "", 0, fmt.Errorf("invalid certificate host/port %q: host must not be empty", target)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return "", 0, fmt.Errorf("invalid certificate host/port %q: port must be between 1 and 65535", target)
+	}
+	return host, port, nil
+}
+
+func requireCertificates(chainInfo *certinfo.ChainInfo) error {
+	if chainInfo == nil || len(chainInfo.Certificates) == 0 {
+		return fmt.Errorf("no certificates found")
+	}
+	return nil
 }
 
 func init() {
 	cmd.RootCmd.AddCommand(certinfoCmd)
-
-	// Main command flags
-	certinfoCmd.Flags().BoolP("chain", "c", false, "Show full certificate chain")
-	certinfoCmd.Flags().Bool("validate", false, "Validate certificate")
-	certinfoCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
-
-	// Subcommands
-	certinfoCmd.AddCommand(certinfoChainCmd)
-	certinfoChainCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
-
-	certinfoCmd.AddCommand(certinfoValidateCmd)
-	certinfoValidateCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
-
-	certinfoCmd.AddCommand(certinfoCompareCmd)
-	certinfoCompareCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
-
-	certinfoCmd.AddCommand(certinfoSANCmd)
-	certinfoSANCmd.Flags().IntP("timeout", "t", 10, "Connection timeout in seconds")
 }
