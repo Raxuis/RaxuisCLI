@@ -24,7 +24,7 @@
         <article class="finding regression"><div class="finding-heading"><span class="badge {{ severityClass .Severity }}">ADDED {{ .Severity }}</span><h3>{{ .Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .RuleID }}</dd><dt>Resource</dt><dd>{{ .Resource }}</dd></dl></article>
 {{- end }}
 {{- range .Worsened }}
-        <article class="finding regression"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">WORSENED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd></dl></article>
+        <article class="finding regression"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">WORSENED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
 {{- end }}
       </div>
 {{- else }}
@@ -40,7 +40,7 @@
         <article class="finding resolution"><div class="finding-heading"><span class="badge {{ severityClass .Severity }}">RESOLVED {{ .Severity }}</span><h3>{{ .Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .RuleID }}</dd><dt>Resource</dt><dd>{{ .Resource }}</dd></dl></article>
 {{- end }}
 {{- range .Improved }}
-        <article class="finding resolution"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">IMPROVED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd></dl></article>
+        <article class="finding resolution"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">IMPROVED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
 {{- end }}
       </div>
 {{- else }}
@@ -53,7 +53,7 @@
 {{- if .Other }}
       <div class="findings">
 {{- range .Other }}
-        <article class="finding"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">CHANGED {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd>{{ if .EvidenceChanged }}<dt>Evidence</dt><dd>Changed</dd>{{ end }}{{ if .DisplayChanged }}<dt>Display details</dt><dd>Changed</dd>{{ end }}</dl></article>
+        <article class="finding"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">CHANGED {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
 {{- end }}
       </div>
 {{- else }}

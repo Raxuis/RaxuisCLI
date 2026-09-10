@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -158,6 +159,28 @@ func TestComparisonRenderersEmphasizeRegressions(t *testing.T) {
 	}
 }
 
+func TestComparisonRenderersShowCooccurringFindingChanges(t *testing.T) {
+	comparison := fixedComparison(t)
+	for _, renderer := range []ComparisonRenderer{
+		NewTextRenderer().(ComparisonRenderer),
+		NewHTMLRenderer().(ComparisonRenderer),
+	} {
+		var got bytes.Buffer
+		if err := renderer.RenderComparison(&got, comparison); err != nil {
+			t.Fatalf("render comparison: %v", err)
+		}
+		body := got.String()
+		for _, want := range []string{
+			"WORSENED", "Evidence changed",
+			"IMPROVED", "Title changed", "Status changed", "Remediation changed",
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("comparison omits %q from severity change: %s", want, body)
+			}
+		}
+	}
+}
+
 func fixedReport() report.Report {
 	return report.NewReport(
 		report.ToolInfo{
@@ -183,8 +206,19 @@ func fixedComparison(t *testing.T) report.Comparison {
 	)
 	before.Observations = append(before.Observations, report.Observation{Key: "server", Value: "before"}, report.Observation{Key: "removed", Value: "gone"})
 	after := fixedReport()
-	after.Findings[0].Severity = constants.SeverityCritical
-	after.Findings[0].Evidence = "Strict-Transport-Security response header was absent after retry."
+	for index := range after.Findings {
+		switch after.Findings[index].RuleID {
+		case "tls.protocol.deprecated":
+			after.Findings[index].Severity = constants.SeverityCritical
+			after.Findings[index].Evidence = "TLS 1.0 was accepted during the handshake after retry."
+		case "http.header.hsts":
+			after.Findings[index].Severity = constants.SeverityLow
+			after.Findings[index].Title = "HSTS header remains absent"
+			after.Findings[index].Status = "confirmed"
+			after.Findings[index].Evidence = "Strict-Transport-Security header was absent after retry."
+			after.Findings[index].Remediation = "Set Strict-Transport-Security with a reviewed max-age."
+		}
+	}
 	after.Findings = append(after.Findings,
 		models.VulnResult{RuleID: "http.header.content-security-policy", Title: "CSP header is missing", Severity: constants.SeverityHigh, Status: "open", Resource: "https://example.com/login", Evidence: "Content-Security-Policy response header was absent.", Remediation: "Set Content-Security-Policy."},
 	)

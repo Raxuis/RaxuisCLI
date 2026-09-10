@@ -138,12 +138,6 @@ func Compare(before, after Report, allowTargetMismatch bool) (Comparison, error)
 	return result, nil
 }
 
-// CompareReports is an explicit alias for Compare for callers that prefer a
-// descriptive operation name.
-func CompareReports(before, after Report, allowTargetMismatch bool) (Comparison, error) {
-	return Compare(before, after, allowTargetMismatch)
-}
-
 // HasRegressionAt reports whether an added or severity-worsened finding meets
 // threshold. Resolutions, severity improvements, evidence changes, and display
 // changes do not affect this policy decision.
@@ -169,6 +163,9 @@ func comparisonFindingMap(findings []models.VulnResult, side string) (map[string
 	for index, finding := range findings {
 		normalized, identity, err := normalizeComparisonFinding(finding)
 		if err != nil {
+			if errors.Is(err, ErrInvalidReport) {
+				return nil, fmt.Errorf("%s finding %d: %w", side, index, err)
+			}
 			return nil, fmt.Errorf("%w: %s finding %d: %v", ErrInvalidFindingIdentity, side, index, err)
 		}
 		if _, exists := result[identity]; exists {
@@ -186,12 +183,14 @@ func normalizeComparisonFinding(finding models.VulnResult) (models.VulnResult, s
 	normalized.RuleID = strings.TrimSpace(normalized.RuleID)
 	normalized.Resource = CanonicalizeResource(normalized.Resource)
 	normalized.URL = normalized.Resource
-	if normalized.RuleID == "" || normalized.Resource == "" {
+	if normalized.RuleID == "" || strings.TrimSpace(normalized.Resource) == "" {
 		return models.VulnResult{}, "", errors.New("rule_id and resource are required")
 	}
-	if severity, err := constants.ParseSeverity(string(normalized.Severity)); err == nil {
-		normalized.Severity = severity
+	severity, err := constants.ParseSeverity(string(normalized.Severity))
+	if err != nil || severity == constants.SeverityNone {
+		return models.VulnResult{}, "", fmt.Errorf("%w: severity must be INFO, LOW, MEDIUM, HIGH, or CRITICAL", ErrInvalidReport)
 	}
+	normalized.Severity = severity
 	normalized.ID = FindingID(normalized.RuleID, normalized.Resource)
 	return normalized, normalized.RuleID + "\n" + normalized.Resource, nil
 }

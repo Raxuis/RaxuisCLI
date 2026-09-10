@@ -52,7 +52,7 @@ func (renderer htmlRenderer) Render(writer io.Writer, value report.Report) error
 
 func (renderer htmlRenderer) RenderComparison(writer io.Writer, value report.Comparison) error {
 	var output bytes.Buffer
-	if err := renderer.comparisonTemplate.Execute(&output, newHTMLComparison(value)); err != nil {
+	if err := renderer.comparisonTemplate.Execute(&output, newComparisonView(value)); err != nil {
 		return fmt.Errorf("execute HTML comparison template: %w", err)
 	}
 	return writeAll(writer, output.Bytes())
@@ -63,29 +63,8 @@ func newHTMLTemplate(sourceTemplate string) *template.Template {
 	source := strings.Replace(sourceTemplate, cssPlaceholder, reportCSS, 1)
 	return template.Must(template.New("report.html").Funcs(template.FuncMap{
 		"severityClass": severityClass,
+		"changeSummary": changeSummary,
 	}).Parse(source))
-}
-
-type htmlComparison struct {
-	Comparison report.Comparison
-	Worsened   []report.FindingChange
-	Improved   []report.FindingChange
-	Other      []report.FindingChange
-}
-
-func newHTMLComparison(value report.Comparison) htmlComparison {
-	result := htmlComparison{Comparison: value, Worsened: make([]report.FindingChange, 0), Improved: make([]report.FindingChange, 0), Other: make([]report.FindingChange, 0)}
-	for _, change := range value.Findings.Changed {
-		switch {
-		case change.SeverityWorsened:
-			result.Worsened = append(result.Worsened, change)
-		case change.SeverityImproved:
-			result.Improved = append(result.Improved, change)
-		default:
-			result.Other = append(result.Other, change)
-		}
-	}
-	return result
 }
 
 func severityCounts(value report.Report) []severityCount {

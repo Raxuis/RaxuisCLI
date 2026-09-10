@@ -3,6 +3,7 @@ package report
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,6 +106,7 @@ func TestCompareRejectsIncompatibleAndAmbiguousInputs(t *testing.T) {
 		}, nil), after: base, want: ErrDuplicateFindingIdentity},
 		{name: "empty rule", before: comparisonReport([]models.VulnResult{{Resource: "https://example.test/one"}}, nil), after: base, want: ErrInvalidFindingIdentity},
 		{name: "empty resource", before: comparisonReport([]models.VulnResult{{RuleID: "rule.one"}}, nil), after: base, want: ErrInvalidFindingIdentity},
+		{name: "whitespace resource", before: comparisonReport([]models.VulnResult{{RuleID: "rule.one", Resource: " \t\n "}}, nil), after: base, want: ErrInvalidFindingIdentity},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -113,6 +115,41 @@ func TestCompareRejectsIncompatibleAndAmbiguousInputs(t *testing.T) {
 				t.Fatalf("Compare error = %v, want errors.Is(_, %v)", err, test.want)
 			}
 		})
+	}
+}
+
+func TestCompareRejectsInvalidFindingSeverity(t *testing.T) {
+	base := comparisonReport(nil, nil)
+	for _, test := range []struct {
+		name     string
+		severity constants.Severity
+		want     error
+	}{
+		{name: "typo", severity: constants.Severity("URGENT"), want: ErrInvalidReport},
+		{name: "none", severity: constants.SeverityNone, want: ErrInvalidReport},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			invalid := comparisonReport([]models.VulnResult{comparisonFinding("rule.invalid", "https://example.test/invalid", test.severity, "invalid", "evidence")}, nil)
+			_, err := Compare(base, invalid, false)
+			if !errors.Is(err, test.want) || !strings.Contains(err.Error(), "after finding 0") || !strings.Contains(err.Error(), "severity") {
+				t.Fatalf("Compare error = %v, want contextual errors.Is(_, %v)", err, test.want)
+			}
+		})
+	}
+}
+
+func TestCompareCanonicalizesLowercaseSeverityForRegressionPolicy(t *testing.T) {
+	before := comparisonReport(nil, nil)
+	after := comparisonReport([]models.VulnResult{comparisonFinding("rule.lowercase", "https://example.test/lowercase", constants.Severity("low"), "added", "evidence")}, nil)
+	comparison, err := Compare(before, after, false)
+	if err != nil {
+		t.Fatalf("Compare: %v", err)
+	}
+	if got := comparison.Findings.Added[0].Severity; got != constants.SeverityLow {
+		t.Errorf("added severity = %q, want canonical %q", got, constants.SeverityLow)
+	}
+	if !comparison.HasRegressionAt(constants.SeverityLow) {
+		t.Error("canonical lowercase LOW added finding must trigger LOW threshold")
 	}
 }
 

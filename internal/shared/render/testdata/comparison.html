@@ -34,7 +34,7 @@ dl { margin: 0; }.finding dl, .facts { display: grid; gap: 6px 16px; grid-templa
       <h2>Regressions</h2>
       <div class="findings">
         <article class="finding regression"><div class="finding-heading"><span class="badge high">ADDED HIGH</span><h3>CSP header is missing</h3></div><dl><dt>Rule</dt><dd>http.header.content-security-policy</dd><dt>Resource</dt><dd>https://example.com/login</dd></dl></article>
-        <article class="finding regression"><div class="finding-heading"><span class="badge critical">WORSENED MEDIUM → CRITICAL</span><h3>Deprecated TLS protocol accepted</h3></div><dl><dt>Rule</dt><dd>tls.protocol.deprecated</dd><dt>Resource</dt><dd>https://example.com/login</dd></dl></article>
+        <article class="finding regression"><div class="finding-heading"><span class="badge critical">WORSENED MEDIUM → CRITICAL</span><h3>Deprecated TLS protocol accepted</h3></div><dl><dt>Rule</dt><dd>tls.protocol.deprecated</dd><dt>Resource</dt><dd>https://example.com/login</dd><dt>Changes</dt><dd>Evidence changed</dd></dl></article>
       </div>
     </section>
 
@@ -42,6 +42,7 @@ dl { margin: 0; }.finding dl, .facts { display: grid; gap: 6px 16px; grid-templa
       <h2>Resolutions</h2>
       <div class="findings">
         <article class="finding resolution"><div class="finding-heading"><span class="badge low">RESOLVED LOW</span><h3>X-Frame-Options missing</h3></div><dl><dt>Rule</dt><dd>http.header.x-frame-options</dd><dt>Resource</dt><dd>https://example.com/login</dd></dl></article>
+        <article class="finding resolution"><div class="finding-heading"><span class="badge low">IMPROVED HIGH → LOW</span><h3>HSTS header remains absent</h3></div><dl><dt>Rule</dt><dd>http.header.hsts</dd><dt>Resource</dt><dd>https://example.com/login</dd><dt>Changes</dt><dd>Evidence changed; Title changed; Status changed; Remediation changed</dd></dl></article>
       </div>
     </section>
 

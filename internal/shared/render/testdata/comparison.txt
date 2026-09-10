@@ -12,12 +12,17 @@ ADDED [HIGH] CSP header is missing
 WORSENED [MEDIUM -> CRITICAL] Deprecated TLS protocol accepted
   Rule: tls.protocol.deprecated
   Resource: https://example.com/login
+  Changes: Evidence changed
 
-Resolutions (1)
+Resolutions (2)
 ---------------
 RESOLVED [LOW] X-Frame-Options missing
   Rule: http.header.x-frame-options
   Resource: https://example.com/login
+IMPROVED [HIGH -> LOW] HSTS header remains absent
+  Rule: http.header.hsts
+  Resource: https://example.com/login
+  Changes: Evidence changed; Title changed; Status changed; Remediation changed
 
 Other finding changes (0)
 -------------------------
