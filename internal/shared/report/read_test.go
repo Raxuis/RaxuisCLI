@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +106,24 @@ func TestReadRejectsDuplicateKeysRecursively(t *testing.T) {
 	}
 }
 
+func TestReadBoundsJSONCollectionCardinality(t *testing.T) {
+	if _, err := Read(strings.NewReader(reportWithFutureArray(maxJSONCollectionEntries))); err != nil {
+		t.Fatalf("Read rejected array at cardinality boundary: %v", err)
+	}
+	_, err := Read(strings.NewReader(reportWithFutureArray(maxJSONCollectionEntries + 1)))
+	if !errors.Is(err, ErrInvalidReport) || !strings.Contains(err.Error(), "array entries") {
+		t.Fatalf("Read oversized array error = %v, want cardinality ErrInvalidReport", err)
+	}
+
+	if _, err := Read(strings.NewReader(reportWithFutureObject(maxJSONObjectMembers))); err != nil {
+		t.Fatalf("Read rejected object at member boundary: %v", err)
+	}
+	_, err = Read(strings.NewReader(reportWithFutureObject(maxJSONObjectMembers + 1)))
+	if !errors.Is(err, ErrInvalidReport) || !strings.Contains(err.Error(), "object members") {
+		t.Fatalf("Read oversized object error = %v, want member-limit ErrInvalidReport", err)
+	}
+}
+
 func TestReadCanonicalizesSeverityForThresholdMatching(t *testing.T) {
 	input := strings.Replace(validInlineReport, `"severity":"LOW"`, `"severity":"low"`, 1)
 	got, err := Read(strings.NewReader(input))
@@ -168,3 +187,19 @@ func TestValidateComparisonInputs(t *testing.T) {
 }
 
 const validInlineReport = `{"schema_version":1,"tool":{"name":"raxuiscli","version":"1.0.0","commit":"abc","go_version":"go1.25","platform":"linux/amd64"},"audit":{"id":"stale","kind":"web","target":"https://example.test/","started_at":"2026-09-04T12:30:00Z","duration":0,"status":"success"},"findings":[{"id":"stale","rule_id":"http.header.example","title":"Example","severity":"LOW","status":"open","resource":"https://example.test/","evidence":"example","remediation":"fix it"}],"observations":[],"errors":[]}`
+
+func reportWithFutureArray(entries int) string {
+	values := make([]string, entries)
+	for index := range values {
+		values[index] = "0"
+	}
+	return strings.TrimSuffix(validInlineReport, "}") + `,"future_array":[` + strings.Join(values, ",") + `]}`
+}
+
+func reportWithFutureObject(members int) string {
+	values := make([]string, members)
+	for index := range values {
+		values[index] = fmt.Sprintf("%q:%d", fmt.Sprintf("field_%d", index), index)
+	}
+	return strings.TrimSuffix(validInlineReport, "}") + `,"future_object":{` + strings.Join(values, ",") + `}}`
+}

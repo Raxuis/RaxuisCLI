@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	maxReportBytes = int64(16 << 20)
-	maxJSONDepth   = 128
+	maxReportBytes           = int64(16 << 20)
+	maxJSONDepth             = 128
+	maxJSONCollectionEntries = 10_000
+	maxJSONObjectMembers     = 256
 )
 
 var (
@@ -260,7 +262,12 @@ func scanJSONValue(decoder *json.Decoder, depth int) error {
 	switch delimiter {
 	case '{':
 		seen := make(map[string]struct{})
+		members := 0
 		for decoder.More() {
+			members++
+			if members > maxJSONObjectMembers {
+				return invalidReport("document", fmt.Sprintf("exceeds %d object members", maxJSONObjectMembers))
+			}
 			keyToken, err := decoder.Token()
 			if err != nil {
 				return fmt.Errorf("%w: decode object key: %v", ErrInvalidReport, err)
@@ -278,7 +285,12 @@ func scanJSONValue(decoder *json.Decoder, depth int) error {
 			}
 		}
 	case '[':
+		entries := 0
 		for decoder.More() {
+			entries++
+			if entries > maxJSONCollectionEntries {
+				return invalidReport("document", fmt.Sprintf("exceeds %d array entries", maxJSONCollectionEntries))
+			}
 			if err := scanJSONValue(decoder, depth+1); err != nil {
 				return err
 			}
