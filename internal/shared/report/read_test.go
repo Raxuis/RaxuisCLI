@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"raxuiscli/internal/shared/constants"
 )
 
 func TestReadNormalizesSchemaV1Deterministically(t *testing.T) {
@@ -44,6 +46,9 @@ func TestReadNormalizesSchemaV1Deterministically(t *testing.T) {
 	if got := report.Observations; len(got) != 2 || got[0].Key != "http.status" || got[1].Key != "tls.version" {
 		t.Errorf("observations not normalized: %#v", got)
 	}
+	if got := report.Errors; len(got) != 2 || got[0].Code != "a.collect" || got[1].Code != "z.collect" || strings.Contains(got[1].Message, "error-secret") {
+		t.Errorf("report errors not sorted/redacted: %#v", got)
+	}
 }
 
 func TestReadPermitsUnknownAdditiveFields(t *testing.T) {
@@ -78,6 +83,36 @@ func TestReadRejectsUnsupportedAndMalformedDocuments(t *testing.T) {
 	_, err := Read(strings.NewReader(validInlineReport + ` {"extra":true}`))
 	if !errors.Is(err, ErrInvalidReport) {
 		t.Fatalf("trailing document error = %v, want ErrInvalidReport", err)
+	}
+}
+
+func TestReadRejectsOversizedDocuments(t *testing.T) {
+	oversized := validInlineReport + strings.Repeat(" ", int(maxReportBytes)-len(validInlineReport)+1)
+	_, err := Read(strings.NewReader(oversized))
+	if !errors.Is(err, ErrInvalidReport) || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("Read oversized error = %v, want ErrInvalidReport size limit", err)
+	}
+}
+
+func TestReadRejectsDuplicateKeysRecursively(t *testing.T) {
+	for _, fixture := range []string{"duplicate-root.json", "duplicate-nested.json"} {
+		t.Run(fixture, func(t *testing.T) {
+			_, err := ReadFile(filepath.Join("testdata", fixture))
+			if !errors.Is(err, ErrInvalidReport) || !strings.Contains(err.Error(), "duplicate") {
+				t.Fatalf("ReadFile error = %v, want duplicate-key ErrInvalidReport", err)
+			}
+		})
+	}
+}
+
+func TestReadCanonicalizesSeverityForThresholdMatching(t *testing.T) {
+	input := strings.Replace(validInlineReport, `"severity":"LOW"`, `"severity":"low"`, 1)
+	got, err := Read(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Read returned error: %v", err)
+	}
+	if severity := got.Findings[0].Severity; severity != constants.SeverityLow || severity.Rank() != constants.SeverityLow.Rank() {
+		t.Fatalf("severity = %q rank %d, want canonical LOW rank %d", severity, severity.Rank(), constants.SeverityLow.Rank())
 	}
 }
 

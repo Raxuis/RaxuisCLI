@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,11 @@ import (
 	"strings"
 
 	"raxuiscli/internal/shared/constants"
+)
+
+const (
+	maxReportBytes = int64(16 << 20)
+	maxJSONDepth   = 128
 )
 
 var (
@@ -30,19 +36,18 @@ func Read(reader io.Reader) (Report, error) {
 		return Report{}, invalidReport("document", "reader is nil")
 	}
 
-	decoder := json.NewDecoder(reader)
-	var document json.RawMessage
-	if err := decoder.Decode(&document); err != nil {
-		return Report{}, fmt.Errorf("%w: decode JSON: %v", ErrInvalidReport, err)
+	contents, err := io.ReadAll(io.LimitReader(reader, maxReportBytes+1))
+	if err != nil {
+		return Report{}, fmt.Errorf("%w: read JSON: %v", ErrInvalidReport, err)
 	}
-	var trailing json.RawMessage
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return Report{}, invalidReport("document", "contains more than one JSON value")
-		}
-		return Report{}, fmt.Errorf("%w: decode trailing JSON: %v", ErrInvalidReport, err)
+	if int64(len(contents)) > maxReportBytes {
+		return Report{}, invalidReport("document", fmt.Sprintf("exceeds %d-byte limit", maxReportBytes))
+	}
+	if err := rejectDuplicateJSONKeys(contents); err != nil {
+		return Report{}, err
 	}
 
+	document := json.RawMessage(contents)
 	root, err := decodeObject(document, "document")
 	if err != nil {
 		return Report{}, err
@@ -54,6 +59,10 @@ func Read(reader io.Reader) (Report, error) {
 	var decoded Report
 	if err := json.Unmarshal(document, &decoded); err != nil {
 		return Report{}, fmt.Errorf("%w: decode schema v1: %v", ErrInvalidReport, err)
+	}
+	for index := range decoded.Findings {
+		severity, _ := constants.ParseSeverity(string(decoded.Findings[index].Severity))
+		decoded.Findings[index].Severity = severity
 	}
 
 	// IDs are derived data. Recompute them after canonicalization instead of
@@ -70,13 +79,15 @@ func ReadFile(filename string) (Report, error) {
 	if err != nil {
 		return Report{}, fmt.Errorf("read report %q: %w", filename, err)
 	}
-	defer file.Close()
-
-	report, err := Read(file)
-	if err != nil {
-		return Report{}, fmt.Errorf("read report %q: %w", filename, err)
+	loaded, readErr := Read(file)
+	closeErr := file.Close()
+	if readErr != nil {
+		return Report{}, fmt.Errorf("read report %q: %w", filename, readErr)
 	}
-	return report, nil
+	if closeErr != nil {
+		return Report{}, fmt.Errorf("read report %q: close: %w", filename, closeErr)
+	}
+	return loaded, nil
 }
 
 // ValidateComparisonInputs enforces the compatibility rules shared by report
@@ -213,6 +224,71 @@ func validateSchemaV1(root map[string]json.RawMessage) error {
 		if _, err := requiredString(reportError, "message", path+".message", false); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func rejectDuplicateJSONKeys(contents []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(contents))
+	decoder.UseNumber()
+	if err := scanJSONValue(decoder, 0); err != nil {
+		return err
+	}
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return invalidReport("document", "contains more than one JSON value")
+		}
+		return fmt.Errorf("%w: decode trailing JSON: %v", ErrInvalidReport, err)
+	}
+	return nil
+}
+
+func scanJSONValue(decoder *json.Decoder, depth int) error {
+	if depth > maxJSONDepth {
+		return invalidReport("document", fmt.Sprintf("exceeds maximum JSON depth %d", maxJSONDepth))
+	}
+	token, err := decoder.Token()
+	if err != nil {
+		return fmt.Errorf("%w: decode JSON: %v", ErrInvalidReport, err)
+	}
+	delimiter, isDelimiter := token.(json.Delim)
+	if !isDelimiter {
+		return nil
+	}
+
+	switch delimiter {
+	case '{':
+		seen := make(map[string]struct{})
+		for decoder.More() {
+			keyToken, err := decoder.Token()
+			if err != nil {
+				return fmt.Errorf("%w: decode object key: %v", ErrInvalidReport, err)
+			}
+			key, ok := keyToken.(string)
+			if !ok {
+				return invalidReport("document", "contains a non-string object key")
+			}
+			if _, exists := seen[key]; exists {
+				return invalidReport("document", "contains a duplicate object key")
+			}
+			seen[key] = struct{}{}
+			if err := scanJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+	case '[':
+		for decoder.More() {
+			if err := scanJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+	default:
+		return invalidReport("document", "contains an unexpected JSON delimiter")
+	}
+
+	if _, err := decoder.Token(); err != nil {
+		return fmt.Errorf("%w: decode closing delimiter: %v", ErrInvalidReport, err)
 	}
 	return nil
 }
