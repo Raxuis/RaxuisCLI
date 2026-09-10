@@ -80,6 +80,21 @@
 
 ---
 
+## ✅ Sprint 3.5: Audit Web Passif & Rapports (COMPLÉTÉ)
+
+| Commande | Description | Status |
+|----------|-------------|--------|
+| `audit web` | Inspection passive HTTP/TLS, rapports texte/JSON/HTML, redaction et seuil CI `--fail-on` | ✅ Done |
+
+`audit web` accepte une URL HTTP(S) autorisée, analyse les en-têtes de réponse
+et, pour HTTPS, la chaîne de certificats. Les redirections sont désactivées par
+défaut; `--follow-redirects` doit rester limité aux destinations autorisées. Les
+rapports JSON suivent le schéma v1, les sorties fichiers sont atomiques et ne
+remplacent pas un fichier existant sans `--force`. Les interfaces guidées et le
+mode démo ne font pas encore partie des commandes livrées.
+
+---
+
 ## ⏳ Sprint 4: Analyse Binaires
 
 | Commande  | Description                  | Status    |
@@ -105,10 +120,11 @@
 - **Sprint 1.5 (Red Team):** 15/15 ✅
 - **Sprint 2 (Crypto):** 4/4 ✅
 - **Sprint 3 (Web):** 4/4 ✅
+- **Sprint 3.5 (Audit Web):** 1/1 ✅
 - **Sprint 4 (Binaires):** 0/3
 - **Sprint 5 (Utils):** 0/2
 
-**Total: 26 / 31 commandes implémentées (84%)**
+**Total: 27 / 32 commandes implémentées (84%)**
 
 ---
 

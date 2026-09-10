@@ -46,6 +46,85 @@ raxuiscli <command> --help
 
 ---
 
+## Passive web audit and reports
+
+`audit web` passively inspects exactly one HTTP or HTTPS URL that you are
+authorized to test. It makes one bounded GET request for HTTP response headers;
+HTTPS targets also have their certificate chain inspected. It does not crawl,
+fuzz, submit forms, attempt exploits, or enumerate other paths. Response bodies
+are read only up to the configured limit because the audit needs headers, not
+content.
+
+Use a local server when trying the command. In one terminal, serve a directory
+that contains no sensitive files:
+
+```bash
+python3 -m http.server 8080 --bind 127.0.0.1
+```
+
+Then run the audit in another terminal:
+
+```bash
+# Human-readable text report on stdout (the default format)
+./bin/raxuiscli audit web http://127.0.0.1:8080/
+
+# Stable schema-v1 JSON on stdout; suitable for CI or other tools
+./bin/raxuiscli --output=json audit web http://127.0.0.1:8080/
+
+# Write JSON atomically to a file. Re-running against the same path needs --force.
+./bin/raxuiscli --output=json --output-file /tmp/raxuiscli-audit-report.json audit web http://127.0.0.1:8080/
+./bin/raxuiscli --output=json --output-file /tmp/raxuiscli-audit-report.json --force audit web http://127.0.0.1:8080/
+
+# HTML is a self-contained, human-readable report and always requires a file.
+./bin/raxuiscli --output=html --output-file /tmp/raxuiscli-audit-report.html audit web http://127.0.0.1:8080/
+```
+
+The report contains a versioned envelope with tool provenance, audit metadata,
+findings, observations, and partial-failure errors. JSON emitted to stdout
+contains only that envelope. The HTML report has embedded CSS and does not load
+scripts or other remote resources. A deterministic, local-fixture example is
+available at [`docs/examples/audit-report.json`](docs/examples/audit-report.json).
+
+### Scope, redirects, and request controls
+
+The audit accepts one absolute `http` or `https` URL. HTTP targets record that
+TLS was skipped; HTTPS targets inspect both headers and TLS certificates. By
+default redirects are not followed, so a redirect response does not cause the
+audit to contact a second target. Use `--follow-redirects` only when the
+redirect destination is also in your authorized scope. `--timeout`,
+`--max-body-bytes`, repeatable `--header 'Name: Value'`, `--cookie`,
+`--user-agent`, and `--insecure` are available for an authorized target;
+`--insecure` skips TLS verification for the HTTP request.
+
+Reports are designed to avoid retaining secrets: URL credentials are removed,
+query values become `<redacted>`, and sensitive request headers, cookies,
+authorization values, common secret-like text, and certificate private material
+are not persisted. Treat a report as security-sensitive nonetheless, because
+it retains the target's scheme, host, port, path, findings, and non-sensitive
+observations.
+
+### Policy and exit status
+
+`--fail-on` accepts `none`, `info`, `low`, `medium`, `high`, or `critical` and
+defaults to `none`. It lets a completed audit fail a CI job when its highest
+finding meets the chosen severity. The loopback server above intentionally lacks
+some security headers, so this local-only example returns `2` after rendering the
+report:
+
+```bash
+./bin/raxuiscli --output=json --fail-on=medium audit web http://127.0.0.1:8080/
+```
+
+The process exit statuses are exact:
+
+| Status | Meaning |
+|--------|---------|
+| `0` | The audit completed and no configured `--fail-on` threshold was met. |
+| `1` | Input or an operational step failed, such as URL validation, network/TLS/HTTP work, or writing a report. A partial audit still renders its available report, then exits `1`. |
+| `2` | The audit completed and one or more findings met `--fail-on`. |
+
+---
+
 ## Available Commands
 
 ### Network Reconnaissance
