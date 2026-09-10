@@ -15,11 +15,15 @@ import (
 //go:embed templates/report.html
 var reportHTMLTemplate string
 
+//go:embed templates/comparison.html
+var comparisonHTMLTemplate string
+
 //go:embed templates/report.css
 var reportCSS string
 
 type htmlRenderer struct {
-	template *template.Template
+	template           *template.Template
+	comparisonTemplate *template.Template
 }
 
 type htmlReport struct {
@@ -35,7 +39,7 @@ type severityCount struct {
 
 // NewHTMLRenderer returns a renderer for a self-contained audit report.
 func NewHTMLRenderer() Renderer {
-	return htmlRenderer{template: newHTMLTemplate()}
+	return htmlRenderer{template: newHTMLTemplate(reportHTMLTemplate), comparisonTemplate: newHTMLTemplate(comparisonHTMLTemplate)}
 }
 
 func (renderer htmlRenderer) Render(writer io.Writer, value report.Report) error {
@@ -46,12 +50,42 @@ func (renderer htmlRenderer) Render(writer io.Writer, value report.Report) error
 	return writeAll(writer, output.Bytes())
 }
 
-func newHTMLTemplate() *template.Template {
+func (renderer htmlRenderer) RenderComparison(writer io.Writer, value report.Comparison) error {
+	var output bytes.Buffer
+	if err := renderer.comparisonTemplate.Execute(&output, newHTMLComparison(value)); err != nil {
+		return fmt.Errorf("execute HTML comparison template: %w", err)
+	}
+	return writeAll(writer, output.Bytes())
+}
+
+func newHTMLTemplate(sourceTemplate string) *template.Template {
 	const cssPlaceholder = "{{ .EmbeddedCSS }}"
-	source := strings.Replace(reportHTMLTemplate, cssPlaceholder, reportCSS, 1)
+	source := strings.Replace(sourceTemplate, cssPlaceholder, reportCSS, 1)
 	return template.Must(template.New("report.html").Funcs(template.FuncMap{
 		"severityClass": severityClass,
 	}).Parse(source))
+}
+
+type htmlComparison struct {
+	Comparison report.Comparison
+	Worsened   []report.FindingChange
+	Improved   []report.FindingChange
+	Other      []report.FindingChange
+}
+
+func newHTMLComparison(value report.Comparison) htmlComparison {
+	result := htmlComparison{Comparison: value, Worsened: make([]report.FindingChange, 0), Improved: make([]report.FindingChange, 0), Other: make([]report.FindingChange, 0)}
+	for _, change := range value.Findings.Changed {
+		switch {
+		case change.SeverityWorsened:
+			result.Worsened = append(result.Worsened, change)
+		case change.SeverityImproved:
+			result.Improved = append(result.Improved, change)
+		default:
+			result.Other = append(result.Other, change)
+		}
+	}
+	return result
 }
 
 func severityCounts(value report.Report) []severityCount {

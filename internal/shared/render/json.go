@@ -23,3 +23,11 @@ func (jsonRenderer) Render(writer io.Writer, value report.Report) error {
 	}
 	return writeAll(writer, append(encoded, '\n'))
 }
+
+func (jsonRenderer) RenderComparison(writer io.Writer, value report.Comparison) error {
+	encoded, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal comparison JSON: %w", err)
+	}
+	return writeAll(writer, append(encoded, '\n'))
+}

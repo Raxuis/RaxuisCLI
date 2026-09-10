@@ -86,6 +86,78 @@ func TestHTMLRendererIsSelfContainedAndSafe(t *testing.T) {
 	}
 }
 
+func TestRenderComparisonGolden(t *testing.T) {
+	comparison := fixedComparison(t)
+	for _, test := range []struct {
+		name     string
+		renderer ComparisonRenderer
+		golden   string
+	}{
+		{name: "text", renderer: NewTextRenderer().(ComparisonRenderer), golden: "comparison.txt"},
+		{name: "json", renderer: NewJSONRenderer().(ComparisonRenderer), golden: "comparison.json"},
+		{name: "html", renderer: NewHTMLRenderer().(ComparisonRenderer), golden: "comparison.html"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var got bytes.Buffer
+			if err := test.renderer.RenderComparison(&got, comparison); err != nil {
+				t.Fatalf("render comparison: %v", err)
+			}
+
+			goldenPath := filepath.Join("testdata", test.golden)
+			if os.Getenv("UPDATE_GOLDEN") != "" {
+				if err := os.WriteFile(goldenPath, got.Bytes(), 0o600); err != nil {
+					t.Fatalf("update golden: %v", err)
+				}
+			}
+			want, err := os.ReadFile(goldenPath)
+			if err != nil {
+				t.Fatalf("read golden: %v", err)
+			}
+			if got.String() != string(want) {
+				t.Errorf("rendered comparison differs from %s\nwant:\n%s\ngot:\n%s", test.golden, want, got.String())
+			}
+		})
+	}
+}
+
+func TestComparisonRenderersEmphasizeRegressions(t *testing.T) {
+	comparison := fixedComparison(t)
+	for _, renderer := range []ComparisonRenderer{
+		NewTextRenderer().(ComparisonRenderer),
+		NewHTMLRenderer().(ComparisonRenderer),
+	} {
+		var got bytes.Buffer
+		if err := renderer.RenderComparison(&got, comparison); err != nil {
+			t.Fatalf("render comparison: %v", err)
+		}
+		body := got.String()
+		regressions, resolutions := bytes.Index([]byte(body), []byte("Regressions")), bytes.Index([]byte(body), []byte("Resolutions"))
+		if regressions < 0 || resolutions < 0 || regressions >= resolutions {
+			t.Errorf("comparison does not place regressions before resolutions: %s", body)
+		}
+	}
+	var htmlOutput bytes.Buffer
+	if err := NewHTMLRenderer().(ComparisonRenderer).RenderComparison(&htmlOutput, comparison); err != nil {
+		t.Fatalf("render HTML comparison: %v", err)
+	}
+	for _, forbidden := range []string{"<script", "src=\"http"} {
+		if bytes.Contains(htmlOutput.Bytes(), []byte(forbidden)) {
+			t.Errorf("HTML comparison contains forbidden %q: %s", forbidden, htmlOutput.Bytes())
+		}
+	}
+	if !bytes.Contains(htmlOutput.Bytes(), []byte(`href="https://github.com/raxuis"`)) || !bytes.Contains(htmlOutput.Bytes(), []byte("Created by Raxuis ·")) {
+		t.Errorf("HTML comparison does not retain Raxuis credit: %s", htmlOutput.Bytes())
+	}
+
+	var jsonOutput bytes.Buffer
+	if err := NewJSONRenderer().(ComparisonRenderer).RenderComparison(&jsonOutput, comparison); err != nil {
+		t.Fatalf("render JSON comparison: %v", err)
+	}
+	if bytes.Contains(jsonOutput.Bytes(), []byte("RaxuisCLI Audit Report")) || !bytes.HasPrefix(jsonOutput.Bytes(), []byte("{\n  \"schema_version\": 1,")) {
+		t.Errorf("JSON comparison is not only its envelope: %s", jsonOutput.Bytes())
+	}
+}
+
 func fixedReport() report.Report {
 	return report.NewReport(
 		report.ToolInfo{
@@ -101,4 +173,25 @@ func fixedReport() report.Report {
 		[]report.Observation{{Key: "http.status", Value: "200"}, {Key: "tls.version", Value: "TLS 1.3"}},
 		[]report.ReportError{{Code: "tls.chain", Message: "certificate chain could not be fully verified"}},
 	)
+}
+
+func fixedComparison(t *testing.T) report.Comparison {
+	t.Helper()
+	before := fixedReport()
+	before.Findings = append(before.Findings,
+		models.VulnResult{RuleID: "http.header.x-frame-options", Title: "X-Frame-Options missing", Severity: constants.SeverityLow, Status: "open", Resource: "https://example.com/login", Evidence: "header missing", Remediation: "Set X-Frame-Options."},
+	)
+	before.Observations = append(before.Observations, report.Observation{Key: "server", Value: "before"}, report.Observation{Key: "removed", Value: "gone"})
+	after := fixedReport()
+	after.Findings[0].Severity = constants.SeverityCritical
+	after.Findings[0].Evidence = "Strict-Transport-Security response header was absent after retry."
+	after.Findings = append(after.Findings,
+		models.VulnResult{RuleID: "http.header.content-security-policy", Title: "CSP header is missing", Severity: constants.SeverityHigh, Status: "open", Resource: "https://example.com/login", Evidence: "Content-Security-Policy response header was absent.", Remediation: "Set Content-Security-Policy."},
+	)
+	after.Observations = append(after.Observations, report.Observation{Key: "server", Value: "after"}, report.Observation{Key: "added", Value: "new"})
+	comparison, err := report.Compare(before, after, false)
+	if err != nil {
+		t.Fatalf("Compare: %v", err)
+	}
+	return comparison
 }

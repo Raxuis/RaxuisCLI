@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "before": {
+    "tool": {
+      "name": "raxuiscli",
+      "version": "1.2.3",
+      "commit": "abc1234",
+      "go_version": "go1.25.13",
+      "platform": "linux/amd64"
+    },
+    "audit": {
+      "id": "audit-demo-001",
+      "kind": "web",
+      "target": "https://example.com/login",
+      "started_at": "2026-09-04T12:30:00Z",
+      "duration": 1250000000,
+      "status": "partial"
+    }
+  },
+  "after": {
+    "tool": {
+      "name": "raxuiscli",
+      "version": "1.2.3",
+      "commit": "abc1234",
+      "go_version": "go1.25.13",
+      "platform": "linux/amd64"
+    },
+    "audit": {
+      "id": "audit-demo-001",
+      "kind": "web",
+      "target": "https://example.com/login",
+      "started_at": "2026-09-04T12:30:00Z",
+      "duration": 1250000000,
+      "status": "partial"
+    }
+  },
+  "findings": {
+    "added": [
+      {
+        "id": "89ad4d34683da3710f3318c54387609f7fc3872f8839078d112087a17c3765cb",
+        "rule_id": "http.header.content-security-policy",
+        "title": "CSP header is missing",
+        "severity": "HIGH",
+        "status": "open",
+        "resource": "https://example.com/login",
+        "evidence": "Content-Security-Policy response header was absent.",
+        "remediation": "Set Content-Security-Policy."
+      }
+    ],
+    "resolved": [
+      {
+        "id": "16245dd3d4ba6ad67c218cd0b8462ebbcdabbc1d17bf48840b2aabe906570b7f",
+        "rule_id": "http.header.x-frame-options",
+        "title": "X-Frame-Options missing",
+        "severity": "LOW",
+        "status": "open",
+        "resource": "https://example.com/login",
+        "evidence": "header missing",
+        "remediation": "Set X-Frame-Options."
+      }
+    ],
+    "changed": [
+      {
+        "before": {
+          "id": "6a66c8ff3b8fd6a7e5ad54d6e13fbb65196c916037d49f90592b7e22f6b6cfd2",
+          "rule_id": "tls.protocol.deprecated",
+          "title": "Deprecated TLS protocol accepted",
+          "severity": "MEDIUM",
+          "status": "open",
+          "resource": "https://example.com/login",
+          "evidence": "TLS 1.0 was accepted during the handshake.",
+          "remediation": "Disable TLS 1.0 and TLS 1.1."
+        },
+        "after": {
+          "id": "6a66c8ff3b8fd6a7e5ad54d6e13fbb65196c916037d49f90592b7e22f6b6cfd2",
+          "rule_id": "tls.protocol.deprecated",
+          "title": "Deprecated TLS protocol accepted",
+          "severity": "CRITICAL",
+          "status": "open",
+          "resource": "https://example.com/login",
+          "evidence": "Strict-Transport-Security response header was absent after retry.",
+          "remediation": "Disable TLS 1.0 and TLS 1.1."
+        },
+        "severity_worsened": true,
+        "severity_improved": false,
+        "evidence_changed": true,
+        "display_changed": false
+      }
+    ],
+    "unchanged": [
+      {
+        "id": "7fa5b56d9b9d18aa0d33f72d96dcefa9033d8b29d990873ec053b7e276955d1d",
+        "rule_id": "http.header.hsts",
+        "title": "HSTS header is missing",
+        "severity": "HIGH",
+        "status": "open",
+        "resource": "https://example.com/login",
+        "evidence": "Strict-Transport-Security response header was absent.",
+        "remediation": "Set Strict-Transport-Security with an appropriate max-age."
+      }
+    ]
+  },
+  "observations": {
+    "added": [
+      {
+        "key": "added",
+        "value": "new"
+      }
+    ],
+    "removed": [
+      {
+        "key": "removed",
+        "value": "gone"
+      }
+    ],
+    "changed": [
+      {
+        "key": "server",
+        "before": "before",
+        "after": "after"
+      }
+    ],
+    "unchanged": [
+      {
+        "key": "http.status",
+        "value": "200"
+      },
+      {
+        "key": "tls.version",
+        "value": "TLS 1.3"
+      }
+    ]
+  }
+}

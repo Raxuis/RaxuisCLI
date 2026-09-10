@@ -11,6 +11,13 @@ import (
 
 type textRenderer struct{}
 
+// ComparisonRenderer is an optional renderer capability for the versioned
+// report comparison envelope. Renderer remains unchanged so existing
+// report.WriteFile callers stay source compatible.
+type ComparisonRenderer interface {
+	RenderComparison(io.Writer, report.Comparison) error
+}
+
 // NewTextRenderer returns a renderer for a portable, human-readable report.
 func NewTextRenderer() Renderer {
 	return textRenderer{}
@@ -67,5 +74,70 @@ func (textRenderer) Render(writer io.Writer, value report.Report) error {
 		fmt.Fprintf(&output, "%s: %s\n", reportError.Code, reportError.Message)
 	}
 
+	return writeAll(writer, output.Bytes())
+}
+
+func (textRenderer) RenderComparison(writer io.Writer, value report.Comparison) error {
+	var output bytes.Buffer
+	fmt.Fprintln(&output, "RaxuisCLI Audit Comparison")
+	fmt.Fprintln(&output, "==========================")
+	fmt.Fprintf(&output, "Before: %s (%s)\n", value.Before.Audit.ID, value.Before.Audit.Target)
+	fmt.Fprintf(&output, "After: %s (%s)\n", value.After.Audit.ID, value.After.Audit.Target)
+	fmt.Fprintf(&output, "Kind: %s\n", value.After.Audit.Kind)
+
+	worsened := make([]report.FindingChange, 0)
+	improved := make([]report.FindingChange, 0)
+	otherChanges := make([]report.FindingChange, 0)
+	for _, change := range value.Findings.Changed {
+		switch {
+		case change.SeverityWorsened:
+			worsened = append(worsened, change)
+		case change.SeverityImproved:
+			improved = append(improved, change)
+		default:
+			otherChanges = append(otherChanges, change)
+		}
+	}
+
+	fmt.Fprintf(&output, "\nRegressions (%d)\n", len(value.Findings.Added)+len(worsened))
+	fmt.Fprintln(&output, "---------------")
+	if len(value.Findings.Added) == 0 && len(worsened) == 0 {
+		fmt.Fprintln(&output, "None")
+	}
+	for _, finding := range value.Findings.Added {
+		fmt.Fprintf(&output, "ADDED [%s] %s\n  Rule: %s\n  Resource: %s\n", finding.Severity, finding.Title, finding.RuleID, finding.Resource)
+	}
+	for _, change := range worsened {
+		fmt.Fprintf(&output, "WORSENED [%s -> %s] %s\n  Rule: %s\n  Resource: %s\n", change.Before.Severity, change.After.Severity, change.After.Title, change.After.RuleID, change.After.Resource)
+	}
+
+	fmt.Fprintf(&output, "\nResolutions (%d)\n", len(value.Findings.Resolved)+len(improved))
+	fmt.Fprintln(&output, "---------------")
+	if len(value.Findings.Resolved) == 0 && len(improved) == 0 {
+		fmt.Fprintln(&output, "None")
+	}
+	for _, finding := range value.Findings.Resolved {
+		fmt.Fprintf(&output, "RESOLVED [%s] %s\n  Rule: %s\n  Resource: %s\n", finding.Severity, finding.Title, finding.RuleID, finding.Resource)
+	}
+	for _, change := range improved {
+		fmt.Fprintf(&output, "IMPROVED [%s -> %s] %s\n  Rule: %s\n  Resource: %s\n", change.Before.Severity, change.After.Severity, change.After.Title, change.After.RuleID, change.After.Resource)
+	}
+
+	fmt.Fprintf(&output, "\nOther finding changes (%d)\n", len(otherChanges))
+	fmt.Fprintln(&output, "-------------------------")
+	if len(otherChanges) == 0 {
+		fmt.Fprintln(&output, "None")
+	}
+	for _, change := range otherChanges {
+		fmt.Fprintf(&output, "CHANGED [%s] %s\n  Rule: %s\n", change.After.Severity, change.After.Title, change.After.RuleID)
+		if change.EvidenceChanged {
+			fmt.Fprintln(&output, "  Evidence changed")
+		}
+		if change.DisplayChanged {
+			fmt.Fprintln(&output, "  Display details changed")
+		}
+	}
+
+	fmt.Fprintf(&output, "\nObservations: %d added, %d removed, %d changed\n", len(value.Observations.Added), len(value.Observations.Removed), len(value.Observations.Changed))
 	return writeAll(writer, output.Bytes())
 }
