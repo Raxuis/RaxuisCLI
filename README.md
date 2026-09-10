@@ -52,8 +52,9 @@ raxuiscli <command> --help
 authorized to test. It makes one bounded GET request for HTTP response headers;
 HTTPS targets also have their certificate chain inspected. It does not crawl,
 fuzz, submit forms, attempt exploits, or enumerate other paths. Response bodies
-are read only up to the configured limit because the audit needs headers, not
-content.
+retained while collecting the audit are capped at the configured limit; one
+extra byte may be read only to detect truncation. The report does not persist
+response bodies because the audit needs headers, not content.
 
 Use a local server when trying the command. In one terminal, serve a directory
 that contains no sensitive files:
@@ -1041,10 +1042,11 @@ See [ROADMAP.md](ROADMAP.md) for progress and upcoming features.
 | Sprint 1.5 | Red Team Tools (15 commands) | ✅ 100% |
 | Sprint 2 | Cryptography (cipher, jwt, keygen, certinfo) | ✅ 100% |
 | Sprint 3 | Web Security (http, fuzz, vuln, cookie) | ✅ 100% |
+| Sprint 3.5 | Audit Web (`audit web`) | ✅ 100% |
 | Sprint 4 | Binary Analysis | ⏳ Coming soon |
 | Sprint 5 | Utilities | ⏳ Coming soon |
 
-**Current progress: 26/31 commands (84%)**
+**Current progress: 27 / 32 commands (84%)**
 
 ---
 
