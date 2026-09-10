@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "future_top_level": {"enabled": true},
+  "tool": {
+    "name": "raxuiscli",
+    "version": "1.0.0",
+    "commit": "abc123",
+    "go_version": "go1.25.0",
+    "platform": "linux/amd64",
+    "future_tool_field": "kept compatible"
+  },
+  "audit": {
+    "id": "stored-id",
+    "kind": "web",
+    "target": "https://example.test/",
+    "started_at": "2026-09-04T12:30:00Z",
+    "duration": 0,
+    "status": "success",
+    "future_audit_field": 42
+  },
+  "findings": [
+    {
+      "id": "stored-finding-id",
+      "rule_id": "http.header.example",
+      "title": "Example",
+      "severity": "LOW",
+      "status": "open",
+      "resource": "https://example.test/",
+      "evidence": "Header not present",
+      "remediation": "Fix it",
+      "future_finding_field": [1, 2, 3]
+    }
+  ],
+  "observations": [],
+  "errors": []
+}
