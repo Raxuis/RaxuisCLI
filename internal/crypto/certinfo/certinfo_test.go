@@ -273,6 +273,25 @@ func TestGetCertFromHostLocalTLSServer(t *testing.T) {
 	}
 }
 
+func TestGetCertFromHostContextAtWithDialContextUsesInjectedDial(t *testing.T) {
+	srv := httptest.NewTLSServer(nil)
+	defer srv.Close()
+	host, port := serverHostPort(t, srv.Listener.Addr().String())
+
+	var network, address string
+	dialer := &net.Dialer{}
+	chain, err := GetCertFromHostContextAtWithDialContext(context.Background(), host, port, time.Now(), func(ctx context.Context, gotNetwork, gotAddress string) (net.Conn, error) {
+		network, address = gotNetwork, gotAddress
+		return dialer.DialContext(ctx, gotNetwork, gotAddress)
+	})
+	if err != nil {
+		t.Fatalf("GetCertFromHostContextAtWithDialContext: %v", err)
+	}
+	if len(chain.Certificates) == 0 || network != "tcp" || address != srv.Listener.Addr().String() {
+		t.Fatalf("chain=%+v dial=%s/%s, want injected TCP dial to %s", chain, network, address, srv.Listener.Addr())
+	}
+}
+
 func TestGetCertFromHostContextAtUsesRequestedVerificationTime(t *testing.T) {
 	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 	server := httptest.NewUnstartedServer(nil)

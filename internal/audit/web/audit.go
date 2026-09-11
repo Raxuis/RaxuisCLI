@@ -39,6 +39,9 @@ type Options struct {
 	HTTPCollector  HTTPCollector
 	TLSCollector   TLSCollector
 	Now            func() time.Time
+	// DialContext optionally controls socket creation for both default
+	// collectors. A nil value preserves their standard network behavior.
+	DialContext func(context.Context, string, string) (net.Conn, error)
 }
 
 // HTTPCollector retrieves the facts needed for a passive header audit. It is
@@ -99,7 +102,7 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 	}
 	tlsCollector := options.TLSCollector
 	if tlsCollector == nil {
-		tlsCollector = defaultTLSCollector{at: startedAt}
+		tlsCollector = defaultTLSCollector{at: startedAt, dialContext: options.DialContext}
 	}
 
 	resource := target.String()
@@ -259,7 +262,8 @@ func (defaultHTTPCollector) CollectHTTP(ctx context.Context, target *url.URL, op
 		// Keep the HTTP client's compatibility timeout beyond the audit
 		// context's deadline. The context is therefore the single deadline
 		// governing all collectors.
-		Timeout: collectorTimeoutSeconds(options.Timeout),
+		Timeout:     collectorTimeoutSeconds(options.Timeout),
+		DialContext: options.DialContext,
 	}, maxBodyBytes)
 	if err != nil {
 		return HTTPCollection{}, err
@@ -279,11 +283,12 @@ func collectorTimeoutSeconds(timeout time.Duration) int {
 }
 
 type defaultTLSCollector struct {
-	at time.Time
+	at          time.Time
+	dialContext func(context.Context, string, string) (net.Conn, error)
 }
 
 func (collector defaultTLSCollector) CollectTLS(ctx context.Context, host string, port int) (*certinfo.ChainInfo, error) {
-	return certinfo.GetCertFromHostContextAt(ctx, host, port, collector.at)
+	return certinfo.GetCertFromHostContextAtWithDialContext(ctx, host, port, collector.at, collector.dialContext)
 }
 
 // headerResults adapts the existing passive header checks without performing a

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -27,6 +28,9 @@ type RequestOptions struct {
 	UserAgent   string
 	Cookie      string
 	BasicAuth   string
+	// DialContext optionally controls socket creation. A nil value retains
+	// net/http's default dialer behavior.
+	DialContext func(context.Context, string, string) (net.Conn, error)
 }
 
 // Response holds HTTP response data
@@ -96,6 +100,7 @@ func DoRequestContext(ctx context.Context, opts RequestOptions, maxBodyBytes int
 
 	// Create HTTP client
 	transport := &http.Transport{
+		DialContext: opts.DialContext,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: opts.Insecure,
 		},

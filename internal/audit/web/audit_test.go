@@ -64,6 +64,39 @@ func TestAuditHTTPSCollectsHTTPAndTLS(t *testing.T) {
 	}
 }
 
+func TestAuditPassesOneDialGuardThroughBothDefaultCollectors(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		setSecureHeaders(w)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	var destinations []string
+	dialer := &net.Dialer{}
+	value, err := Audit(context.Background(), server.URL, Options{
+		InsecureTLS: true,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			destinations = append(destinations, network+"/"+address)
+			return dialer.DialContext(ctx, network, address)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value.Audit.Status != "success" {
+		t.Fatalf("status=%q errors=%+v", value.Audit.Status, value.Errors)
+	}
+	if len(destinations) != 2 {
+		t.Fatalf("dial destinations=%v, want HTTP and TLS collectors", destinations)
+	}
+	want := "tcp/" + server.Listener.Addr().String()
+	for _, destination := range destinations {
+		if destination != want {
+			t.Fatalf("dial destination=%q, want %q", destination, want)
+		}
+	}
+}
+
 func TestAuditHTTPSValidatesEveryCollectedCertificate(t *testing.T) {
 	target := "https://example.test/"
 	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)

@@ -72,6 +72,7 @@ func runWeb(ctx context.Context, runner WebAuditRunner, starter func() (*webFixt
 		AllowRedirects: false,
 		InsecureTLS:    true,
 		Now:            func() time.Time { return demoAuditInstant },
+		DialContext:    fixture.dialGuard.DialContext,
 	})
 	if err != nil {
 		return value, err
@@ -85,6 +86,7 @@ type webFixture struct {
 	targetURL string
 	closeOnce sync.Once
 	closeErr  error
+	dialGuard *loopbackDialGuard
 }
 
 func startWebFixture() (*webFixture, error) {
@@ -112,6 +114,7 @@ func startWebFixture() (*webFixture, error) {
 		listener:  listener,
 		server:    server,
 		targetURL: "https://" + listener.Addr().String() + "/",
+		dialGuard: newLoopbackDialGuard((&net.Dialer{}).DialContext),
 	}
 	go func() {
 		serveErr := server.Serve(tlsListener)
@@ -214,6 +217,47 @@ func (fixture *webFixture) Close() error {
 
 func (fixture *webFixture) remoteAddresses() []string {
 	return fixture.listener.remoteAddresses()
+}
+
+func (fixture *webFixture) dialDestinations() []string {
+	return fixture.dialGuard.destinations()
+}
+
+type loopbackDialGuard struct {
+	dial    func(context.Context, string, string) (net.Conn, error)
+	mu      sync.Mutex
+	allowed []string
+}
+
+func newLoopbackDialGuard(dial func(context.Context, string, string) (net.Conn, error)) *loopbackDialGuard {
+	return &loopbackDialGuard{dial: dial}
+}
+
+func (guard *loopbackDialGuard) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if guard == nil || guard.dial == nil {
+		return nil, fmt.Errorf("demo loopback dialer is not configured")
+	}
+	if network != "tcp" && network != "tcp4" && network != "tcp6" {
+		return nil, fmt.Errorf("demo permits only loopback TCP connections, got network %q", network)
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("demo requires a loopback IP and port: %w", err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return nil, fmt.Errorf("demo refused non-loopback destination %q", address)
+	}
+	guard.mu.Lock()
+	guard.allowed = append(guard.allowed, address)
+	guard.mu.Unlock()
+	return guard.dial(ctx, network, address)
+}
+
+func (guard *loopbackDialGuard) destinations() []string {
+	guard.mu.Lock()
+	defer guard.mu.Unlock()
+	return append([]string(nil), guard.allowed...)
 }
 
 type loopbackListener struct {

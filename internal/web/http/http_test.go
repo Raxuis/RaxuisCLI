@@ -55,6 +55,29 @@ func TestDoRequestContextHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestDoRequestContextUsesInjectedDialContext(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	var network, address string
+	dialer := &net.Dialer{}
+	response, err := DoRequestContext(context.Background(), RequestOptions{
+		URL: srv.URL,
+		DialContext: func(ctx context.Context, gotNetwork, gotAddress string) (net.Conn, error) {
+			network, address = gotNetwork, gotAddress
+			return dialer.DialContext(ctx, gotNetwork, gotAddress)
+		},
+	}, 1024)
+	if err != nil {
+		t.Fatalf("DoRequestContext: %v", err)
+	}
+	if response.Body != "ok" || network != "tcp" || address != srv.Listener.Addr().String() {
+		t.Fatalf("body=%q dial=%s/%s, want injected TCP dial to %s", response.Body, network, address, srv.Listener.Addr())
+	}
+}
+
 func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("body"))

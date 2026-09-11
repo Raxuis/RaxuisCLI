@@ -81,6 +81,13 @@ func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainI
 // it at at. A zero instant retains the compatibility behavior of using the
 // current time.
 func GetCertFromHostContextAt(ctx context.Context, host string, port int, at time.Time) (*ChainInfo, error) {
+	return GetCertFromHostContextAtWithDialContext(ctx, host, port, at, nil)
+}
+
+// GetCertFromHostContextAtWithDialContext retrieves and verifies a host certificate
+// using dialContext for socket creation. A nil callback preserves the default
+// net.Dialer behavior used by the compatibility wrappers.
+func GetCertFromHostContextAtWithDialContext(ctx context.Context, host string, port int, at time.Time, dialContext func(context.Context, string, string) (net.Conn, error)) (*ChainInfo, error) {
 	if at.IsZero() {
 		at = time.Now()
 	}
@@ -89,8 +96,10 @@ func GetCertFromHostContextAt(ctx context.Context, host string, port int, at tim
 	}
 
 	address := net.JoinHostPort(host, strconv.Itoa(port))
-	dialer := &net.Dialer{}
-	rawConnection, err := dialer.DialContext(ctx, "tcp", address)
+	if dialContext == nil {
+		dialContext = (&net.Dialer{}).DialContext
+	}
+	rawConnection, err := dialContext(ctx, "tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 func TestWebUsesProductionAuditAndOnlyLoopbackConnections(t *testing.T) {
 	var captured *webFixture
 	called := false
+	underlyingDials := 0
 	value, err := runWeb(context.Background(), func(ctx context.Context, target string, options webaudit.Options) (report.Report, error) {
 		called = true
 		parsed, parseErr := url.Parse(target)
@@ -35,6 +37,13 @@ func TestWebUsesProductionAuditAndOnlyLoopbackConnections(t *testing.T) {
 		return webaudit.Audit(ctx, target, options)
 	}, func() (*webFixture, error) {
 		fixture, startErr := startWebFixture()
+		if startErr == nil {
+			dialer := &net.Dialer{}
+			fixture.dialGuard = newLoopbackDialGuard(func(ctx context.Context, network, address string) (net.Conn, error) {
+				underlyingDials++
+				return dialer.DialContext(ctx, network, address)
+			})
+		}
 		captured = fixture
 		return fixture, startErr
 	})
@@ -62,7 +71,46 @@ func TestWebUsesProductionAuditAndOnlyLoopbackConnections(t *testing.T) {
 	if got := len(captured.remoteAddresses()); got < 2 {
 		t.Fatalf("accepted connections = %d, want HTTP and TLS collectors", got)
 	}
+	guardedDestinations := captured.dialDestinations()
+	if len(guardedDestinations) != 2 {
+		t.Fatalf("guarded dial destinations = %v, want HTTP and TLS collectors", guardedDestinations)
+	}
+	if underlyingDials != 2 {
+		t.Fatalf("underlying dials = %d, want both production collectors", underlyingDials)
+	}
+	for _, destination := range guardedDestinations {
+		host, _, splitErr := net.SplitHostPort(destination)
+		if splitErr != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+			t.Fatalf("dial guard allowed non-loopback destination %q", destination)
+		}
+	}
+	_, publicErr := captured.dialGuard.DialContext(context.Background(), "tcp", "1.1.1.1:443")
+	if publicErr == nil || !strings.Contains(publicErr.Error(), "loopback") {
+		t.Fatalf("public dial error = %v, want loopback refusal", publicErr)
+	}
+	if underlyingDials != 2 {
+		t.Fatalf("public destination reached underlying dial; calls=%d", underlyingDials)
+	}
 	assertFixtureClosed(t, captured)
+}
+
+func TestLoopbackDialGuardRejectsPublicDestinationBeforeDial(t *testing.T) {
+	underlyingCalls := 0
+	guard := newLoopbackDialGuard(func(context.Context, string, string) (net.Conn, error) {
+		underlyingCalls++
+		return nil, errors.New("underlying dial must not run")
+	})
+
+	_, err := guard.DialContext(context.Background(), "tcp", "1.1.1.1:443")
+	if err == nil || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("public dial error = %v, want loopback refusal", err)
+	}
+	if underlyingCalls != 0 {
+		t.Fatalf("underlying dial called %d times for rejected public address", underlyingCalls)
+	}
+	if got := guard.destinations(); len(got) != 0 {
+		t.Fatalf("rejected destinations recorded as allowed: %v", got)
+	}
 }
 
 func TestWebProducesDeterministicDocumentedFindings(t *testing.T) {
