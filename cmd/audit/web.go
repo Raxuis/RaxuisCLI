@@ -192,5 +192,11 @@ func buildToolInfo() report.ToolInfo {
 			tool.GoVersion = strings.TrimSpace(parts[1])
 		}
 	}
+	// `go run` and source-tree test builds may not embed VCS metadata. Schema-v1
+	// reports still require a non-empty commit so every emitted snapshot remains
+	// readable by report.Read and therefore comparable locally.
+	if strings.TrimSpace(tool.Commit) == "" {
+		tool.Commit = "unknown"
+	}
 	return tool
 }

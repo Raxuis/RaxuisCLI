@@ -188,7 +188,10 @@ func TestWebAttachesBuildMetadata(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &captured); err != nil {
 		t.Fatal(err)
 	}
-	if captured.Tool.Name != "raxuiscli" || captured.Tool.Version == "" || captured.Tool.GoVersion != runtime.Version() || captured.Tool.Platform != runtime.GOOS+"/"+runtime.GOARCH {
+	if _, err := report.Read(bytes.NewReader(stdout.Bytes())); err != nil {
+		t.Fatalf("emitted audit snapshot is not self-readable: %v", err)
+	}
+	if captured.Tool.Name != "raxuiscli" || captured.Tool.Version == "" || captured.Tool.Commit == "" || captured.Tool.GoVersion != runtime.Version() || captured.Tool.Platform != runtime.GOOS+"/"+runtime.GOARCH {
 		t.Errorf("tool metadata = %+v, want current build metadata", captured.Tool)
 	}
 }
