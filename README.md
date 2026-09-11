@@ -1061,17 +1061,20 @@ Using this tool against systems without explicit authorization is illegal. The a
 
 See [ROADMAP.md](ROADMAP.md) for progress and upcoming features.
 
-| Sprint | Description | Status |
-|--------|-------------|--------|
-| Sprint 1 | Network (dns, whois, recon) | ✅ 100% |
-| Sprint 1.5 | Red Team Tools (15 commands) | ✅ 100% |
-| Sprint 2 | Cryptography (cipher, jwt, keygen, certinfo) | ✅ 100% |
-| Sprint 3 | Web Security (http, fuzz, vuln, cookie) | ✅ 100% |
-| Sprint 3.5 | Audit Web (`audit web`) | ✅ 100% |
-| Sprint 4 | Binary Analysis | ⏳ Coming soon |
-| Sprint 5 | Utilities | ⏳ Coming soon |
+<!-- BEGIN GENERATED COMMAND CATALOG -->
+This table is generated from the command catalog. `stable` means the implementation is supported; `experimental` means it may be incomplete or change; `informational` means it primarily provides guidance or generated examples.
 
-**Current progress: 27 / 32 commands (84%)**
+| Category | Stable | Experimental | Informational | Total |
+|---|---:|---:|---:|---:|
+| audit & reporting | 5 | 0 | 0 | 5 |
+| core | 1 | 0 | 0 | 1 |
+| cryptography | 0 | 30 | 0 | 30 |
+| infrastructure | 0 | 22 | 1 | 23 |
+| network | 0 | 7 | 0 | 7 |
+| offensive security | 0 | 57 | 14 | 71 |
+| utilities | 0 | 28 | 0 | 28 |
+| web security | 0 | 33 | 2 | 35 |
+<!-- END GENERATED COMMAND CATALOG -->
 
 ---
 
