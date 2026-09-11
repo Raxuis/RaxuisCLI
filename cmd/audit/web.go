@@ -163,13 +163,20 @@ func highestSeverityAt(threshold constants.Severity, value report.Report) (const
 // envelope. The banner is produced from ldflags and Go's embedded build info,
 // so reports retain the same provenance shown by `raxuiscli version`.
 func buildToolInfo() report.ToolInfo {
+	return toolInfoFromVersionBanner(cmd.RootCmd.Version)
+}
+
+// toolInfoFromVersionBanner translates the stable user-facing version banner
+// into schema-v1 report metadata. It is deliberately independent of the
+// process build provenance so source builds have deterministic report output.
+func toolInfoFromVersionBanner(banner string) report.ToolInfo {
 	tool := report.ToolInfo{
 		Name:      "raxuiscli",
 		Version:   "dev",
 		GoVersion: runtime.Version(),
 		Platform:  runtime.GOOS + "/" + runtime.GOARCH,
 	}
-	lines := strings.Split(cmd.RootCmd.Version, "\n")
+	lines := strings.Split(banner, "\n")
 	if len(lines) == 0 {
 		return tool
 	}

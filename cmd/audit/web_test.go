@@ -196,6 +196,31 @@ func TestWebAttachesBuildMetadata(t *testing.T) {
 	}
 }
 
+func TestToolInfoFromVersionBannerCommitFallback(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		banner string
+		commit string
+	}{
+		{
+			name:   "missing commit uses deterministic fallback",
+			banner: "raxuiscli dev\nlinux/amd64, go1.test",
+			commit: "unknown",
+		},
+		{
+			name:   "embedded commit is retained",
+			banner: "raxuiscli v1.2.3 (abc123def456)\nlinux/amd64, go1.test",
+			commit: "abc123def456",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toolInfoFromVersionBanner(tt.banner).Commit; got != tt.commit {
+				t.Fatalf("Commit = %q, want %q", got, tt.commit)
+			}
+		})
+	}
+}
+
 func newTestRoot(t *testing.T, runner auditRunner) *cobra.Command {
 	t.Helper()
 	root := &cobra.Command{
