@@ -86,6 +86,31 @@ contains only that envelope. The HTML report has embedded CSS and does not load
 scripts or other remote resources. A deterministic, local-fixture example is
 available at [`docs/examples/audit-report.json`](docs/examples/audit-report.json).
 
+### Compare saved audit reports
+
+`compare` accepts two schema-v1 JSON snapshots for the same audit kind and
+target, then writes a deterministic difference. It classifies findings as
+added, resolved, changed, or unchanged; use `--allow-target-mismatch` only when
+comparing intentionally different local targets. The following uses the bundled
+local fixture, so it makes no network request and always produces an empty diff:
+
+```bash
+mkdir -p /tmp/raxuiscli-compare
+cp docs/examples/audit-report.json /tmp/raxuiscli-compare/before.json
+cp docs/examples/audit-report.json /tmp/raxuiscli-compare/after.json
+
+# Text is the default; JSON is a standalone comparison envelope for CI.
+./bin/raxuiscli compare /tmp/raxuiscli-compare/before.json /tmp/raxuiscli-compare/after.json
+./bin/raxuiscli --output=json compare /tmp/raxuiscli-compare/before.json /tmp/raxuiscli-compare/after.json
+```
+
+Use snapshots captured before and after an authorized local configuration change
+to review regressions. `--fail-on-new=medium` returns status `2` only for an
+added finding or a finding whose severity worsened to at least `MEDIUM`; it does
+not fail for resolved, improved, or evidence-only changes. Comparison output
+uses the same `--output-file` and `--force` contract as audits, and HTML output
+requires an output file.
+
 ### Scope, redirects, and request controls
 
 The audit accepts one absolute `http` or `https` URL. HTTP targets record that
