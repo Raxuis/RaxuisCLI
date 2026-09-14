@@ -15,9 +15,7 @@ import (
 	"raxuiscli/internal/shared/report"
 )
 
-// state enumerates the screens of the guided interface. The interface is a
-// small, explicit state machine so update logic can be tested without a real
-// terminal.
+// An explicit state machine so update logic is testable without a real terminal.
 type state int
 
 const (
@@ -33,7 +31,6 @@ const (
 	stateBrowse
 )
 
-// resultKind distinguishes the payload shown on the results screen.
 type resultKind int
 
 const (
@@ -41,12 +38,9 @@ const (
 	kindComparison
 )
 
-// narrowWidth is the terminal width below which the interface collapses to a
-// single-column layout.
 const narrowWidth = 72
 
-// uiText centralizes every user-facing string. Keeping them in one place lets a
-// future release localize the interface without touching update logic.
+// Centralized so a future release can localize without touching update logic.
 var uiText = struct {
 	AppTitle     string
 	Loading      string
@@ -79,20 +73,13 @@ var uiText = struct {
 	CreditURL:    "https://github.com/raxuis",
 }
 
-// Config carries the settings the interface needs from the root command.
 type Config struct {
-	// Color enables colorized, styled output. Callers compute it with
-	// ColorEnabled so the flag, environment, and terminal are all respected.
-	Color bool
-	// Force allows a saved report to overwrite an existing file.
-	Force bool
-	// SavePath is the destination used when saving a report from the results
-	// screen. When empty a format-appropriate default filename is used.
-	SavePath string
+	Color    bool   // compute with ColorEnabled to honor the flag, env, and terminal
+	Force    bool   // allow a saved report to overwrite an existing file
+	SavePath string // save destination; empty uses a format-appropriate default name
 }
 
-// services holds the audit and report operations the interface invokes. They
-// are injectable so update logic and runs can be tested without a network.
+// Injectable so update logic and runs can be tested without a network.
 type services struct {
 	audit   func(context.Context, string, webaudit.Options) (report.Report, error)
 	demo    func(context.Context) (report.Report, error)
@@ -130,7 +117,6 @@ type (
 	readyMsg       struct{}
 )
 
-// Model is the Bubble Tea model for the guided interface.
 type Model struct {
 	state  state
 	keys   keyMap
@@ -163,7 +149,6 @@ type Model struct {
 	quitting  bool
 }
 
-// New builds the interface model from cfg.
 func New(cfg Config) Model {
 	search := textinput.New()
 	search.Placeholder = uiText.SearchPrompt
@@ -180,22 +165,18 @@ func New(cfg Config) Model {
 	}
 }
 
-// Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
 	return func() tea.Msg { return readyMsg{} }
 }
 
-// narrow reports whether the interface should use a single-column layout.
 func (m Model) narrow() bool {
 	return m.width > 0 && m.width < narrowWidth
 }
 
-// visibleItems returns the palette items matching the current search query.
 func (m Model) visibleItems() []paletteItem {
 	return filterItems(m.items, m.search.Value())
 }
 
-// Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -326,7 +307,6 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// selectItem opens the screen for the highlighted palette item.
 func (m Model) selectItem() Model {
 	visible := m.visibleItems()
 	if len(visible) == 0 {
@@ -480,8 +460,7 @@ func (m Model) updateInfo(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// runCmd builds the command that performs the selected action. The context is
-// stored on the model so a running action can be cancelled.
+// The context is stored on the model so a running action can be cancelled.
 func (m Model) runCmd(ctx context.Context) tea.Cmd {
 	svc := m.svc
 	switch m.selected {
@@ -518,7 +497,6 @@ func (m Model) runCmd(ctx context.Context) tea.Cmd {
 	}
 }
 
-// View implements tea.Model.
 func (m Model) View() tea.View {
 	if m.quitting {
 		return tea.NewView("")
@@ -665,8 +643,7 @@ func extensionFor(output string) string {
 	}
 }
 
-// toolInfo is the minimal, deterministic provenance recorded on TUI-produced
-// reports so a saved report remains a valid schema-v1 document.
+// Minimal deterministic provenance so a saved report stays a valid schema-v1 document.
 func toolInfo() report.ToolInfo {
 	return report.ToolInfo{
 		Name:      "raxuiscli",
