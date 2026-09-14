@@ -1067,7 +1067,7 @@ This table is generated from the command catalog. `stable` means the implementat
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
 | audit & reporting | 5 | 0 | 0 | 5 |
-| core | 1 | 0 | 0 | 1 |
+| core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 30 | 0 | 30 |
 | infrastructure | 0 | 22 | 1 | 23 |
 | network | 0 | 7 | 0 | 7 |

@@ -51,6 +51,9 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 
+	root.SetHelpTemplate(helpTemplate)
+	root.SetUsageTemplate(usageTemplate)
+
 	root.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
 	root.PersistentFlags().String("output", outputText, "Output format: text, json, or html")
 	root.PersistentFlags().String("output-file", "", "Write output to file")

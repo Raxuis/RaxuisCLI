@@ -80,6 +80,11 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli cloud gcp metadata", Summary: "Check GCP metadata service"},
 	{Path: "raxuiscli cloud metadata", Summary: "Check cloud metadata service"},
 	{Path: "raxuiscli compare", Summary: "Compare two versioned audit reports"},
+	{Path: "raxuiscli completion", Summary: "Generate the autocompletion script for the specified shell"},
+	{Path: "raxuiscli completion bash", Summary: "Generate the autocompletion script for bash"},
+	{Path: "raxuiscli completion fish", Summary: "Generate the autocompletion script for fish"},
+	{Path: "raxuiscli completion powershell", Summary: "Generate the autocompletion script for powershell"},
+	{Path: "raxuiscli completion zsh", Summary: "Generate the autocompletion script for zsh"},
 	{Path: "raxuiscli container", Summary: "Container security assessment"},
 	{Path: "raxuiscli container check", Summary: "Full container security check"},
 	{Path: "raxuiscli container detect", Summary: "Detect container environment"},
@@ -131,6 +136,7 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli hash", Summary: "Hash text or files"},
 	{Path: "raxuiscli hash crack", Summary: "Crack hash using wordlist"},
 	{Path: "raxuiscli hash identify", Summary: "Identify hash type"},
+	{Path: "raxuiscli help", Summary: "Help about any command"},
 	{Path: "raxuiscli hexdump", Summary: "Display file contents in hex and ASCII"},
 	{Path: "raxuiscli http", Summary: "HTTP request tools and security header analysis"},
 	{Path: "raxuiscli http curl", Summary: "Generate curl command"},
@@ -271,7 +277,8 @@ func buildEntries(specs []commandSpec) []Entry {
 
 func maturityFor(path string) Maturity {
 	switch path {
-	case "raxuiscli", "raxuiscli audit", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web":
+	case "raxuiscli", "raxuiscli audit", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web",
+		"raxuiscli completion", "raxuiscli completion bash", "raxuiscli completion fish", "raxuiscli completion powershell", "raxuiscli completion zsh", "raxuiscli help":
 		return MaturityStable
 	case "raxuiscli http curl", "raxuiscli k8s commands", "raxuiscli kerberos asrep", "raxuiscli kerberos golden", "raxuiscli kerberos roast", "raxuiscli kerberos silver", "raxuiscli ntlm pth", "raxuiscli persist list", "raxuiscli poison arp", "raxuiscli poison dhcp", "raxuiscli poison llmnr", "raxuiscli poison mdns", "raxuiscli poison nbtns", "raxuiscli poison protocols", "raxuiscli poison responder", "raxuiscli tunnel dns", "raxuiscli vuln payloads":
 		return MaturityInformational
@@ -286,6 +293,8 @@ func categoryFor(path string) string {
 		return "core"
 	}
 	switch parts[1] {
+	case "completion", "help":
+		return "core"
 	case "audit", "compare", "demo":
 		return "audit & reporting"
 	case "dns", "recon", "whois":
@@ -303,23 +312,106 @@ func categoryFor(path string) string {
 	}
 }
 
+// safetyOverrides classifies invocations by actual behavior, not family.
+// Entries that read local state only (no network action) are passive;
+// entries that compute/transform/format text with no I/O are safe.
+var safetyOverrides = map[string]SafetyLevel{
+	"raxuiscli http curl":        SafetySafe,
+	"raxuiscli k8s commands":     SafetyPassive,
+	"raxuiscli kerberos asrep":   SafetySafe,
+	"raxuiscli kerberos golden":  SafetySafe,
+	"raxuiscli kerberos parse":   SafetySafe,
+	"raxuiscli kerberos roast":   SafetySafe,
+	"raxuiscli kerberos silver":  SafetySafe,
+	"raxuiscli ntlm hash":        SafetySafe,
+	"raxuiscli ntlm identify":    SafetySafe,
+	"raxuiscli ntlm parse":       SafetySafe,
+	"raxuiscli ntlm pth":         SafetySafe,
+	"raxuiscli persist cron":     SafetySafe,
+	"raxuiscli persist launchd":  SafetySafe,
+	"raxuiscli persist list":     SafetySafe,
+	"raxuiscli persist systemd":  SafetySafe,
+	"raxuiscli poison arp":       SafetySafe,
+	"raxuiscli poison dhcp":      SafetySafe,
+	"raxuiscli poison llmnr":     SafetySafe,
+	"raxuiscli poison mdns":      SafetySafe,
+	"raxuiscli poison nbtns":     SafetySafe,
+	"raxuiscli poison protocols": SafetySafe,
+	"raxuiscli poison responder": SafetySafe,
+	"raxuiscli tunnel decode":    SafetySafe,
+	"raxuiscli tunnel dns":       SafetySafe,
+	"raxuiscli tunnel encode":    SafetySafe,
+	"raxuiscli vuln payloads":    SafetySafe,
+}
+
+// safetyFor returns the SafetyLevel for a command path, checking overrides first,
+// then special cases, then family-level classification by prefix.
 func safetyFor(path string) SafetyLevel {
+	if override, ok := safetyOverrides[path]; ok {
+		return override
+	}
+
 	if path == "raxuiscli audit web" {
 		return SafetyPassive
 	}
-	if path == "raxuiscli" || strings.HasPrefix(path, "raxuiscli compare") || strings.HasPrefix(path, "raxuiscli demo") || strings.HasPrefix(path, "raxuiscli cipher") || strings.HasPrefix(path, "raxuiscli certinfo") || strings.HasPrefix(path, "raxuiscli keygen") || strings.HasPrefix(path, "raxuiscli cookie") || strings.HasPrefix(path, "raxuiscli encode") || strings.HasPrefix(path, "raxuiscli entropy") || strings.HasPrefix(path, "raxuiscli hash") || strings.HasPrefix(path, "raxuiscli hexdump") || strings.HasPrefix(path, "raxuiscli metadata") || strings.HasPrefix(path, "raxuiscli pwgen") || strings.HasPrefix(path, "raxuiscli strings") || strings.HasPrefix(path, "raxuiscli todo") || strings.HasPrefix(path, "raxuiscli version") {
+
+	// Safe: root command and utilities that only transform/format data without I/O.
+	if path == "raxuiscli" {
 		return SafetySafe
 	}
-	if strings.HasPrefix(path, "raxuiscli creds") || strings.HasPrefix(path, "raxuiscli exfil") || strings.HasPrefix(path, "raxuiscli kerberos") || strings.HasPrefix(path, "raxuiscli ldap") || strings.HasPrefix(path, "raxuiscli ntlm") || strings.HasPrefix(path, "raxuiscli obfuscate") || strings.HasPrefix(path, "raxuiscli persist") || strings.HasPrefix(path, "raxuiscli pivot") || strings.HasPrefix(path, "raxuiscli poison") || strings.HasPrefix(path, "raxuiscli privesc") || strings.HasPrefix(path, "raxuiscli smb") || strings.HasPrefix(path, "raxuiscli tunnel") || path == "raxuiscli files shred" {
+	safePrefixes := []string{
+		"raxuiscli compare", "raxuiscli demo",
+		"raxuiscli cipher", "raxuiscli certinfo", "raxuiscli keygen",
+		"raxuiscli cookie", "raxuiscli encode", "raxuiscli entropy",
+		"raxuiscli hash", "raxuiscli hexdump", "raxuiscli metadata",
+		"raxuiscli pwgen", "raxuiscli strings", "raxuiscli todo", "raxuiscli version",
+	}
+	if hasPrefix(path, safePrefixes) {
+		return SafetySafe
+	}
+
+	// Dangerous: offensive/system commands.
+	dangerousPrefixes := []string{
+		"raxuiscli creds", "raxuiscli exfil",
+		"raxuiscli kerberos", "raxuiscli ldap", "raxuiscli ntlm",
+		"raxuiscli obfuscate", "raxuiscli persist", "raxuiscli pivot",
+		"raxuiscli poison", "raxuiscli privesc", "raxuiscli smb", "raxuiscli tunnel",
+	}
+	if hasPrefix(path, dangerousPrefixes) || path == "raxuiscli files shred" {
 		return SafetyDangerous
 	}
-	if strings.HasPrefix(path, "raxuiscli dns axfr") || strings.HasPrefix(path, "raxuiscli dns brute") || strings.HasPrefix(path, "raxuiscli fuzz") || strings.HasPrefix(path, "raxuiscli vuln") || strings.HasPrefix(path, "raxuiscli cloud") || strings.HasPrefix(path, "raxuiscli container") || strings.HasPrefix(path, "raxuiscli k8s") || strings.HasPrefix(path, "raxuiscli ports") || path == "raxuiscli http post" || path == "raxuiscli http put" || path == "raxuiscli http delete" || path == "raxuiscli http options" || path == "raxuiscli jwt none-attack" {
+
+	// Active: network testing and scanning.
+	activePrefixes := []string{
+		"raxuiscli dns axfr", "raxuiscli dns brute",
+		"raxuiscli fuzz", "raxuiscli vuln",
+		"raxuiscli cloud", "raxuiscli container", "raxuiscli k8s", "raxuiscli ports",
+		"raxuiscli http post", "raxuiscli http put", "raxuiscli http delete",
+		"raxuiscli http options", "raxuiscli jwt none-attack",
+	}
+	if hasPrefix(path, activePrefixes) {
 		return SafetyActive
 	}
-	if strings.HasPrefix(path, "raxuiscli dns") || strings.HasPrefix(path, "raxuiscli whois") || strings.HasPrefix(path, "raxuiscli recon") || strings.HasPrefix(path, "raxuiscli http") {
+
+	// Passive: information gathering only.
+	passivePrefixes := []string{
+		"raxuiscli dns", "raxuiscli whois", "raxuiscli recon", "raxuiscli http",
+	}
+	if hasPrefix(path, passivePrefixes) {
 		return SafetyPassive
 	}
+
 	return SafetySafe
+}
+
+// hasPrefix returns true if path matches any string exactly or has it as a prefix.
+func hasPrefix(path string, candidates []string) bool {
+	for _, candidate := range candidates {
+		if strings.HasPrefix(path, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 // All returns the command catalog in path order. The returned slice is a copy.

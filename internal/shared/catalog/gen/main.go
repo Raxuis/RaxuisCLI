@@ -62,13 +62,40 @@ func prepare(path, generated string) (documentUpdate, error) {
 	return documentUpdate{path: path, before: before, after: []byte(after), mode: info.Mode().Perm()}, nil
 }
 
+// write publishes update.after via a sibling temporary file and rename, so a
+// failed write (disk full, permissions) can never leave update.path
+// truncated or half-written.
 func (update documentUpdate) write() error {
 	if bytes.Equal(update.before, update.after) {
 		return nil
 	}
-	if err := os.WriteFile(update.path, update.after, update.mode); err != nil {
-		return fmt.Errorf("write %s: %w", update.path, err)
+	dir := filepath.Dir(update.path)
+	temp, err := os.CreateTemp(dir, "."+filepath.Base(update.path)+".tmp-")
+	if err != nil {
+		return fmt.Errorf("create temp file for %s: %w", update.path, err)
 	}
+	tempPath := temp.Name()
+	defer func() {
+		if tempPath != "" {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	if _, err := temp.Write(update.after); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("write temp file for %s: %w", update.path, err)
+	}
+	if err := temp.Chmod(update.mode); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("chmod temp file for %s: %w", update.path, err)
+	}
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("close temp file for %s: %w", update.path, err)
+	}
+	if err := os.Rename(tempPath, update.path); err != nil {
+		return fmt.Errorf("rename temp file for %s: %w", update.path, err)
+	}
+	tempPath = ""
 	return nil
 }
 

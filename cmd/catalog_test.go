@@ -60,12 +60,15 @@ func TestCatalogMatchesVisibleCommandTree(t *testing.T) {
 }
 
 func visibleCommands(root *cobra.Command) map[string]*cobra.Command {
+	// Force Cobra's lazily-attached help/completion commands into the tree
+	// so the catalog is checked against what a real user sees in --help.
+	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
+
 	result := make(map[string]*cobra.Command)
 	var visit func(*cobra.Command)
 	visit = func(command *cobra.Command) {
-		// Cobra generates help and completion commands at runtime. They are not
-		// product commands and therefore deliberately have no catalog metadata.
-		if command.Hidden || command.Name() == "help" || command.Name() == "completion" {
+		if command.Hidden {
 			return
 		}
 		result[command.CommandPath()] = command

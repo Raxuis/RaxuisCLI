@@ -177,6 +177,39 @@ func TestRootOptionsErrorsAreOperational(t *testing.T) {
 	}
 }
 
+func TestHelpShowsCatalogMaturityAndSafety(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"root list", []string{"--help"}, "audit       Passive security audits with versioned reports [stable]"},
+		{"audit web detail", []string{"audit", "web", "--help"}, "Maturity: stable   Safety: passive"},
+		{"compare detail", []string{"compare", "--help"}, "Maturity: stable   Safety: safe"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRootCommand()
+			auditCmd := &cobra.Command{Use: "audit", Short: "Passive security audits with versioned reports"}
+			auditCmd.AddCommand(&cobra.Command{Use: "web", Short: "Passively inspect HTTP security headers and TLS certificates", Run: func(*cobra.Command, []string) {}})
+			root.AddCommand(auditCmd)
+			root.AddCommand(&cobra.Command{Use: "compare", Short: "Compare two versioned audit reports", Run: func(*cobra.Command, []string) {}})
+
+			stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+			root.SetOut(stdout)
+			root.SetErr(stderr)
+			root.SetArgs(tt.args)
+
+			if err := root.Execute(); err != nil {
+				t.Fatalf("root.Execute() returned error: %v", err)
+			}
+			if !strings.Contains(stdout.String(), tt.want) {
+				t.Errorf("help output missing %q; got:\n%s", tt.want, stdout.String())
+			}
+		})
+	}
+}
+
 func TestRootOptionsIgnoreChildOutputFlag(t *testing.T) {
 	root := newRootCommand()
 	child := &cobra.Command{

@@ -41,6 +41,11 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli cloud gcp metadata` | Check GCP metadata service | infrastructure | `experimental` | `active` | no |
 | `raxuiscli cloud metadata` | Check cloud metadata service | infrastructure | `experimental` | `active` | no |
 | `raxuiscli compare` | Compare two versioned audit reports | audit & reporting | `stable` | `safe` | yes |
+| `raxuiscli completion` | Generate the autocompletion script for the specified shell | core | `stable` | `safe` | no |
+| `raxuiscli completion bash` | Generate the autocompletion script for bash | core | `stable` | `safe` | no |
+| `raxuiscli completion fish` | Generate the autocompletion script for fish | core | `stable` | `safe` | no |
+| `raxuiscli completion powershell` | Generate the autocompletion script for powershell | core | `stable` | `safe` | no |
+| `raxuiscli completion zsh` | Generate the autocompletion script for zsh | core | `stable` | `safe` | no |
 | `raxuiscli container` | Container security assessment | infrastructure | `experimental` | `active` | no |
 | `raxuiscli container check` | Full container security check | infrastructure | `experimental` | `active` | no |
 | `raxuiscli container detect` | Detect container environment | infrastructure | `experimental` | `active` | no |
@@ -92,9 +97,10 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli hash` | Hash text or files | utilities | `experimental` | `safe` | no |
 | `raxuiscli hash crack` | Crack hash using wordlist | utilities | `experimental` | `safe` | no |
 | `raxuiscli hash identify` | Identify hash type | utilities | `experimental` | `safe` | no |
+| `raxuiscli help` | Help about any command | core | `stable` | `safe` | no |
 | `raxuiscli hexdump` | Display file contents in hex and ASCII | utilities | `experimental` | `safe` | no |
 | `raxuiscli http` | HTTP request tools and security header analysis | web security | `experimental` | `passive` | no |
-| `raxuiscli http curl` | Generate curl command | web security | `informational` | `passive` | no |
+| `raxuiscli http curl` | Generate curl command | web security | `informational` | `safe` | no |
 | `raxuiscli http delete` | Perform HTTP DELETE request | web security | `experimental` | `active` | no |
 | `raxuiscli http get` | Perform HTTP GET request | web security | `experimental` | `passive` | no |
 | `raxuiscli http head` | Perform HTTP HEAD request | web security | `experimental` | `passive` | no |
@@ -112,17 +118,17 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli jwt verify` | Verify JWT signature | cryptography | `experimental` | `safe` | no |
 | `raxuiscli k8s` | Kubernetes security assessment | infrastructure | `experimental` | `active` | no |
 | `raxuiscli k8s check` | Full Kubernetes security check | infrastructure | `experimental` | `active` | no |
-| `raxuiscli k8s commands` | Show useful kubectl commands | infrastructure | `informational` | `active` | no |
+| `raxuiscli k8s commands` | Show useful kubectl commands | infrastructure | `informational` | `passive` | no |
 | `raxuiscli k8s detect` | Detect Kubernetes environment | infrastructure | `experimental` | `active` | no |
 | `raxuiscli k8s enum` | Enumerate accessible resources | infrastructure | `experimental` | `active` | no |
 | `raxuiscli k8s privesc` | Check privilege escalation paths | infrastructure | `experimental` | `active` | no |
 | `raxuiscli k8s secrets` | List accessible secrets | infrastructure | `experimental` | `active` | no |
 | `raxuiscli kerberos` | Kerberos attack helpers | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli kerberos asrep` | AS-REP Roasting commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli kerberos golden` | Golden ticket commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli kerberos parse` | Parse Kerberos hash | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli kerberos roast` | Kerberoasting commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli kerberos silver` | Silver ticket commands | offensive security | `informational` | `dangerous` | no |
+| `raxuiscli kerberos asrep` | AS-REP Roasting commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli kerberos golden` | Golden ticket commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli kerberos parse` | Parse Kerberos hash | offensive security | `experimental` | `safe` | no |
+| `raxuiscli kerberos roast` | Kerberoasting commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli kerberos silver` | Silver ticket commands | offensive security | `informational` | `safe` | no |
 | `raxuiscli keygen` | Generate cryptographic keys and certificates | cryptography | `experimental` | `safe` | no |
 | `raxuiscli keygen aes` | Generate AES key | cryptography | `experimental` | `safe` | no |
 | `raxuiscli keygen cert` | Generate self-signed certificate | cryptography | `experimental` | `safe` | no |
@@ -139,10 +145,10 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli metadata strip` | Strip metadata from a file | utilities | `experimental` | `safe` | no |
 | `raxuiscli ntlm` | NTLM hash operations | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli ntlm crack` | Crack NTLM hash | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli ntlm hash` | Generate NTLM hash | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli ntlm identify` | Identify hash type | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli ntlm parse` | Parse NTLM dump format | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli ntlm pth` | Generate pass-the-hash commands | offensive security | `informational` | `dangerous` | no |
+| `raxuiscli ntlm hash` | Generate NTLM hash | offensive security | `experimental` | `safe` | no |
+| `raxuiscli ntlm identify` | Identify hash type | offensive security | `experimental` | `safe` | no |
+| `raxuiscli ntlm parse` | Parse NTLM dump format | offensive security | `experimental` | `safe` | no |
+| `raxuiscli ntlm pth` | Generate pass-the-hash commands | offensive security | `informational` | `safe` | no |
 | `raxuiscli obfuscate` | Payload obfuscation | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli obfuscate bash` | Obfuscate Bash commands | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli obfuscate ps` | Obfuscate PowerShell | offensive security | `experimental` | `dangerous` | no |
@@ -151,23 +157,23 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli obfuscate string` | Obfuscate string | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli persist` | Persistence mechanism helpers | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli persist check` | Check existing persistence | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli persist cron` | Generate cron persistence | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli persist launchd` | Generate launchd plist (macOS) | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli persist list` | List persistence techniques | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli persist systemd` | Generate systemd service | offensive security | `experimental` | `dangerous` | no |
+| `raxuiscli persist cron` | Generate cron persistence | offensive security | `experimental` | `safe` | no |
+| `raxuiscli persist launchd` | Generate launchd plist (macOS) | offensive security | `experimental` | `safe` | no |
+| `raxuiscli persist list` | List persistence techniques | offensive security | `informational` | `safe` | no |
+| `raxuiscli persist systemd` | Generate systemd service | offensive security | `experimental` | `safe` | no |
 | `raxuiscli pivot` | Network pivoting and proxying | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli pivot forward` | TCP port forwarding | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli pivot socks5` | Start SOCKS5 proxy | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli pivot test` | Test remote connectivity | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli poison` | Network poisoning helpers | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli poison analyze` | Analyze network for poisoning opportunities | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli poison arp` | ARP poisoning commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison dhcp` | DHCP poisoning information | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison llmnr` | LLMNR poisoning commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison mdns` | mDNS poisoning commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison nbtns` | NBT-NS poisoning commands | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison protocols` | List poisoning protocols | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli poison responder` | Responder command generator | offensive security | `informational` | `dangerous` | no |
+| `raxuiscli poison arp` | ARP poisoning commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison dhcp` | DHCP poisoning information | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison llmnr` | LLMNR poisoning commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison mdns` | mDNS poisoning commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison nbtns` | NBT-NS poisoning commands | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison protocols` | List poisoning protocols | offensive security | `informational` | `safe` | no |
+| `raxuiscli poison responder` | Responder command generator | offensive security | `informational` | `safe` | no |
 | `raxuiscli ports` | Check open ports on a host | utilities | `experimental` | `active` | no |
 | `raxuiscli privesc` | Privilege escalation enumeration | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli privesc capabilities` | Check Linux capabilities | offensive security | `experimental` | `dangerous` | no |
@@ -192,9 +198,9 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli todo incomplete` | Mark a todo item as incomplete | utilities | `experimental` | `safe` | no |
 | `raxuiscli todo list` | List all todo items | utilities | `experimental` | `safe` | no |
 | `raxuiscli tunnel` | Network tunneling utilities | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli tunnel decode` | Decode tunneled data | offensive security | `experimental` | `dangerous` | no |
-| `raxuiscli tunnel dns` | DNS tunneling information | offensive security | `informational` | `dangerous` | no |
-| `raxuiscli tunnel encode` | Encode data for tunneling | offensive security | `experimental` | `dangerous` | no |
+| `raxuiscli tunnel decode` | Decode tunneled data | offensive security | `experimental` | `safe` | no |
+| `raxuiscli tunnel dns` | DNS tunneling information | offensive security | `informational` | `safe` | no |
+| `raxuiscli tunnel encode` | Encode data for tunneling | offensive security | `experimental` | `safe` | no |
 | `raxuiscli tunnel tcp` | TCP port forwarding | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli version` | Print version, commit and build information | utilities | `experimental` | `safe` | no |
 | `raxuiscli vuln` | Vulnerability scanning and testing | web security | `experimental` | `active` | no |
@@ -204,7 +210,7 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli vuln host` | Test for Host header injection | web security | `experimental` | `active` | no |
 | `raxuiscli vuln lfi` | Test for Local File Inclusion vulnerabilities | web security | `experimental` | `active` | no |
 | `raxuiscli vuln nosqli` | Test for NoSQL injection | web security | `experimental` | `active` | no |
-| `raxuiscli vuln payloads` | List vulnerability payloads | web security | `informational` | `active` | no |
+| `raxuiscli vuln payloads` | List vulnerability payloads | web security | `informational` | `safe` | no |
 | `raxuiscli vuln race` | Test for race condition vulnerabilities | web security | `experimental` | `active` | no |
 | `raxuiscli vuln scan` | Quick vulnerability scan | web security | `experimental` | `active` | no |
 | `raxuiscli vuln sqli` | Test for SQL injection vulnerabilities | web security | `experimental` | `active` | no |

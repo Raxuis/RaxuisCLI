@@ -170,6 +170,44 @@ func TestValidateRejectsInvalidMetadata(t *testing.T) {
 	}
 }
 
+func TestOverridesAreNotActiveOrDangerous(t *testing.T) {
+	t.Parallel()
+
+	for path := range safetyOverrides {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			entry, ok := Lookup(path)
+			if !ok {
+				t.Fatalf("Lookup(%q) not found", path)
+			}
+			if entry.Safety == SafetyActive || entry.Safety == SafetyDangerous {
+				t.Errorf("Safety = %q, want safe or passive", entry.Safety)
+			}
+		})
+	}
+}
+
+func TestActionsStillClassifiedByBehavior(t *testing.T) {
+	t.Parallel()
+
+	// Commands that perform real network/filesystem/process actions retain
+	// their family-level classification despite being siblings of safe/passive
+	// text-generation commands in the same family.
+	want := map[string]SafetyLevel{
+		"raxuiscli poison analyze": SafetyDangerous,
+		"raxuiscli k8s enum":       SafetyActive,
+	}
+	for path, safety := range want {
+		entry, ok := Lookup(path)
+		if !ok {
+			t.Fatalf("Lookup(%q) not found", path)
+		}
+		if entry.Safety != safety {
+			t.Errorf("%s Safety = %q, want %q", path, entry.Safety, safety)
+		}
+	}
+}
+
 func TestGeneratedDocumentationIsCurrent(t *testing.T) {
 	t.Parallel()
 
