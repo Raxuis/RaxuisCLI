@@ -151,6 +151,49 @@ The process exit statuses are exact:
 
 ---
 
+## Guided interface
+
+`raxuiscli interactive` launches a keyboard-driven terminal interface for the
+passive audit, the local demo, and report comparison. It never starts
+implicitly: scripts and pipelines keep the stable non-interactive behavior, and
+the command refuses to run when standard input or output is not a terminal
+(for example under a pipe or in CI), printing the equivalent commands to use
+instead.
+
+```bash
+./bin/raxuiscli interactive
+```
+
+Every action mirrors an existing command, and the review screen shows the exact
+equivalent before anything runs (secret values such as cookies are masked):
+
+| Interface action | Equivalent command |
+|---|---|
+| Passive Web Audit | `raxuiscli audit web <url> --output <fmt>` |
+| Local Demo | `raxuiscli demo web` |
+| Compare Reports | `raxuiscli compare <before> <after>` |
+| Browse Commands | *(reads the built-in command catalog)* |
+
+Keyboard controls:
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` (or `k` / `j`) | Move between actions or fields |
+| `enter` | Select the action, continue, or run |
+| `esc` | Go back one screen (or cancel a run in progress) |
+| `ctrl+k` / `/` | Open the searchable command palette |
+| `tab` / `←` / `→` | Move between form fields and change selectors |
+| `1`–`5` / `a` | Filter results by severity, or show all |
+| `s` | Save the current report |
+| `q` | Quit |
+
+Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
+`TERM=dumb`, and non-terminal output all fall back to plain text. A capture of
+the home screen and a demo result is in
+[`docs/assets/interactive.txt`](docs/assets/interactive.txt).
+
+---
+
 ## Available Commands
 
 ### Network Reconnaissance
@@ -1066,7 +1109,7 @@ This table is generated from the command catalog. `stable` means the implementat
 
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
-| audit & reporting | 5 | 0 | 0 | 5 |
+| audit & reporting | 6 | 0 | 0 | 6 |
 | core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 30 | 0 | 30 |
 | infrastructure | 0 | 22 | 1 | 23 |

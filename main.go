@@ -9,6 +9,7 @@ import (
 	_ "raxuiscli/cmd/cloud"
 	_ "raxuiscli/cmd/container"
 	_ "raxuiscli/cmd/crypto"
+	_ "raxuiscli/cmd/interactive"
 	_ "raxuiscli/cmd/network"
 	_ "raxuiscli/cmd/redteam"
 	_ "raxuiscli/cmd/tools"

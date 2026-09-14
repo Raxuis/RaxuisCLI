@@ -148,6 +148,7 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli http post", Summary: "Perform HTTP POST request"},
 	{Path: "raxuiscli http put", Summary: "Perform HTTP PUT request"},
 	{Path: "raxuiscli http trace", Summary: "Trace redirects"},
+	{Path: "raxuiscli interactive", Summary: "Launch the guided terminal interface"},
 	{Path: "raxuiscli jwt", Summary: "JWT token operations (decode, forge, crack, attack)"},
 	{Path: "raxuiscli jwt check", Summary: "Check JWT for vulnerabilities"},
 	{Path: "raxuiscli jwt crack", Summary: "Brute force JWT secret"},
@@ -277,7 +278,7 @@ func buildEntries(specs []commandSpec) []Entry {
 
 func maturityFor(path string) Maturity {
 	switch path {
-	case "raxuiscli", "raxuiscli audit", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web",
+	case "raxuiscli", "raxuiscli audit", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web", "raxuiscli interactive",
 		"raxuiscli completion", "raxuiscli completion bash", "raxuiscli completion fish", "raxuiscli completion powershell", "raxuiscli completion zsh", "raxuiscli help":
 		return MaturityStable
 	case "raxuiscli http curl", "raxuiscli k8s commands", "raxuiscli kerberos asrep", "raxuiscli kerberos golden", "raxuiscli kerberos roast", "raxuiscli kerberos silver", "raxuiscli ntlm pth", "raxuiscli persist list", "raxuiscli poison arp", "raxuiscli poison dhcp", "raxuiscli poison llmnr", "raxuiscli poison mdns", "raxuiscli poison nbtns", "raxuiscli poison protocols", "raxuiscli poison responder", "raxuiscli tunnel dns", "raxuiscli vuln payloads":
@@ -295,7 +296,7 @@ func categoryFor(path string) string {
 	switch parts[1] {
 	case "completion", "help":
 		return "core"
-	case "audit", "compare", "demo":
+	case "audit", "compare", "demo", "interactive":
 		return "audit & reporting"
 	case "dns", "recon", "whois":
 		return "network"
@@ -360,7 +361,7 @@ func safetyFor(path string) SafetyLevel {
 		return SafetySafe
 	}
 	safePrefixes := []string{
-		"raxuiscli compare", "raxuiscli demo",
+		"raxuiscli compare", "raxuiscli demo", "raxuiscli interactive",
 		"raxuiscli cipher", "raxuiscli certinfo", "raxuiscli keygen",
 		"raxuiscli cookie", "raxuiscli encode", "raxuiscli entropy",
 		"raxuiscli hash", "raxuiscli hexdump", "raxuiscli metadata",

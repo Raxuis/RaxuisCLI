@@ -109,6 +109,7 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli http post` | Perform HTTP POST request | web security | `experimental` | `active` | no |
 | `raxuiscli http put` | Perform HTTP PUT request | web security | `experimental` | `active` | no |
 | `raxuiscli http trace` | Trace redirects | web security | `experimental` | `passive` | no |
+| `raxuiscli interactive` | Launch the guided terminal interface | audit & reporting | `stable` | `safe` | no |
 | `raxuiscli jwt` | JWT token operations (decode, forge, crack, attack) | cryptography | `experimental` | `safe` | no |
 | `raxuiscli jwt check` | Check JWT for vulnerabilities | cryptography | `experimental` | `safe` | no |
 | `raxuiscli jwt crack` | Brute force JWT secret | cryptography | `experimental` | `safe` | no |
@@ -249,6 +250,11 @@ go build -o bin/raxuiscli .
 ./bin/raxuiscli fuzz dir https://example.com --common
 ./bin/raxuiscli vuln scan "https://site.com?id=1"
 ./bin/raxuiscli cookie decode "eyJhZG1pbiI6dHJ1ZX0="
+
+# Audit, reporting & guided interface (loopback-only demo, no public network)
+./bin/raxuiscli demo web --output json
+./bin/raxuiscli demo web --output html --output-file /tmp/raxuis-demo.html
+./bin/raxuiscli interactive
 ```
 
 ---
