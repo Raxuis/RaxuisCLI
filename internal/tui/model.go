@@ -1,12 +1,18 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"runtime"
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+
+	webaudit "raxuiscli/internal/audit/web"
+	localdemo "raxuiscli/internal/demo"
+	"raxuiscli/internal/shared/constants"
+	"raxuiscli/internal/shared/report"
 )
 
 // state enumerates the screens of the guided interface. The interface is a
@@ -24,6 +30,15 @@ const (
 	stateResults
 	stateError
 	stateAbout
+	stateBrowse
+)
+
+// resultKind distinguishes the payload shown on the results screen.
+type resultKind int
+
+const (
+	kindReport resultKind = iota
+	kindComparison
 )
 
 // narrowWidth is the terminal width below which the interface collapses to a
@@ -41,7 +56,7 @@ var uiText = struct {
 	FormHint     string
 	ReviewHint   string
 	Running      string
-	ResultsHint  string
+	Cancelled    string
 	ErrorHeading string
 	AboutHeading string
 	AboutBody    string
@@ -53,10 +68,10 @@ var uiText = struct {
 	HomeHint:     "↑/↓ move · enter select · ctrl+k search · q quit",
 	SearchPrompt: "Search actions",
 	SearchEmpty:  "No matching actions.",
-	FormHint:     "enter continue · esc back",
+	FormHint:     "tab move · ←/→ change · enter continue · esc back",
 	ReviewHint:   "enter run · esc back",
-	Running:      "Running…",
-	ResultsHint:  "esc home · q quit",
+	Running:      "Running…  esc cancels",
+	Cancelled:    "Run cancelled.",
 	ErrorHeading: "Something went wrong",
 	AboutHeading: "About",
 	AboutBody:    "RaxuisCLI is a passive security auditing toolkit.",
@@ -64,64 +79,88 @@ var uiText = struct {
 	CreditURL:    "https://github.com/raxuis",
 }
 
-// actionID identifies a top-level action offered on the home palette.
-type actionID int
-
-const (
-	actionAudit actionID = iota
-	actionDemo
-	actionCompare
-	actionBrowse
-	actionAbout
-)
-
-// action is a selectable entry in the command palette.
-type action struct {
-	id    actionID
-	title string
-	desc  string
-}
-
-func defaultActions() []action {
-	return []action{
-		{actionAudit, "Passive Web Audit", "Inspect HTTP headers and TLS for one target."},
-		{actionDemo, "Local Demo", "Audit a safe in-process fixture on loopback."},
-		{actionCompare, "Compare Reports", "Diff two saved audit snapshots."},
-		{actionBrowse, "Browse Commands", "List every command and its maturity."},
-		{actionAbout, "Help / About", "Learn what this interface can do."},
-	}
-}
-
 // Config carries the settings the interface needs from the root command.
 type Config struct {
 	// Color enables colorized, styled output. Callers compute it with
 	// ColorEnabled so the flag, environment, and terminal are all respected.
 	Color bool
+	// Force allows a saved report to overwrite an existing file.
+	Force bool
+	// SavePath is the destination used when saving a report from the results
+	// screen. When empty a format-appropriate default filename is used.
+	SavePath string
 }
 
-// readyMsg signals that startup work is finished and the home screen can show.
-type readyMsg struct{}
+// services holds the audit and report operations the interface invokes. They
+// are injectable so update logic and runs can be tested without a network.
+type services struct {
+	audit   func(context.Context, string, webaudit.Options) (report.Report, error)
+	demo    func(context.Context) (report.Report, error)
+	compare func(before, after string) (report.Comparison, error)
+}
 
-// auditDoneMsg and auditFailedMsg model the completion of a run. The shell wires
-// only the state transitions; the real audit service is connected in a later
-// task.
+func defaultServices() services {
+	return services{
+		audit: webaudit.Audit,
+		demo:  localdemo.Web,
+		compare: func(before, after string) (report.Comparison, error) {
+			beforeReport, err := report.ReadFile(before)
+			if err != nil {
+				return report.Comparison{}, err
+			}
+			afterReport, err := report.ReadFile(after)
+			if err != nil {
+				return report.Comparison{}, err
+			}
+			return report.Compare(beforeReport, afterReport, false)
+		},
+	}
+}
+
+// Run-completion messages. A run started while a context is live; the model
+// ignores a completion whose state is no longer running (for example after the
+// operator cancelled).
 type (
-	auditDoneMsg   struct{ summary string }
+	auditDoneMsg struct {
+		report report.Report
+		output string
+	}
+	compareDoneMsg struct{ comparison report.Comparison }
 	auditFailedMsg struct{ err error }
+	readyMsg       struct{}
 )
 
 // Model is the Bubble Tea model for the guided interface.
 type Model struct {
-	state    state
-	keys     keyMap
-	styles   Styles
-	actions  []action
+	state  state
+	keys   keyMap
+	styles Styles
+	config Config
+	width  int
+
+	items    []paletteItem
 	cursor   int
 	search   textinput.Model
-	width    int
-	summary  string
-	err      error
-	quitting bool
+	selected actionID
+
+	form        auditForm
+	compareForm compareForm
+
+	report     report.Report
+	comparison report.Comparison
+	kind       resultKind
+	output     string
+	filter     constants.Severity
+	savedPath  string
+
+	browse       []paletteItem
+	browseCursor int
+
+	svc       services
+	cancel    context.CancelFunc
+	cancelled bool
+	err       error
+	quitting  bool
 }
 
 // New builds the interface model from cfg.
@@ -130,11 +169,14 @@ func New(cfg Config) Model {
 	search.Placeholder = uiText.SearchPrompt
 
 	return Model{
-		state:   stateLoading,
-		keys:    defaultKeyMap(),
-		styles:  newStyles(cfg.Color),
-		actions: defaultActions(),
-		search:  search,
+		state:  stateLoading,
+		keys:   defaultKeyMap(),
+		styles: newStyles(cfg.Color),
+		config: cfg,
+		items:  initialActions(),
+		search: search,
+		filter: constants.SeverityNone,
+		svc:    defaultServices(),
 	}
 }
 
@@ -148,19 +190,9 @@ func (m Model) narrow() bool {
 	return m.width > 0 && m.width < narrowWidth
 }
 
-// visibleActions returns the actions matching the current search query.
-func (m Model) visibleActions() []action {
-	q := strings.TrimSpace(strings.ToLower(m.search.Value()))
-	if q == "" {
-		return m.actions
-	}
-	var out []action
-	for _, a := range m.actions {
-		if strings.Contains(strings.ToLower(a.title), q) {
-			out = append(out, a)
-		}
-	}
-	return out
+// visibleItems returns the palette items matching the current search query.
+func (m Model) visibleItems() []paletteItem {
+	return filterItems(m.items, m.search.Value())
 }
 
 // Update implements tea.Model.
@@ -176,14 +208,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case auditDoneMsg:
 		if m.state == stateRunning {
+			m.clearCancel()
+			m.report = msg.report
+			m.kind = kindReport
+			m.output = msg.output
+			m.filter = constants.SeverityNone
+			m.savedPath = ""
 			m.state = stateResults
-			m.summary = msg.summary
+		}
+		return m, nil
+	case compareDoneMsg:
+		if m.state == stateRunning {
+			m.clearCancel()
+			m.comparison = msg.comparison
+			m.kind = kindComparison
+			m.state = stateResults
 		}
 		return m, nil
 	case auditFailedMsg:
 		if m.state == stateRunning {
-			m.state = stateError
+			m.clearCancel()
 			m.err = msg.err
+			m.state = stateError
 		}
 		return m, nil
 	case tea.KeyPressMsg:
@@ -192,9 +238,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) clearCancel() {
+	if m.cancel != nil {
+		m.cancel()
+		m.cancel = nil
+	}
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+C always quits, even while typing.
 	if msg.String() == "ctrl+c" {
+		m.clearCancel()
 		m.quitting = true
 		return m, tea.Quit
 	}
@@ -205,112 +259,263 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case stateHome:
 		return m.updateHome(msg)
 	case stateForm:
-		switch {
-		case key.Matches(msg, m.keys.Back):
-			m.state = stateHome
-		case key.Matches(msg, m.keys.Confirm):
+		return m.updateForm(msg)
+	case stateReview:
+		return m.updateReview(msg)
+	case stateRunning:
+		if matchesBinding(msg, m.keys.Back) {
+			m.clearCancel()
+			m.cancelled = true
 			m.state = stateReview
 		}
 		return m, nil
-	case stateReview:
-		return m.updateReview(msg)
-	case stateResults, stateError, stateAbout:
+	case stateResults:
+		return m.updateResults(msg)
+	case stateBrowse:
+		return m.updateBrowse(msg)
+	case stateError, stateAbout:
 		return m.updateInfo(msg)
-	case stateRunning:
-		// Runs are non-interactive; only Ctrl+C (handled above) interrupts.
-		return m, nil
 	}
 	return m, nil
 }
 
 func (m Model) updateHome(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Quit):
+	case matchesBinding(msg, m.keys.Quit):
 		m.quitting = true
 		return m, tea.Quit
-	case key.Matches(msg, m.keys.Search):
+	case matchesBinding(msg, m.keys.Search):
 		m.state = stateSearch
 		m.cursor = 0
 		return m, m.search.Focus()
-	case key.Matches(msg, m.keys.Up):
+	case matchesBinding(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
 		}
 		return m, nil
-	case key.Matches(msg, m.keys.Down):
-		if m.cursor < len(m.visibleActions())-1 {
+	case matchesBinding(msg, m.keys.Down):
+		if m.cursor < len(m.visibleItems())-1 {
 			m.cursor++
 		}
 		return m, nil
-	case key.Matches(msg, m.keys.Confirm):
-		return m.selectAction(), nil
+	case matchesBinding(msg, m.keys.Confirm):
+		return m.selectItem(), nil
 	}
 	return m, nil
 }
 
 func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Back):
+	case matchesBinding(msg, m.keys.Back):
 		m.search.SetValue("")
 		m.search.Blur()
 		m.cursor = 0
 		m.state = stateHome
 		return m, nil
-	case key.Matches(msg, m.keys.Confirm):
+	case matchesBinding(msg, m.keys.Confirm):
 		m.search.Blur()
 		m.state = stateHome
-		return m.selectAction(), nil
+		return m.selectItem(), nil
 	}
 
 	var cmd tea.Cmd
 	m.search, cmd = m.search.Update(msg)
-	if m.cursor >= len(m.visibleActions()) {
+	if m.cursor >= len(m.visibleItems()) {
 		m.cursor = 0
 	}
 	return m, cmd
 }
 
-// selectAction opens the screen for the highlighted action.
-func (m Model) selectAction() Model {
-	visible := m.visibleActions()
+// selectItem opens the screen for the highlighted palette item.
+func (m Model) selectItem() Model {
+	visible := m.visibleItems()
 	if len(visible) == 0 {
 		return m
 	}
 	if m.cursor >= len(visible) {
 		m.cursor = len(visible) - 1
 	}
-	if visible[m.cursor].id == actionAbout {
+	m.selected = visible[m.cursor].id
+	switch m.selected {
+	case actionAudit:
+		m.form = newAuditForm()
+		m.state = stateForm
+	case actionCompare:
+		m.compareForm = newCompareForm()
+		m.state = stateForm
+	case actionDemo:
+		m.state = stateReview
+	case actionBrowse:
+		m.browse = browseItems()
+		m.browseCursor = 0
+		m.state = stateBrowse
+	case actionAbout:
 		m.state = stateAbout
-		return m
 	}
-	m.state = stateForm
 	return m
+}
+
+func (m Model) updateForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case matchesBinding(msg, m.keys.Back):
+		m.state = stateHome
+		return m, nil
+	case matchesBinding(msg, m.keys.Confirm):
+		if m.selected == actionCompare {
+			if err := m.compareForm.validate(); err != nil {
+				m.compareForm.errText = err.Error()
+				return m, nil
+			}
+		} else if err := m.form.validate(); err != nil {
+			m.form.errText = err.Error()
+			return m, nil
+		}
+		m.state = stateReview
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	if m.selected == actionCompare {
+		m.compareForm, cmd = m.compareForm.update(msg, m.keys)
+	} else {
+		m.form, cmd = m.form.update(msg, m.keys)
+	}
+	return m, cmd
 }
 
 func (m Model) updateReview(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Back):
-		m.state = stateForm
+	case matchesBinding(msg, m.keys.Back):
+		if m.selected == actionDemo {
+			m.state = stateHome
+		} else {
+			m.state = stateForm
+		}
 		return m, nil
-	case key.Matches(msg, m.keys.Confirm):
+	case matchesBinding(msg, m.keys.Confirm):
+		ctx, cancel := context.WithCancel(context.Background())
+		m.cancel = cancel
+		m.cancelled = false
 		m.state = stateRunning
-		return m, func() tea.Msg { return auditDoneMsg{summary: "0 findings"} }
+		return m, m.runCmd(ctx)
+	}
+	return m, nil
+}
+
+func (m Model) updateResults(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case matchesBinding(msg, m.keys.Quit):
+		m.quitting = true
+		return m, tea.Quit
+	case matchesBinding(msg, m.keys.Back):
+		m.state = stateHome
+		m.err = nil
+		m.savedPath = ""
+		m.filter = constants.SeverityNone
+		return m, nil
+	}
+	if m.kind != kindReport {
+		return m, nil
+	}
+	switch msg.String() {
+	case "1", "2", "3", "4", "5":
+		m.filter = severityOrder[int(msg.String()[0]-'1')]
+	case "a":
+		m.filter = constants.SeverityNone
+	case "s":
+		return m.saveCurrentReport(), nil
+	}
+	return m, nil
+}
+
+func (m Model) saveCurrentReport() Model {
+	output := m.output
+	if output == "" {
+		output = "text"
+	}
+	path := m.config.SavePath
+	if path == "" {
+		path = "raxuis-report." + extensionFor(output)
+	}
+	saved, err := saveReport(path, m.report, output, m.config.Force)
+	if err != nil {
+		m.err = err
+		m.state = stateError
+		return m
+	}
+	m.savedPath = saved
+	return m
+}
+
+func (m Model) updateBrowse(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case matchesBinding(msg, m.keys.Quit):
+		m.quitting = true
+		return m, tea.Quit
+	case matchesBinding(msg, m.keys.Back):
+		m.state = stateHome
+		return m, nil
+	case matchesBinding(msg, m.keys.Up):
+		if m.browseCursor > 0 {
+			m.browseCursor--
+		}
+	case matchesBinding(msg, m.keys.Down):
+		if m.browseCursor < len(m.browse)-1 {
+			m.browseCursor++
+		}
 	}
 	return m, nil
 }
 
 func (m Model) updateInfo(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Quit):
+	case matchesBinding(msg, m.keys.Quit):
 		m.quitting = true
 		return m, tea.Quit
-	case key.Matches(msg, m.keys.Back):
+	case matchesBinding(msg, m.keys.Back):
 		m.state = stateHome
 		m.err = nil
-		m.summary = ""
 		return m, nil
 	}
 	return m, nil
+}
+
+// runCmd builds the command that performs the selected action. The context is
+// stored on the model so a running action can be cancelled.
+func (m Model) runCmd(ctx context.Context) tea.Cmd {
+	svc := m.svc
+	switch m.selected {
+	case actionDemo:
+		return func() tea.Msg {
+			value, err := svc.demo(ctx)
+			if err != nil {
+				return auditFailedMsg{err: err}
+			}
+			value.Tool = toolInfo()
+			return auditDoneMsg{report: value, output: "text"}
+		}
+	case actionCompare:
+		before, after := m.compareForm.before(), m.compareForm.after()
+		return func() tea.Msg {
+			comparison, err := svc.compare(before, after)
+			if err != nil {
+				return auditFailedMsg{err: err}
+			}
+			return compareDoneMsg{comparison: comparison}
+		}
+	default:
+		target := m.form.target()
+		output := m.form.output()
+		options := webaudit.Options{Cookie: m.form.cookie()}
+		return func() tea.Msg {
+			value, err := svc.audit(ctx, target, options)
+			if err != nil {
+				return auditFailedMsg{err: err}
+			}
+			value.Tool = toolInfo()
+			return auditDoneMsg{report: value, output: output}
+		}
+	}
 }
 
 // View implements tea.Model.
@@ -338,27 +543,65 @@ func (m Model) body() string {
 	case stateHome, stateSearch:
 		return m.homeBody()
 	case stateForm:
-		return m.styles.App.Render("Enter target and options.") + "\n\n" + m.styles.Muted.Render(uiText.FormHint)
+		if m.selected == actionCompare {
+			return m.compareForm.view(m.styles) + "\n\n" + m.styles.Muted.Render(uiText.FormHint)
+		}
+		return m.form.view(m.styles) + "\n\n" + m.styles.Muted.Render(uiText.FormHint)
 	case stateReview:
-		return m.styles.App.Render("Review the equivalent command.") + "\n\n" + m.styles.Muted.Render(uiText.ReviewHint)
+		return renderReview(m.styles, m.reviewData()) + "\n\n" + m.styles.Muted.Render(uiText.ReviewHint)
 	case stateRunning:
+		if m.cancelled {
+			return m.styles.Muted.Render(uiText.Cancelled)
+		}
 		return m.styles.Muted.Render(uiText.Running)
 	case stateResults:
-		summary := m.summary
-		if summary == "" {
-			summary = "Done."
+		if m.kind == kindComparison {
+			return renderComparison(m.styles, m.comparison, m.narrow())
 		}
-		return m.styles.App.Render(summary) + "\n\n" + m.styles.Muted.Render(uiText.ResultsHint)
+		return renderReport(m.styles, m.report, m.filter, m.savedPath, m.narrow())
+	case stateBrowse:
+		return renderBrowse(m.styles, m.browse, m.browseCursor, m.narrow())
 	case stateError:
-		msg := "unknown error"
+		message := "unknown error"
 		if m.err != nil {
-			msg = m.err.Error()
+			message = m.err.Error()
 		}
-		return m.styles.Title.Render(uiText.ErrorHeading) + "\n" + m.styles.App.Render(msg) + "\n\n" + m.styles.Muted.Render(uiText.ResultsHint)
+		return m.styles.Title.Render(uiText.ErrorHeading) + "\n" +
+			m.styles.App.Render(message) + "\n\n" +
+			m.styles.Muted.Render("esc home · q quit")
 	case stateAbout:
 		return m.aboutBody()
 	}
 	return ""
+}
+
+func (m Model) reviewData() reviewData {
+	switch m.selected {
+	case actionDemo:
+		return reviewData{
+			Scope:    "https://127.0.0.1/demo (loopback fixture)",
+			Duration: "up to 5s",
+			Output:   "stdout (text)",
+			Safety:   "safe",
+			Command:  "raxuiscli demo web",
+		}
+	case actionCompare:
+		return reviewData{
+			Scope:    m.compareForm.before() + " → " + m.compareForm.after(),
+			Duration: "instant",
+			Output:   "stdout (text)",
+			Safety:   "safe",
+			Command:  m.compareForm.equivalentCommand(),
+		}
+	default:
+		return reviewData{
+			Scope:    m.form.target(),
+			Duration: "up to 10s",
+			Output:   "stdout (" + m.form.output() + ")",
+			Safety:   "passive",
+			Command:  m.form.equivalentCommand(),
+		}
+	}
 }
 
 func (m Model) homeBody() string {
@@ -368,24 +611,28 @@ func (m Model) homeBody() string {
 		b.WriteString("\n\n")
 	}
 
-	visible := m.visibleActions()
+	visible := m.visibleItems()
 	if len(visible) == 0 {
 		b.WriteString(m.styles.Muted.Render(uiText.SearchEmpty))
 		return b.String()
 	}
 
-	for i, a := range visible {
+	for i, item := range visible {
 		style := m.styles.Item
 		marker := "  "
 		if i == m.cursor {
 			style = m.styles.SelectedItem
 			marker = "▸ "
 		}
-		line := marker + a.title
+		line := marker + item.title
 		if !m.narrow() {
-			line = fmt.Sprintf("%s — %s", line, a.desc)
+			line = fmt.Sprintf("%s — %s", line, item.summary)
 		}
 		b.WriteString(style.Render(line))
+		b.WriteString(" ")
+		b.WriteString(maturityBadge(m.styles, item.maturity))
+		b.WriteString(" ")
+		b.WriteString(safetyBadge(m.styles, item.safety))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
@@ -403,6 +650,29 @@ func (m Model) aboutBody() string {
 	b.WriteString("\n")
 	b.WriteString(m.styles.Muted.Render(uiText.CreditURL))
 	b.WriteString("\n\n")
-	b.WriteString(m.styles.Muted.Render(uiText.ResultsHint))
+	b.WriteString(m.styles.Muted.Render("esc home · q quit"))
 	return b.String()
+}
+
+func extensionFor(output string) string {
+	switch output {
+	case "json":
+		return "json"
+	case "html":
+		return "html"
+	default:
+		return "txt"
+	}
+}
+
+// toolInfo is the minimal, deterministic provenance recorded on TUI-produced
+// reports so a saved report remains a valid schema-v1 document.
+func toolInfo() report.ToolInfo {
+	return report.ToolInfo{
+		Name:      "raxuiscli",
+		Version:   "dev",
+		Commit:    "unknown",
+		GoVersion: runtime.Version(),
+		Platform:  runtime.GOOS + "/" + runtime.GOARCH,
+	}
 }

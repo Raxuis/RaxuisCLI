@@ -1,9 +1,15 @@
 package tui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+)
 
-// keyMap collects the keyboard bindings for the interface. Navigation works
-// without a mouse; every action reachable from the UI has a binding here.
+// Wrapped here so view files need not import the key package.
+func matchesBinding(msg tea.KeyPressMsg, binding key.Binding) bool {
+	return key.Matches(msg, binding)
+}
+
 type keyMap struct {
 	Up      key.Binding
 	Down    key.Binding

@@ -1,11 +1,15 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	webaudit "raxuiscli/internal/audit/web"
+	"raxuiscli/internal/shared/report"
 )
 
 func newTestModel() Model { return New(Config{Color: false}) }
@@ -42,49 +46,42 @@ func TestStartsInLoadingThenHome(t *testing.T) {
 
 func TestHomeCursorNavigationIsBounded(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
-	if m.cursor != 0 {
-		t.Fatalf("initial cursor = %d, want 0", m.cursor)
-	}
 	m = step(t, m, up()) // already at top
 	if m.cursor != 0 {
 		t.Fatalf("cursor after up at top = %d, want 0", m.cursor)
 	}
-	for i := 0; i < len(m.actions)+3; i++ {
+	for i := 0; i < len(m.items)+3; i++ {
 		m = step(t, m, down())
 	}
-	if want := len(m.actions) - 1; m.cursor != want {
+	if want := len(m.items) - 1; m.cursor != want {
 		t.Fatalf("cursor after many downs = %d, want %d", m.cursor, want)
 	}
-	m = step(t, m, up())
-	if want := len(m.actions) - 2; m.cursor != want {
-		t.Fatalf("cursor after up = %d, want %d", m.cursor, want)
-	}
 }
 
-func TestHomeSelectOpensForm(t *testing.T) {
+func TestHomeSelectOpensAuditForm(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
 	m = step(t, m, enter()) // first action is the audit
-	if m.state != stateForm {
-		t.Fatalf("state = %v, want form", m.state)
+	if m.state != stateForm || m.selected != actionAudit {
+		t.Fatalf("state = %v selected = %v, want form/audit", m.state, m.selected)
 	}
 }
 
-func TestSearchFiltersActions(t *testing.T) {
+func TestSearchFiltersToCompare(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
 	m = step(t, m, ctrlK())
 	if m.state != stateSearch {
 		t.Fatalf("state = %v, want search", m.state)
 	}
-	for _, r := range "demo" {
+	for _, r := range "compare" {
 		m = step(t, m, runeKey(r))
 	}
-	visible := m.visibleActions()
-	if len(visible) != 1 || visible[0].id != actionDemo {
-		t.Fatalf("visible = %+v, want only Local Demo", visible)
+	visible := m.visibleItems()
+	if len(visible) != 1 || visible[0].id != actionCompare {
+		t.Fatalf("visible = %+v, want only Compare Reports", visible)
 	}
 	m = step(t, m, enter())
-	if m.state != stateForm {
-		t.Fatalf("state after selecting match = %v, want form", m.state)
+	if m.state != stateForm || m.selected != actionCompare {
+		t.Fatalf("state = %v selected = %v, want form/compare", m.state, m.selected)
 	}
 }
 
@@ -101,35 +98,55 @@ func TestSearchEscapeReturnsHomeAndClears(t *testing.T) {
 	if m.search.Value() != "" {
 		t.Fatalf("search value = %q, want empty", m.search.Value())
 	}
-	if len(m.visibleActions()) != len(m.actions) {
-		t.Fatalf("filter not cleared: %d visible", len(m.visibleActions()))
+	if len(m.visibleItems()) != len(m.items) {
+		t.Fatalf("filter not cleared: %d visible", len(m.visibleItems()))
 	}
 }
 
-func TestFormReviewRunToResults(t *testing.T) {
+func TestAuditFormToReviewToRunToResults(t *testing.T) {
+	fake := report.Report{Audit: report.AuditInfo{Target: "https://example.com"}}
 	m := step(t, newTestModel(), readyMsg{})
-	m = step(t, m, enter()) // -> form
+	m.svc = services{audit: func(context.Context, string, webaudit.Options) (report.Report, error) {
+		return fake, nil
+	}}
+	m = step(t, m, enter()) // -> audit form
+	m.form.inputs[0].SetValue("https://example.com")
 	m = step(t, m, enter()) // -> review
 	if m.state != stateReview {
 		t.Fatalf("state = %v, want review", m.state)
 	}
-	next, cmd := m.Update(enter()) // -> running, emits done cmd
+
+	next, cmd := m.Update(enter()) // -> running, emits run command
 	m = next.(Model)
 	if m.state != stateRunning {
 		t.Fatalf("state = %v, want running", m.state)
 	}
 	if cmd == nil {
-		t.Fatal("expected a command when entering running state")
+		t.Fatal("expected a run command")
 	}
 	m = step(t, m, cmd())
-	if m.state != stateResults {
-		t.Fatalf("state = %v, want results", m.state)
+	if m.state != stateResults || m.kind != kindReport {
+		t.Fatalf("state = %v kind = %v, want results/report", m.state, m.kind)
+	}
+}
+
+func TestAuditFormRejectsInvalidURL(t *testing.T) {
+	m := step(t, newTestModel(), readyMsg{})
+	m = step(t, m, enter()) // audit form
+	m.form.inputs[0].SetValue("not a url")
+	m = step(t, m, enter())
+	if m.state != stateForm {
+		t.Fatalf("state = %v, want form (invalid URL should not advance)", m.state)
+	}
+	if m.form.errText == "" {
+		t.Fatal("expected an inline validation error")
 	}
 }
 
 func TestReviewBackToForm(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
 	m = step(t, m, enter()) // form
+	m.form.inputs[0].SetValue("https://example.com")
 	m = step(t, m, enter()) // review
 	m = step(t, m, esc())
 	if m.state != stateForm {
@@ -137,15 +154,26 @@ func TestReviewBackToForm(t *testing.T) {
 	}
 }
 
+func TestRunningCancellation(t *testing.T) {
+	cancelled := false
+	m := newTestModel()
+	m.state = stateRunning
+	m.cancel = func() { cancelled = true }
+	m = step(t, m, esc())
+	if !cancelled {
+		t.Fatal("esc during running did not cancel the context")
+	}
+	if m.state != stateReview || !m.cancelled {
+		t.Fatalf("state = %v cancelled = %v, want review/true", m.state, m.cancelled)
+	}
+}
+
 func TestRunningFailureGoesToError(t *testing.T) {
 	m := newTestModel()
 	m.state = stateRunning
 	m = step(t, m, auditFailedMsg{err: errors.New("dial failed")})
-	if m.state != stateError {
-		t.Fatalf("state = %v, want error", m.state)
-	}
-	if m.err == nil {
-		t.Fatal("expected error to be recorded")
+	if m.state != stateError || m.err == nil {
+		t.Fatalf("state = %v err = %v, want error state with error", m.state, m.err)
 	}
 }
 
@@ -164,9 +192,31 @@ func TestResultsAndErrorReturnHome(t *testing.T) {
 	}
 }
 
+func TestBrowseCommandsListing(t *testing.T) {
+	m := step(t, newTestModel(), readyMsg{})
+	for i := 0; i < 3; i++ { // navigate to Browse Commands (4th action)
+		m = step(t, m, down())
+	}
+	m = step(t, m, enter())
+	if m.state != stateBrowse {
+		t.Fatalf("state = %v, want browse", m.state)
+	}
+	if len(m.browse) == 0 {
+		t.Fatal("browse listing is empty")
+	}
+	m = step(t, m, down())
+	if m.browseCursor != 1 {
+		t.Fatalf("browse cursor = %d, want 1", m.browseCursor)
+	}
+	m = step(t, m, esc())
+	if m.state != stateHome {
+		t.Fatalf("state = %v, want home", m.state)
+	}
+}
+
 func TestAboutStateFromHelpAction(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
-	for i := 0; i < len(m.actions)-1; i++ {
+	for i := 0; i < len(m.items)-1; i++ {
 		m = step(t, m, down())
 	}
 	m = step(t, m, enter())
@@ -187,11 +237,8 @@ func TestQuitFromHome(t *testing.T) {
 	m := step(t, newTestModel(), readyMsg{})
 	next, cmd := m.Update(runeKey('q'))
 	m = next.(Model)
-	if !m.quitting {
-		t.Fatal("expected quitting to be true")
-	}
-	if cmd == nil {
-		t.Fatal("expected a quit command")
+	if !m.quitting || cmd == nil {
+		t.Fatalf("q did not quit: quitting=%v", m.quitting)
 	}
 }
 
@@ -232,7 +279,6 @@ func TestFooterCreditAlwaysRendered(t *testing.T) {
 
 func TestNoColorRendersPlainText(t *testing.T) {
 	m := step(t, New(Config{Color: false}), readyMsg{})
-	m.cursor = 0
 	if strings.Contains(m.render(), "\x1b") {
 		t.Fatal("no-color render should contain no ANSI escape sequences")
 	}

@@ -7,9 +7,8 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Palette holds the approved dark command-palette colors. The values mirror the
-// HTML report theme so the terminal interface and the saved reports read as one
-// product.
+// Palette mirrors the HTML report theme so the terminal interface and the saved
+// reports read as one product.
 type Palette struct {
 	Background string
 	Surface    string
@@ -20,7 +19,6 @@ type Palette struct {
 	SelectedBg string // soft selected-row background, no side border
 }
 
-// DarkPalette is the approved dark, restrained direction.
 var DarkPalette = Palette{
 	Background: "#0b1220",
 	Surface:    "#121c2d",
@@ -31,10 +29,8 @@ var DarkPalette = Palette{
 	SelectedBg: "#16263c",
 }
 
-// Styles are the reusable lip gloss styles for the interface. When color is
-// disabled every style degrades to plain text so redirected output, dumb
-// terminals, and NO_COLOR stay clean and deterministic.
 type Styles struct {
+	Color        bool // consulted by badge helpers so their inline colors honor the same decision
 	App          lipgloss.Style
 	Title        lipgloss.Style
 	Muted        lipgloss.Style
@@ -44,9 +40,8 @@ type Styles struct {
 	Footer       lipgloss.Style
 }
 
-// newStyles builds the interface styles from the approved dark palette. When
-// enabled is false the styles carry no color or emphasis attributes so their
-// Render output is the raw text.
+// When enabled is false every style is plain text, so redirected output, dumb
+// terminals, and NO_COLOR stay clean.
 func newStyles(enabled bool) Styles {
 	p := DarkPalette
 	base := lipgloss.NewStyle()
@@ -65,6 +60,7 @@ func newStyles(enabled bool) Styles {
 
 	accent := lipgloss.Color(p.Accent)
 	return Styles{
+		Color:        true,
 		App:          base.Foreground(lipgloss.Color(p.Text)),
 		Title:        base.Foreground(accent).Bold(true),
 		Muted:        base.Foreground(lipgloss.Color(p.Muted)),
@@ -75,10 +71,8 @@ func newStyles(enabled bool) Styles {
 	}
 }
 
-// ColorEnabled reports whether colorized output should be produced. It honors
-// the --no-color flag, the NO_COLOR convention, dumb terminals, and output that
-// is not attached to a terminal. lookupEnv and isTTY are injected so the
-// decision is testable without touching the process environment.
+// ColorEnabled honors --no-color, NO_COLOR, dumb terminals, and non-terminal
+// output. lookupEnv and isTTY are injected so the decision is testable.
 func ColorEnabled(noColorFlag bool, lookupEnv func(string) (string, bool), isTTY bool) bool {
 	if noColorFlag {
 		return false
@@ -92,8 +86,6 @@ func ColorEnabled(noColorFlag bool, lookupEnv func(string) (string, bool), isTTY
 	return isTTY
 }
 
-// isTerminal reports whether f refers to a character device (a real terminal)
-// rather than a pipe or regular file.
 func isTerminal(f *os.File) bool {
 	if f == nil {
 		return false
