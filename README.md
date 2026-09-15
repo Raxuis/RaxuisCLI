@@ -6,6 +6,14 @@
 
 RaxuisCLI is a command-line tool designed for security professionals, pentesters, and CTF participants. It bundles many essential tools into a unified and portable interface.
 
+> **Maturity — read this first.** Commands carry a maturity label shown in their
+> `--help` and in the [command catalog](#command-catalog) at the bottom of this
+> file. Only `stable` commands (the passive **audit**, **compare**, **demo**, the
+> guided **interactive** interface, and core commands) are considered complete.
+> Many others are `experimental` (may be incomplete or change) or
+> `informational` (they mostly print guidance or generated examples rather than
+> performing the action end to end). Check the label before relying on a command.
+
 ## ⚠️ Legal Disclaimer
 
 RaxuisCLI is built for **authorized security testing, CTF competitions, and educational use only**. It includes offensive tooling (network poisoning, credential attacks, exfiltration helpers, etc.) that can be illegal to use against systems you do not own or lack explicit written permission to test.
@@ -1048,6 +1056,35 @@ raxuiscli metadata image.jpg
 raxuiscli metadata document.pdf
 ```
 
+#### `files` - File Operations
+Encrypt, decrypt, compress, extract, checksum, find, and securely shred files.
+```bash
+raxuiscli files checksum report.pdf
+raxuiscli files encrypt secret.txt --algo aes256 --key-file key.bin --out secret.enc
+raxuiscli files decrypt secret.enc --key-file key.bin --out secret.txt
+raxuiscli files compress logs/                 # archive a directory
+raxuiscli files extract archive.tar.gz
+raxuiscli files find /var --name '*.conf'
+raxuiscli files shred secret.txt               # secure delete
+```
+
+#### `todo` - Task Management
+A small local todo list.
+```bash
+raxuiscli todo add "Write the report"
+raxuiscli todo list
+raxuiscli todo complete 1
+raxuiscli todo incomplete 1
+```
+
+#### `ports` - Port Scanner
+TCP/UDP port scanner with preset ranges (`common`, `web`, `dev`, `database`, `system`, `extended`, `all`).
+```bash
+raxuiscli ports -H localhost -p common
+raxuiscli ports -H example.com -p 80,443,8080
+raxuiscli ports -H 192.168.1.1 -p 1-1024 --scan-type tcp --timeout 3
+```
+
 ---
 
 ## Project Structure
@@ -1103,6 +1140,8 @@ Using this tool against systems without explicit authorization is illegal. The a
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for progress and upcoming features.
+
+## Command catalog
 
 <!-- BEGIN GENERATED COMMAND CATALOG -->
 This table is generated from the command catalog. `stable` means the implementation is supported; `experimental` means it may be incomplete or change; `informational` means it primarily provides guidance or generated examples.
