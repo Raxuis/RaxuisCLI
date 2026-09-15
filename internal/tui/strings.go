@@ -149,7 +149,7 @@ var uiText = struct {
 	SafetyPassive:        "passive",
 
 	Running:   "Running…  esc cancels",
-	Cancelled: "Run cancelled.",
+	Cancelled: "Run canceled.",
 
 	ResultsTitleFmt:   "Results — %s",
 	ResultsSummary:    "Summary  ",

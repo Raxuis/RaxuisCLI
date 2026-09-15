@@ -73,7 +73,7 @@ func defaultServices() services {
 
 // Run-completion messages. A run started while a context is live; the model
 // ignores a completion whose state is no longer running (for example after the
-// operator cancelled).
+// operator canceled).
 type (
 	auditDoneMsg struct {
 		report report.Report
@@ -111,7 +111,7 @@ type Model struct {
 
 	svc       services
 	cancel    context.CancelFunc
-	cancelled bool
+	canceled bool
 	err       error
 	quitting  bool
 }
@@ -213,7 +213,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case stateRunning:
 		if matchesBinding(msg, m.keys.Back) {
 			m.clearCancel()
-			m.cancelled = true
+			m.canceled = true
 			m.state = stateReview
 		}
 		return m, nil
@@ -345,7 +345,7 @@ func (m Model) updateReview(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case matchesBinding(msg, m.keys.Confirm):
 		ctx, cancel := context.WithCancel(context.Background())
 		m.cancel = cancel
-		m.cancelled = false
+		m.canceled = false
 		m.state = stateRunning
 		return m, m.runCmd(ctx)
 	}
@@ -430,7 +430,7 @@ func (m Model) updateInfo(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// The context is stored on the model so a running action can be cancelled.
+// The context is stored on the model so a running action can be canceled.
 func (m Model) runCmd(ctx context.Context) tea.Cmd {
 	svc := m.svc
 	switch m.selected {
@@ -498,7 +498,7 @@ func (m Model) body() string {
 	case stateReview:
 		return renderReview(m.styles, m.reviewData()) + "\n\n" + m.styles.Muted.Render(uiText.ReviewHint)
 	case stateRunning:
-		if m.cancelled {
+		if m.canceled {
 			return m.styles.Muted.Render(uiText.Cancelled)
 		}
 		return m.styles.Muted.Render(uiText.Running)

@@ -9,14 +9,12 @@ import (
 )
 
 type Capture struct {
-	buffer       *bytes.Buffer
-	originalOut  io.Writer
-	originalErr  io.Writer
-	quiet        bool
-	outputFile   string
-	force        bool
-	multiWriter  io.Writer
-	mu            sync.Mutex
+	buffer      *bytes.Buffer
+	quiet       bool
+	outputFile  string
+	force       bool
+	multiWriter io.Writer
+	mu          sync.Mutex
 }
 
 func NewCapture(outputFile string, quiet, force bool) *Capture {

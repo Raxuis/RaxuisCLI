@@ -163,8 +163,8 @@ func TestRunningCancellation(t *testing.T) {
 	if !cancelled {
 		t.Fatal("esc during running did not cancel the context")
 	}
-	if m.state != stateReview || !m.cancelled {
-		t.Fatalf("state = %v cancelled = %v, want review/true", m.state, m.cancelled)
+	if m.state != stateReview || !m.canceled {
+		t.Fatalf("state = %v cancelled = %v, want review/true", m.state, m.canceled)
 	}
 }
 

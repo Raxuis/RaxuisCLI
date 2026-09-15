@@ -149,4 +149,3 @@ func TestParseKirbiFileInvalid(t *testing.T) {
 		t.Errorf("ParseKirbiFile() should error on invalid magic")
 	}
 }
-
