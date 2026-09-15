@@ -2,9 +2,17 @@
 
 **Offensive Cybersecurity CLI Toolkit written in Go**
 
+[![CI](https://github.com/Raxuis/RaxuisCLI/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxuis/RaxuisCLI/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Raxuis/RaxuisCLI?sort=semver)](https://github.com/Raxuis/RaxuisCLI/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Raxuis/RaxuisCLI)](https://goreportcard.com/report/github.com/Raxuis/RaxuisCLI)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Raxuis/RaxuisCLI.svg)](https://pkg.go.dev/github.com/Raxuis/RaxuisCLI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 RaxuisCLI is a command-line tool designed for security professionals, pentesters, and CTF participants. It bundles many essential tools into a unified and portable interface.
+
+<p align="center">
+  <img src="docs/demo.gif" alt="RaxuisCLI demo: version banner, a classical Caesar cipher, and a passive offline web security audit with severity-rated findings" width="820">
+</p>
 
 > **Maturity — read this first.** Commands carry a maturity label shown in their
 > `--help` and in the [command catalog](#command-catalog) at the bottom of this

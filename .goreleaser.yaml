@@ -15,9 +15,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X raxuiscli/cmd.version={{ .Version }}
-      - -X raxuiscli/cmd.commit={{ .Commit }}
-      - -X raxuiscli/cmd.date={{ .Date }}
+      - -X github.com/Raxuis/RaxuisCLI/cmd.version={{ .Version }}
+      - -X github.com/Raxuis/RaxuisCLI/cmd.commit={{ .Commit }}
+      - -X github.com/Raxuis/RaxuisCLI/cmd.date={{ .Date }}
     goos:
       - linux
       - windows
