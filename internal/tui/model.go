@@ -294,6 +294,9 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.state = stateHome
 		return m, nil
 	case matchesBinding(msg, m.keys.Confirm):
+		if len(m.visibleItems()) == 0 {
+			return m, nil
+		}
 		m.search.Blur()
 		m.state = stateHome
 		return m.selectItem(), nil

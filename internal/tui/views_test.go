@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"raxuiscli/internal/shared/catalog"
 	"raxuiscli/internal/shared/constants"
 	"raxuiscli/internal/shared/models"
@@ -253,6 +255,34 @@ func TestRenderReportNarrowDropsRemediation(t *testing.T) {
 	narrow := renderReport(styles, value, constants.SeverityNone, "", true)
 	if strings.Contains(narrow, "fix now") {
 		t.Fatal("narrow report should drop remediation detail")
+	}
+}
+
+func TestSelectorIgnoresNonNavKeys(t *testing.T) {
+	f := newAuditForm()
+	f.focus = 2 // output selector
+	f, _ = f.update(tea.KeyPressMsg{Code: 'x', Text: "x"}, defaultKeyMap())
+	if f.outputIndex != 0 {
+		t.Fatalf("a letter changed the selector: outputIndex = %d", f.outputIndex)
+	}
+	f, _ = f.update(tea.KeyPressMsg{Code: tea.KeyRight}, defaultKeyMap())
+	if f.outputIndex != 1 {
+		t.Fatalf("right did not advance the selector: outputIndex = %d", f.outputIndex)
+	}
+}
+
+func TestSearchConfirmWithoutMatchesStays(t *testing.T) {
+	m := step(t, newTestModel(), readyMsg{})
+	m = step(t, m, ctrlK())
+	for _, r := range "zzzz" {
+		m = step(t, m, runeKey(r))
+	}
+	if len(m.visibleItems()) != 0 {
+		t.Fatal("expected no matches for gibberish query")
+	}
+	m = step(t, m, enter())
+	if m.state != stateSearch {
+		t.Fatalf("state = %v, want search (confirm with no match must not leave home filtered-empty)", m.state)
 	}
 }
 

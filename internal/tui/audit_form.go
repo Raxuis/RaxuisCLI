@@ -83,10 +83,14 @@ func (f auditForm) update(msg tea.KeyPressMsg, keys keyMap) (auditForm, tea.Cmd)
 
 	switch f.focus {
 	case 2:
-		f.outputIndex = cycleIndex(f.outputIndex, len(outputFormats), selectorDelta(msg))
+		if d := selectorDelta(msg); d != 0 {
+			f.outputIndex = cycleIndex(f.outputIndex, len(outputFormats), d)
+		}
 		return f, nil
 	case 3:
-		f.failOnIndex = cycleIndex(f.failOnIndex, len(thresholds), selectorDelta(msg))
+		if d := selectorDelta(msg); d != 0 {
+			f.failOnIndex = cycleIndex(f.failOnIndex, len(thresholds), d)
+		}
 		return f, nil
 	default:
 		var cmd tea.Cmd
@@ -208,8 +212,10 @@ func selectorDelta(msg tea.KeyPressMsg) int {
 	switch msg.String() {
 	case "left", "h":
 		return -1
-	default:
+	case "right", "l", "space", " ":
 		return 1
+	default:
+		return 0
 	}
 }
 
