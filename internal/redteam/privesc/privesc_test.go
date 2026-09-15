@@ -1,6 +1,7 @@
 package privesc
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -33,6 +34,12 @@ func TestCheckSudo(t *testing.T) {
 
 func TestCheckCapabilities(t *testing.T) {
 	results := CheckCapabilities()
+	if runtime.GOOS != "linux" {
+		if len(results) != 0 {
+			t.Errorf("CheckCapabilities() = %+v, want no Linux-only results", results)
+		}
+		return
+	}
 	if results == nil {
 		t.Errorf("CheckCapabilities() returned nil")
 	}

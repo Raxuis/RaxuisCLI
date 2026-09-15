@@ -86,7 +86,7 @@ func ParseKirbiFile(data []byte) (*KerberosTicket, error) {
 	ticket := &KerberosTicket{}
 
 	// Check for kirbi magic bytes
-	if len(data) < 4 || data[0] != 0x76 {
+	if len(data) == 0 || data[0] != 0x76 {
 		return nil, fmt.Errorf("invalid kirbi format")
 	}
 

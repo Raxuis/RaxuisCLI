@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -196,31 +197,14 @@ func ChunkData(data []byte, chunkSize int) [][]byte {
 
 // EncodeForDNS encodes data to be DNS-safe (alphanumeric + hyphen)
 func EncodeForDNS(data []byte) string {
-	// Use base32 for DNS-safe encoding
-	encoded := base64.URLEncoding.EncodeToString(data)
-	// Replace non-DNS characters
-	encoded = strings.ReplaceAll(encoded, "+", "0")
-	encoded = strings.ReplaceAll(encoded, "/", "1")
-	encoded = strings.ReplaceAll(encoded, "=", "")
-	return strings.ToLower(encoded)
+	// Base32 is inherently DNS-label safe and, unlike lower-cased base64,
+	// retains enough information to be decoded unambiguously.
+	return strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(data))
 }
 
 // DecodeFromDNS decodes DNS-safe encoded data
 func DecodeFromDNS(encoded string) ([]byte, error) {
-	// Reverse the encoding
-	encoded = strings.ToUpper(encoded)
-	encoded = strings.ReplaceAll(encoded, "0", "+")
-	encoded = strings.ReplaceAll(encoded, "1", "/")
-
-	// Add padding
-	switch len(encoded) % 4 {
-	case 2:
-		encoded += "=="
-	case 3:
-		encoded += "="
-	}
-
-	return base64.URLEncoding.DecodeString(encoded)
+	return base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(encoded))
 }
 
 // TCPProxy creates a TCP proxy/forwarder

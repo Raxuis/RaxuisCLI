@@ -258,6 +258,9 @@ func TestConnection(host string, port int, timeout int) error {
 
 // GetBaseDN derives base DN from domain
 func GetBaseDN(domain string) string {
+	if domain == "" {
+		return ""
+	}
 	parts := strings.Split(domain, ".")
 	var dn []string
 	for _, part := range parts {

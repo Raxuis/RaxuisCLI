@@ -31,10 +31,13 @@ func TestConvertFormat(t *testing.T) {
 }
 
 func TestDecodeCredential(t *testing.T) {
-	encoded := "admin:password123"
+	encoded := "YWRtaW46cGFzc3dvcmQxMjM="
 	results := DecodeCredential(encoded)
 	if len(results) == 0 {
 		t.Errorf("DecodeCredential() returned empty results")
+	}
+	if results[0].Method != "Base64" || results[0].Value != "admin:password123" {
+		t.Errorf("DecodeCredential() = %+v, want Base64 admin:password123", results)
 	}
 }
 
