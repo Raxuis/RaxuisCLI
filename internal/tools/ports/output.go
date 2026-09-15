@@ -1,8 +1,5 @@
 package ports
 
-import (
-	"io"
-	"os"
-)
+import "raxuiscli/internal/shared/output"
 
-var stdoutW io.Writer = os.Stdout
+var stdoutW = output.Std

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -10,7 +11,31 @@ import (
 
 	sharedcommand "raxuiscli/internal/shared/command"
 	"raxuiscli/internal/shared/constants"
+	"raxuiscli/internal/shared/output"
 )
+
+func TestPersistentPreRunRoutesOutputThroughCommandWriter(t *testing.T) {
+	root := newRootCommand()
+	root.AddCommand(&cobra.Command{
+		Use: "emit",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			_, err := io.WriteString(output.Std, "hello-from-legacy")
+			return err
+		},
+	})
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"emit"})
+	t.Cleanup(func() { output.Set(nil) })
+
+	if code := execute(root); code != 0 {
+		t.Fatalf("execute() = %d", code)
+	}
+	if !strings.Contains(buf.String(), "hello-from-legacy") {
+		t.Fatalf("output not routed through the command writer: %q", buf.String())
+	}
+}
 
 func TestRootOptionsAcceptPersistentFlags(t *testing.T) {
 	root := newRootCommand()
