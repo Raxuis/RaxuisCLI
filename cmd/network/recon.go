@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/network/recon"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/network/recon"
 
 	"github.com/spf13/cobra"
 )

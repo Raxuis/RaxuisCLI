@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/ports"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/ports"
 
 	"github.com/spf13/cobra"
 )

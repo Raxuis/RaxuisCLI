@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"raxuiscli/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 )
 
 var (

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"raxuiscli/internal/web/vuln"
+	"github.com/Raxuis/RaxuisCLI/internal/web/vuln"
 )
 
 func TestXXEFileDisclosure(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestGraphQL tests for GraphQL security issues

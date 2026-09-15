@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"raxuiscli/internal/web/vuln"
+	"github.com/Raxuis/RaxuisCLI/internal/web/vuln"
 )
 
 func TestHostHeaderReflected(t *testing.T) {

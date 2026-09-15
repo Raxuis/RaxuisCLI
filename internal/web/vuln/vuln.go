@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/httpclient"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/httpclient"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // Re-export types for backward compatibility

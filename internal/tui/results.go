@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/render"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/render"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 var severityOrder = []constants.Severity{

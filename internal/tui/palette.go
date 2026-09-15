@@ -5,7 +5,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"raxuiscli/internal/shared/catalog"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
 )
 
 // actionID identifies a top-level action offered on the home palette.

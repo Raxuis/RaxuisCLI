@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 // Renderer writes a report to an output stream.

@@ -1,4 +1,4 @@
-module raxuiscli
+module github.com/Raxuis/RaxuisCLI
 
 go 1.25.13
 

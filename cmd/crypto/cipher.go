@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/crypto/cipher"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/cipher"
 )
 
 var cipherCmd = &cobra.Command{

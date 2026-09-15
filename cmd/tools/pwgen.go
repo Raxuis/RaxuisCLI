@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/pwgen"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/pwgen"
 
 	"github.com/spf13/cobra"
 )

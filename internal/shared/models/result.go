@@ -1,6 +1,6 @@
 package models
 
-import "raxuiscli/internal/shared/constants"
+import "github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 
 // VulnResult represents a vulnerability finding
 type VulnResult struct {

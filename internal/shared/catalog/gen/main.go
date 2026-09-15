@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"raxuiscli/internal/shared/catalog"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
 )
 
 func main() {

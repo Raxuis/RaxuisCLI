@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestCORS tests for CORS misconfiguration vulnerabilities

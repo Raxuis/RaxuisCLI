@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/shared/urlnorm"
-	httplib "raxuiscli/internal/web/http"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/urlnorm"
+	httplib "github.com/Raxuis/RaxuisCLI/internal/web/http"
 )
 
 var httpCmd = &cobra.Command{

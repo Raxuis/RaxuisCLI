@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 const (

@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/network/whois"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/network/whois"
 
 	"github.com/spf13/cobra"
 )

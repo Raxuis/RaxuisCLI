@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"raxuiscli/internal/crypto/certinfo"
-	sharedcommand "raxuiscli/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/certinfo"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
 )
 
 func TestCertinfoCommandsRequireExactArguments(t *testing.T) {

@@ -17,12 +17,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	webaudit "raxuiscli/internal/audit/web"
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func TestWebRequiresExactlyOneTarget(t *testing.T) {

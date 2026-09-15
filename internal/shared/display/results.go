@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 // DisplayVulnResults displays vulnerability results in a formatted way

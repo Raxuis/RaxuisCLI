@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/metadata"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/metadata"
 
 	"github.com/spf13/cobra"
 )

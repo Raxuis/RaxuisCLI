@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 //go:embed templates/report.html

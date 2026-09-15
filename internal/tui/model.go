@@ -9,10 +9,10 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	webaudit "raxuiscli/internal/audit/web"
-	localdemo "raxuiscli/internal/demo"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/report"
+	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
+	localdemo "github.com/Raxuis/RaxuisCLI/internal/demo"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 // An explicit state machine so update logic is testable without a real terminal.

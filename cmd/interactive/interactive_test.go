@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/tui"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/tui"
 )
 
 func newTestRoot(t *testing.T, d deps) *cobra.Command {

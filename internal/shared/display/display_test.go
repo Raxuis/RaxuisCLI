@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 // captureStdout runs fn with os.Stdout redirected and returns everything it printed.

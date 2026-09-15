@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"raxuiscli/internal/crypto/certinfo"
-	"raxuiscli/internal/shared/models"
-	sharedreport "raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/certinfo"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	sharedreport "github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func TestAuditHTTPSCollectsHTTPAndTLS(t *testing.T) {

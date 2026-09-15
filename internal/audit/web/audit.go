@@ -13,11 +13,11 @@ import (
 
 	"golang.org/x/net/idna"
 
-	"raxuiscli/internal/crypto/certinfo"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/report"
-	webhttp "raxuiscli/internal/web/http"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/certinfo"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
+	webhttp "github.com/Raxuis/RaxuisCLI/internal/web/http"
 )
 
 const (

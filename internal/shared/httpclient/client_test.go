@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

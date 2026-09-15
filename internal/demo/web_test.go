@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	webaudit "raxuiscli/internal/audit/web"
-	"raxuiscli/internal/shared/report"
+	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func TestWebUsesProductionAuditAndOnlyLoopbackConnections(t *testing.T) {

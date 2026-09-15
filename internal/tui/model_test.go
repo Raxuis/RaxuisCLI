@@ -8,8 +8,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	webaudit "raxuiscli/internal/audit/web"
-	"raxuiscli/internal/shared/report"
+	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func newTestModel() Model { return New(Config{Color: false}) }

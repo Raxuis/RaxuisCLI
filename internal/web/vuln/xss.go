@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestXSS tests for XSS vulnerabilities

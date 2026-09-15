@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/crypto/certinfo"
-	sharedcommand "raxuiscli/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/certinfo"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
 )
 
 const defaultCertinfoPort = 443

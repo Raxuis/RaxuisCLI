@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"raxuiscli/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 )
 
 func TestReadNormalizesSchemaV1Deterministically(t *testing.T) {

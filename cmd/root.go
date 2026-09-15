@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/output"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 )
 
 const (

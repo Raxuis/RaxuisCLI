@@ -15,12 +15,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	localdemo "raxuiscli/internal/demo"
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	localdemo "github.com/Raxuis/RaxuisCLI/internal/demo"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func TestDemoWebRunsWithoutArgumentsAndEmitsReadableJSON(t *testing.T) {

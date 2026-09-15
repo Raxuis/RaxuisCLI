@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"raxuiscli/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 )
 
 func TestExitCodeOperationalError(t *testing.T) {

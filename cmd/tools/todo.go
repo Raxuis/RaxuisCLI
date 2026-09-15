@@ -3,8 +3,8 @@ package tools
 import (
 	"fmt"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/todo"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/todo"
 
 	"github.com/spf13/cobra"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 type jsonRenderer struct{}

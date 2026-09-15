@@ -1,5 +1,5 @@
 package ldap
 
-import "raxuiscli/internal/shared/output"
+import "github.com/Raxuis/RaxuisCLI/internal/shared/output"
 
 var stdoutW = output.Std

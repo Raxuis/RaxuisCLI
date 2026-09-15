@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 func TestCompareClassifiesFindingsAndObservations(t *testing.T) {

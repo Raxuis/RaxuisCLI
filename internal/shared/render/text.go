@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 type textRenderer struct{}

@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 // ComparisonSchemaVersion is the version of the comparison JSON envelope.

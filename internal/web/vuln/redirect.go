@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestOpenRedirect tests for open redirect vulnerabilities

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 // SchemaVersion is the current public JSON report schema version.

@@ -14,12 +14,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
-	"raxuiscli/internal/shared/render"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/render"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 func TestCompareRequiresExactlyTwoReportsBeforeReading(t *testing.T) {

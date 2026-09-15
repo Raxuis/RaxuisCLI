@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	webaudit "raxuiscli/internal/audit/web"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 // auditRunner keeps the Cobra layer testable while the production command uses

@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	localdemo "raxuiscli/internal/demo"
-	sharedcommand "raxuiscli/internal/shared/command"
-	"raxuiscli/internal/shared/render"
-	"raxuiscli/internal/shared/report"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	localdemo "github.com/Raxuis/RaxuisCLI/internal/demo"
+	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/render"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/report"
 )
 
 type demoRunner func(context.Context) (report.Report, error)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/shared/catalog"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
 )
 
 // Cobra's default templates, extended to show catalog maturity/safety data.

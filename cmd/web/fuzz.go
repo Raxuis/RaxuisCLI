@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/shared/urlnorm"
-	"raxuiscli/internal/web/fuzz"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/urlnorm"
+	"github.com/Raxuis/RaxuisCLI/internal/web/fuzz"
 )
 
 var fuzzCmd = &cobra.Command{

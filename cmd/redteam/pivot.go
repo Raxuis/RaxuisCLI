@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/pivot"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/pivot"
 
 	"github.com/spf13/cobra"
 )

@@ -8,17 +8,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/cmd"
-	_ "raxuiscli/cmd/audit"
-	_ "raxuiscli/cmd/cloud"
-	_ "raxuiscli/cmd/container"
-	_ "raxuiscli/cmd/crypto"
-	_ "raxuiscli/cmd/interactive"
-	_ "raxuiscli/cmd/network"
-	_ "raxuiscli/cmd/redteam"
-	_ "raxuiscli/cmd/tools"
-	_ "raxuiscli/cmd/web"
-	"raxuiscli/internal/shared/catalog"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/audit"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/cloud"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/container"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/crypto"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/interactive"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/network"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/redteam"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/tools"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/web"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
 )
 
 func TestCatalogMatchesVisibleCommandTree(t *testing.T) {

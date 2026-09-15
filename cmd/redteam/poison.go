@@ -3,8 +3,8 @@ package redteam
 import (
 	"fmt"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/poison"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/poison"
 
 	"github.com/spf13/cobra"
 )

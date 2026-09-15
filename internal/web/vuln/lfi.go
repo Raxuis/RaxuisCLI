@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"sync"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestLFI tests for Local File Inclusion vulnerabilities

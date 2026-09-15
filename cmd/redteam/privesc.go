@@ -3,8 +3,8 @@ package redteam
 import (
 	"fmt"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/privesc"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/privesc"
 
 	"github.com/spf13/cobra"
 )
