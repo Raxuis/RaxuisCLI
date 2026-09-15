@@ -499,7 +499,7 @@ func (m Model) body() string {
 		return renderReview(m.styles, m.reviewData()) + "\n\n" + m.styles.Muted.Render(uiText.ReviewHint)
 	case stateRunning:
 		if m.canceled {
-			return m.styles.Muted.Render(uiText.Cancelled)
+			return m.styles.Muted.Render(uiText.Canceled)
 		}
 		return m.styles.Muted.Render(uiText.Running)
 	case stateResults:

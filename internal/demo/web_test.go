@@ -160,7 +160,7 @@ func TestWebProducesDeterministicDocumentedFindings(t *testing.T) {
 	}
 }
 
-func TestWebHonorsCancelledContext(t *testing.T) {
+func TestWebHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var captured *webFixture

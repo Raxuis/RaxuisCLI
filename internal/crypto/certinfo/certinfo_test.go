@@ -361,7 +361,7 @@ func TestGetCertFromHostUnreachable(t *testing.T) {
 	}
 }
 
-func TestGetCertFromHostContextHonorsCancelledContext(t *testing.T) {
+func TestGetCertFromHostContextHonorsCanceledContext(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)

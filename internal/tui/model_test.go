@@ -155,16 +155,16 @@ func TestReviewBackToForm(t *testing.T) {
 }
 
 func TestRunningCancellation(t *testing.T) {
-	cancelled := false
+	canceled := false
 	m := newTestModel()
 	m.state = stateRunning
-	m.cancel = func() { cancelled = true }
+	m.cancel = func() { canceled = true }
 	m = step(t, m, esc())
-	if !cancelled {
+	if !canceled {
 		t.Fatal("esc during running did not cancel the context")
 	}
 	if m.state != stateReview || !m.canceled {
-		t.Fatalf("state = %v cancelled = %v, want review/true", m.state, m.canceled)
+		t.Fatalf("state = %v canceled = %v, want review/true", m.state, m.canceled)
 	}
 }
 
