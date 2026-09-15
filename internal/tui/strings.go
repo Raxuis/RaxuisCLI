@@ -61,7 +61,7 @@ var uiText = struct {
 	SafetySafe           string
 	SafetyPassive        string
 
-	Running   string
+	Running  string
 	Canceled string
 
 	ResultsTitleFmt   string
@@ -148,7 +148,7 @@ var uiText = struct {
 	SafetySafe:           "safe",
 	SafetyPassive:        "passive",
 
-	Running:   "Running…  esc cancels",
+	Running:  "Running…  esc cancels",
 	Canceled: "Run canceled.",
 
 	ResultsTitleFmt:   "Results — %s",

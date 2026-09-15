@@ -1,4 +1,4 @@
-.PHONY: build build-all clean install test test-race cover lint tidy run help
+.PHONY: build build-all clean install test test-race cover lint format install-hooks tidy run help
 
 BINARY      := raxuiscli
 PKG         := raxuiscli/cmd
@@ -47,6 +47,14 @@ cover:
 ## lint: run golangci-lint (install: https://golangci-lint.run/usage/install/)
 lint:
 	golangci-lint run ./...
+
+## format: format all tracked Go source files
+format:
+	gofmt -w $$(git ls-files '*.go')
+
+## install-hooks: enable the repository's Git hooks for this checkout
+install-hooks:
+	git config core.hooksPath .githooks
 
 ## tidy: sync go.mod / go.sum
 tidy:

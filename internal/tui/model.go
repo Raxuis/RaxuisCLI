@@ -109,11 +109,11 @@ type Model struct {
 	browse       []paletteItem
 	browseCursor int
 
-	svc       services
-	cancel    context.CancelFunc
+	svc      services
+	cancel   context.CancelFunc
 	canceled bool
-	err       error
-	quitting  bool
+	err      error
+	quitting bool
 }
 
 func New(cfg Config) Model {
