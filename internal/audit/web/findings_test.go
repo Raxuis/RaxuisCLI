@@ -342,6 +342,27 @@ func TestCertificateFindingsClassifyVerifyFailuresWithoutMisleadingChainDuplicat
 	}
 }
 
+func TestCertificateFindingsReportsChainFailureForExpiredSelfSignedCertificate(t *testing.T) {
+	findings := CertificateFindings("https://example.test/", certinfo.ChainInfo{
+		Valid:             false,
+		Error:             "x509: certificate has expired",
+		VerificationError: x509.CertificateInvalidError{Reason: x509.Expired},
+	}, []certinfo.ValidationResult{{
+		Expired:     true,
+		SelfSigned:  true,
+		ChainErrors: []string{"Certificate has expired"},
+		Warnings:    []string{"Certificate is self-signed"},
+	}})
+
+	ruleIDs := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		ruleIDs = append(ruleIDs, finding.RuleID)
+	}
+	if want := []string{"tls.certificate.chain-validation", "tls.certificate.expired", "tls.certificate.self-signed"}; !reflect.DeepEqual(ruleIDs, want) {
+		t.Errorf("finding rules = %#v, want %#v", ruleIDs, want)
+	}
+}
+
 func TestCertificateFindingsUseValidationFactsForAmbiguousValidityErrors(t *testing.T) {
 	const resource = "https://example.test/"
 	const ambiguous = "x509: certificate has expired or is not yet valid"

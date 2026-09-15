@@ -123,6 +123,10 @@ func verificationFinding(resource string, chain certinfo.ChainInfo, findings []m
 
 	if verificationErrorIsTimeValidity(chain.VerificationError) || isAmbiguousValidityError(chain.Error) {
 		if hasFindingRule(findings, "tls.certificate.expired") || hasFindingRule(findings, "tls.certificate.not-yet-valid") {
+			if hasFindingRule(findings, "tls.certificate.self-signed") {
+				finding := tlsFinding(resource, "tls.certificate.chain-validation", "Certificate chain validation failed", "Certificate is self-signed and not trusted by a known certificate authority.", "Install the complete chain issued by a trusted certificate authority.")
+				return &finding
+			}
 			return nil
 		}
 		finding := tlsFinding(resource, "tls.certificate.invalid-validity-period", "Certificate validity period is invalid", chain.Error, "Use a certificate whose validity period includes the time of the audit.")

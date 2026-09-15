@@ -129,6 +129,20 @@ func TestReplaceGeneratedBlockPreservesSurroundingContent(t *testing.T) {
 	}
 }
 
+func TestReplaceGeneratedBlockPreservesCRLF(t *testing.T) {
+	t.Parallel()
+
+	document := "before\r\n" + BeginMarker + "\r\nstale\r\n" + EndMarker + "\r\nafter\r\n"
+	got, err := ReplaceGeneratedBlock(document, "fresh\ncontent")
+	if err != nil {
+		t.Fatalf("ReplaceGeneratedBlock() error = %v", err)
+	}
+	want := "before\r\n" + BeginMarker + "\r\nfresh\r\ncontent\r\n" + EndMarker + "\r\nafter\r\n"
+	if got != want {
+		t.Fatalf("ReplaceGeneratedBlock() = %q, want %q", got, want)
+	}
+}
+
 func TestReplaceGeneratedBlockRejectsInvalidMarkers(t *testing.T) {
 	t.Parallel()
 

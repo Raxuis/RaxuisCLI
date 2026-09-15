@@ -543,7 +543,12 @@ func ReplaceGeneratedBlock(document, generated string) (string, error) {
 		return "", fmt.Errorf("generated command catalog markers are reversed")
 	}
 	contentStart := begin + len(BeginMarker)
-	return document[:contentStart] + "\n" + strings.TrimSpace(generated) + "\n" + document[end:], nil
+	newline := "\n"
+	if strings.Contains(document, "\r\n") {
+		newline = "\r\n"
+	}
+	generated = strings.ReplaceAll(strings.TrimSpace(generated), "\n", newline)
+	return document[:contentStart] + newline + generated + newline + document[end:], nil
 }
 
 func escapeTableCell(value string) string {
