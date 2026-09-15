@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/crypto/keygen"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/keygen"
 )
 
 var keygenCmd = &cobra.Command{

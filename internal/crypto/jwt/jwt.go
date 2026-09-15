@@ -348,50 +348,50 @@ func base64URLDecode(s string) ([]byte, error) {
 
 // DisplayJWT displays decoded JWT information
 func DisplayJWT(jwt *JWT) {
-	fmt.Println("\n[JWT DECODED]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[JWT DECODED]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	// Header
-	fmt.Println("\n[Header]")
+	fmt.Fprintln(stdoutW, "\n[Header]")
 	headerJSON, _ := json.MarshalIndent(jwt.Header, "", "  ")
-	fmt.Println(string(headerJSON))
+	fmt.Fprintln(stdoutW, string(headerJSON))
 
 	// Payload
-	fmt.Println("\n[Payload]")
+	fmt.Fprintln(stdoutW, "\n[Payload]")
 	payloadJSON, _ := json.MarshalIndent(jwt.Payload, "", "  ")
-	fmt.Println(string(payloadJSON))
+	fmt.Fprintln(stdoutW, string(payloadJSON))
 
 	// Signature
-	fmt.Println("\n[Signature]")
-	fmt.Printf("Algorithm: %s\n", jwt.Algorithm)
+	fmt.Fprintln(stdoutW, "\n[Signature]")
+	fmt.Fprintf(stdoutW, "Algorithm: %s\n", jwt.Algorithm)
 	if len(jwt.Signature) > 50 {
-		fmt.Printf("Signature: %s...\n", jwt.Signature[:50])
+		fmt.Fprintf(stdoutW, "Signature: %s...\n", jwt.Signature[:50])
 	} else {
-		fmt.Printf("Signature: %s\n", jwt.Signature)
+		fmt.Fprintf(stdoutW, "Signature: %s\n", jwt.Signature)
 	}
 
 	// Time claims
-	fmt.Println("\n[Time Claims]")
+	fmt.Fprintln(stdoutW, "\n[Time Claims]")
 	if iat := GetClaimTime(jwt, "iat"); iat != "" {
-		fmt.Printf("Issued At (iat): %s\n", iat)
+		fmt.Fprintf(stdoutW, "Issued At (iat): %s\n", iat)
 	}
 	if exp := GetClaimTime(jwt, "exp"); exp != "" {
-		fmt.Printf("Expires (exp): %s\n", exp)
+		fmt.Fprintf(stdoutW, "Expires (exp): %s\n", exp)
 	}
 	if nbf := GetClaimTime(jwt, "nbf"); nbf != "" {
-		fmt.Printf("Not Before (nbf): %s\n", nbf)
+		fmt.Fprintf(stdoutW, "Not Before (nbf): %s\n", nbf)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayVulnerabilities displays vulnerability check results
 func DisplayVulnerabilities(checks []VulnerabilityCheck) {
-	fmt.Println("\n[SECURITY CHECKS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[SECURITY CHECKS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(checks) == 0 {
-		fmt.Println("No vulnerabilities detected.")
+		fmt.Fprintln(stdoutW, "No vulnerabilities detected.")
 		return
 	}
 
@@ -400,11 +400,11 @@ func DisplayVulnerabilities(checks []VulnerabilityCheck) {
 		if check.Vulnerable {
 			status = fmt.Sprintf("[%s]", check.Severity)
 		}
-		fmt.Printf("\n%s %s\n", status, check.Name)
-		fmt.Printf("    %s\n", check.Description)
+		fmt.Fprintf(stdoutW, "\n%s %s\n", status, check.Name)
+		fmt.Fprintf(stdoutW, "    %s\n", check.Description)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // CommonSecrets returns a list of common JWT secrets for testing

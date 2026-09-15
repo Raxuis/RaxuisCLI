@@ -66,14 +66,14 @@ func shredDirectory(dirPath string, opts ShredOptions) error {
 func shredFile(path string, opts ShredOptions) error {
 	// Confirmation si nécessaire
 	if !opts.Force {
-		fmt.Printf("Shred file %s? (y/N): ", path)
+		fmt.Fprintf(stdoutW, "Shred file %s? (y/N): ", path)
 		var response string
 		_, err := fmt.Scanln(&response)
 		if err != nil {
 			return err
 		}
 		if response != "y" && response != "Y" {
-			fmt.Println("Skipped.")
+			fmt.Fprintln(stdoutW, "Skipped.")
 			return nil
 		}
 	}
@@ -86,7 +86,7 @@ func shredFile(path string, opts ShredOptions) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", path, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", path, err)
 		}
 	}(file)
 
@@ -120,7 +120,7 @@ func shredFile(path string, opts ShredOptions) error {
 			return err
 		}
 
-		fmt.Printf("Pass %d/%d completed for %s\n", i+1, opts.Passes, path)
+		fmt.Fprintf(stdoutW, "Pass %d/%d completed for %s\n", i+1, opts.Passes, path)
 	}
 
 	// Passe finale avec des zéros si demandé
@@ -134,7 +134,7 @@ func shredFile(path string, opts ShredOptions) error {
 		if err := file.Sync(); err != nil {
 			return err
 		}
-		fmt.Printf("Final zero pass completed for %s\n", path)
+		fmt.Fprintf(stdoutW, "Final zero pass completed for %s\n", path)
 	}
 
 	err = file.Close()
@@ -147,7 +147,7 @@ func shredFile(path string, opts ShredOptions) error {
 		return err
 	}
 
-	fmt.Printf("Successfully shredded: %s\n", path)
+	fmt.Fprintf(stdoutW, "Successfully shredded: %s\n", path)
 	return nil
 }
 

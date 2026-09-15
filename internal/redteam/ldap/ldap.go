@@ -258,6 +258,9 @@ func TestConnection(host string, port int, timeout int) error {
 
 // GetBaseDN derives base DN from domain
 func GetBaseDN(domain string) string {
+	if domain == "" {
+		return ""
+	}
 	parts := strings.Split(domain, ".")
 	var dn []string
 	for _, part := range parts {
@@ -291,11 +294,11 @@ func EnumerateUsers(opts LDAPOptions, filter string) ([]User, error) {
 
 // DisplayUsers displays user enumeration results
 func DisplayUsers(users []User, showAll bool) {
-	fmt.Println("\n[LDAP] User Enumeration Results")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[LDAP] User Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if len(users) == 0 {
-		fmt.Println("No users found (or enumeration requires valid credentials)")
+		fmt.Fprintln(stdoutW, "No users found (or enumeration requires valid credentials)")
 		return
 	}
 
@@ -308,7 +311,7 @@ func DisplayUsers(users []User, showAll bool) {
 		displayUser(user, showAll)
 	}
 
-	fmt.Printf("\nTotal users: %d\n", len(users))
+	fmt.Fprintf(stdoutW, "\nTotal users: %d\n", len(users))
 }
 
 func displayUser(user User, detailed bool) {
@@ -338,32 +341,32 @@ func displayUser(user User, detailed bool) {
 		flagStr = " [" + strings.Join(flags, ", ") + "]"
 	}
 
-	fmt.Printf("  %-30s %s%s\n", user.SAMAccountName, user.DisplayName, flagStr)
+	fmt.Fprintf(stdoutW, "  %-30s %s%s\n", user.SAMAccountName, user.DisplayName, flagStr)
 
 	if detailed {
 		if user.Email != "" {
-			fmt.Printf("    Email: %s\n", user.Email)
+			fmt.Fprintf(stdoutW, "    Email: %s\n", user.Email)
 		}
 		if user.Description != "" {
-			fmt.Printf("    Description: %s\n", user.Description)
+			fmt.Fprintf(stdoutW, "    Description: %s\n", user.Description)
 		}
 		if len(user.MemberOf) > 0 {
-			fmt.Printf("    Groups: %s\n", strings.Join(user.MemberOf[:min(3, len(user.MemberOf))], ", "))
+			fmt.Fprintf(stdoutW, "    Groups: %s\n", strings.Join(user.MemberOf[:min(3, len(user.MemberOf))], ", "))
 		}
 		if len(user.ServicePrincipal) > 0 {
-			fmt.Printf("    SPNs: %s\n", strings.Join(user.ServicePrincipal, ", "))
+			fmt.Fprintf(stdoutW, "    SPNs: %s\n", strings.Join(user.ServicePrincipal, ", "))
 		}
-		fmt.Println()
+		fmt.Fprintln(stdoutW)
 	}
 }
 
 // DisplayComputers displays computer enumeration results
 func DisplayComputers(computers []Computer, showAll bool) {
-	fmt.Println("\n[LDAP] Computer Enumeration Results")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[LDAP] Computer Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if len(computers) == 0 {
-		fmt.Println("No computers found")
+		fmt.Fprintln(stdoutW, "No computers found")
 		return
 	}
 
@@ -381,61 +384,61 @@ func DisplayComputers(computers []Computer, showAll bool) {
 			flagStr = " [" + strings.Join(flags, ", ") + "]"
 		}
 
-		fmt.Printf("  %-30s %-30s %s%s\n", comp.Name, comp.OperatingSystem, comp.DNSHostName, flagStr)
+		fmt.Fprintf(stdoutW, "  %-30s %-30s %s%s\n", comp.Name, comp.OperatingSystem, comp.DNSHostName, flagStr)
 	}
 
-	fmt.Printf("\nTotal computers: %d\n", len(computers))
+	fmt.Fprintf(stdoutW, "\nTotal computers: %d\n", len(computers))
 }
 
 // DisplayGroups displays group enumeration results
 func DisplayGroups(groups []Group, showAll bool) {
-	fmt.Println("\n[LDAP] Group Enumeration Results")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[LDAP] Group Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if len(groups) == 0 {
-		fmt.Println("No groups found")
+		fmt.Fprintln(stdoutW, "No groups found")
 		return
 	}
 
 	for _, group := range groups {
 		memberCount := len(group.Members)
-		fmt.Printf("  %-40s (%d members)\n", group.Name, memberCount)
+		fmt.Fprintf(stdoutW, "  %-40s (%d members)\n", group.Name, memberCount)
 
 		if showAll && group.Description != "" {
-			fmt.Printf("    Description: %s\n", group.Description)
+			fmt.Fprintf(stdoutW, "    Description: %s\n", group.Description)
 		}
 	}
 
-	fmt.Printf("\nTotal groups: %d\n", len(groups))
+	fmt.Fprintf(stdoutW, "\nTotal groups: %d\n", len(groups))
 }
 
 // DisplayDomainInfo displays domain information
 func DisplayDomainInfo(info *DomainInfo) {
-	fmt.Println("\n[LDAP] Domain Information")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[LDAP] Domain Information")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if info == nil {
-		fmt.Println("No domain information available")
+		fmt.Fprintln(stdoutW, "No domain information available")
 		return
 	}
 
-	fmt.Printf("  Domain Name:       %s\n", info.Name)
-	fmt.Printf("  NetBIOS Name:      %s\n", info.NetBIOSName)
-	fmt.Printf("  Forest Name:       %s\n", info.ForestName)
-	fmt.Printf("  Functional Level:  %s\n", info.FunctionalLevel)
+	fmt.Fprintf(stdoutW, "  Domain Name:       %s\n", info.Name)
+	fmt.Fprintf(stdoutW, "  NetBIOS Name:      %s\n", info.NetBIOSName)
+	fmt.Fprintf(stdoutW, "  Forest Name:       %s\n", info.ForestName)
+	fmt.Fprintf(stdoutW, "  Functional Level:  %s\n", info.FunctionalLevel)
 
 	if len(info.DomainControllers) > 0 {
-		fmt.Println("\n  Domain Controllers:")
+		fmt.Fprintln(stdoutW, "\n  Domain Controllers:")
 		for _, dc := range info.DomainControllers {
-			fmt.Printf("    - %s\n", dc)
+			fmt.Fprintf(stdoutW, "    - %s\n", dc)
 		}
 	}
 
-	fmt.Println("\n  Password Policy:")
-	fmt.Printf("    Min Length:        %d\n", info.PasswordPolicy.MinLength)
-	fmt.Printf("    History Length:    %d\n", info.PasswordPolicy.HistoryLength)
-	fmt.Printf("    Lockout Threshold: %d\n", info.PasswordPolicy.LockoutThreshold)
-	fmt.Printf("    Complexity:        %v\n", info.PasswordPolicy.Complexity)
+	fmt.Fprintln(stdoutW, "\n  Password Policy:")
+	fmt.Fprintf(stdoutW, "    Min Length:        %d\n", info.PasswordPolicy.MinLength)
+	fmt.Fprintf(stdoutW, "    History Length:    %d\n", info.PasswordPolicy.HistoryLength)
+	fmt.Fprintf(stdoutW, "    Lockout Threshold: %d\n", info.PasswordPolicy.LockoutThreshold)
+	fmt.Fprintf(stdoutW, "    Complexity:        %v\n", info.PasswordPolicy.Complexity)
 }
 
 // CheckAnonymousBind tests if anonymous bind is allowed

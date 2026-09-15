@@ -1,10 +1,13 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -25,6 +28,9 @@ type RequestOptions struct {
 	UserAgent   string
 	Cookie      string
 	BasicAuth   string
+	// DialContext optionally controls socket creation. A nil value retains
+	// net/http's default dialer behavior.
+	DialContext func(context.Context, string, string) (net.Conn, error)
 }
 
 // Response holds HTTP response data
@@ -37,6 +43,7 @@ type Response struct {
 	Duration      time.Duration
 	RedirectChain []string
 	TLS           *TLSInfo
+	Truncated     bool
 }
 
 // TLSInfo holds TLS connection information
@@ -66,8 +73,21 @@ type HeaderAnalysis struct {
 	Missing  []string
 }
 
-// DoRequest performs an HTTP request
+// DoRequest performs an HTTP request. It is kept for compatibility with
+// callers that do not need cancellation or a response-body limit.
 func DoRequest(opts RequestOptions) (*Response, error) {
+	return DoRequestContext(context.Background(), opts, 0)
+}
+
+// DoRequestContext performs an HTTP request with cancellation and an optional
+// response-body limit. A positive maxBodyBytes limits the returned body and
+// sets Response.Truncated when more data was available. A non-positive limit
+// preserves the unbounded behavior of DoRequest.
+func DoRequestContext(ctx context.Context, opts RequestOptions, maxBodyBytes int64) (*Response, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("request context must not be nil")
+	}
+
 	if opts.Method == "" {
 		opts.Method = "GET"
 	}
@@ -80,16 +100,21 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 
 	// Create HTTP client
 	transport := &http.Transport{
+		DialContext: opts.DialContext,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: opts.Insecure,
 		},
 	}
+	// Each request constructs a transport, so do not retain idle sockets after
+	// this call returns (including proxy/request/client error paths).
+	defer transport.CloseIdleConnections()
 
 	if opts.Proxy != "" {
-		proxyURL, err := url.Parse(opts.Proxy)
-		if err == nil {
-			transport.Proxy = http.ProxyURL(proxyURL)
+		proxyURL, err := url.ParseRequestURI(opts.Proxy)
+		if err != nil || proxyURL.Host == "" || (proxyURL.Scheme != "http" && proxyURL.Scheme != "https") {
+			return nil, fmt.Errorf("invalid proxy URL %q", opts.Proxy)
 		}
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
 	client := &http.Client{
@@ -120,9 +145,9 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 		bodyReader = strings.NewReader(opts.Body)
 	}
 
-	req, err := http.NewRequest(opts.Method, opts.URL, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, opts.Method, opts.URL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -158,14 +183,14 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 	duration := time.Since(start)
 
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Read body
-	body, err := io.ReadAll(resp.Body)
+	body, truncated, err := readResponseBody(resp.Body, maxBodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	response := &Response{
@@ -176,6 +201,7 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 		ContentLength: resp.ContentLength,
 		Duration:      duration,
 		RedirectChain: redirectChain,
+		Truncated:     truncated,
 	}
 
 	// TLS info
@@ -188,6 +214,29 @@ func DoRequest(opts RequestOptions) (*Response, error) {
 	}
 
 	return response, nil
+}
+
+func readResponseBody(body io.Reader, maxBodyBytes int64) ([]byte, bool, error) {
+	if maxBodyBytes <= 0 {
+		contents, err := io.ReadAll(body)
+		return contents, false, err
+	}
+	if maxBodyBytes == math.MaxInt64 {
+		// maxBodyBytes+1 would overflow, so retain the maximum safe limit.
+		contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes))
+		return contents, false, err
+	}
+
+	// Reading one byte beyond the configured limit makes truncation explicit
+	// without retaining unbounded response data.
+	contents, err := io.ReadAll(io.LimitReader(body, maxBodyBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(contents)) > maxBodyBytes {
+		return contents[:maxBodyBytes], true, nil
+	}
+	return contents, false, nil
 }
 
 // tlsVersionString converts TLS version to string
@@ -542,34 +591,34 @@ func DetectTechnology(headers http.Header, body string) []string {
 
 // DisplayResponse displays HTTP response
 func DisplayResponse(resp *Response, showBody bool, maxBodyLen int) {
-	fmt.Println("\n[HTTP RESPONSE]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[HTTP RESPONSE]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	// Status
-	fmt.Printf("\nStatus: %s\n", resp.Status)
-	fmt.Printf("Duration: %v\n", resp.Duration)
+	fmt.Fprintf(stdoutW, "\nStatus: %s\n", resp.Status)
+	fmt.Fprintf(stdoutW, "Duration: %v\n", resp.Duration)
 
 	if resp.ContentLength > 0 {
-		fmt.Printf("Content-Length: %d bytes\n", resp.ContentLength)
+		fmt.Fprintf(stdoutW, "Content-Length: %d bytes\n", resp.ContentLength)
 	}
 
 	// TLS info
 	if resp.TLS != nil {
-		fmt.Printf("\n[TLS]\n")
-		fmt.Printf("Version: %s\n", resp.TLS.Version)
-		fmt.Printf("Cipher: %s\n", resp.TLS.CipherSuite)
+		fmt.Fprintf(stdoutW, "\n[TLS]\n")
+		fmt.Fprintf(stdoutW, "Version: %s\n", resp.TLS.Version)
+		fmt.Fprintf(stdoutW, "Cipher: %s\n", resp.TLS.CipherSuite)
 	}
 
 	// Redirects
 	if len(resp.RedirectChain) > 0 {
-		fmt.Printf("\n[Redirect Chain]\n")
+		fmt.Fprintf(stdoutW, "\n[Redirect Chain]\n")
 		for i, url := range resp.RedirectChain {
-			fmt.Printf("  %d. %s\n", i+1, url)
+			fmt.Fprintf(stdoutW, "  %d. %s\n", i+1, url)
 		}
 	}
 
 	// Headers
-	fmt.Printf("\n[Headers]\n")
+	fmt.Fprintf(stdoutW, "\n[Headers]\n")
 	keys := make([]string, 0, len(resp.Headers))
 	for k := range resp.Headers {
 		keys = append(keys, k)
@@ -578,30 +627,30 @@ func DisplayResponse(resp *Response, showBody bool, maxBodyLen int) {
 
 	for _, k := range keys {
 		for _, v := range resp.Headers[k] {
-			fmt.Printf("  %s: %s\n", k, v)
+			fmt.Fprintf(stdoutW, "  %s: %s\n", k, v)
 		}
 	}
 
 	// Body
 	if showBody && resp.Body != "" {
-		fmt.Printf("\n[Body]\n")
+		fmt.Fprintf(stdoutW, "\n[Body]\n")
 		body := resp.Body
 		if maxBodyLen > 0 && len(body) > maxBodyLen {
 			body = body[:maxBodyLen] + "\n... (truncated)"
 		}
-		fmt.Println(body)
+		fmt.Fprintln(stdoutW, body)
 	}
 }
 
 // DisplayHeaderAnalysis displays security header analysis
 func DisplayHeaderAnalysis(analysis *HeaderAnalysis) {
-	fmt.Println("\n[SECURITY HEADERS ANALYSIS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[SECURITY HEADERS ANALYSIS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("\nSecurity Score: %d/%d (Grade: %s)\n", analysis.Score, analysis.MaxScore, analysis.Grade)
+	fmt.Fprintf(stdoutW, "\nSecurity Score: %d/%d (Grade: %s)\n", analysis.Score, analysis.MaxScore, analysis.Grade)
 
-	fmt.Printf("\n%-35s %-10s %s\n", "HEADER", "STATUS", "DETAILS")
-	fmt.Println(strings.Repeat("-", 60))
+	fmt.Fprintf(stdoutW, "\n%-35s %-10s %s\n", "HEADER", "STATUS", "DETAILS")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 60))
 
 	for _, h := range analysis.Headers {
 		status := "OK"
@@ -612,24 +661,24 @@ func DisplayHeaderAnalysis(analysis *HeaderAnalysis) {
 			status = "MISSING"
 		}
 
-		fmt.Printf("%-35s %-10s %s\n", h.Name, status, h.Description)
+		fmt.Fprintf(stdoutW, "%-35s %-10s %s\n", h.Name, status, h.Description)
 	}
 
 	if len(analysis.Missing) > 0 {
-		fmt.Printf("\n[Missing Headers]\n")
+		fmt.Fprintf(stdoutW, "\n[Missing Headers]\n")
 		for _, h := range analysis.Missing {
-			fmt.Printf("  - %s\n", h)
+			fmt.Fprintf(stdoutW, "  - %s\n", h)
 		}
 	}
 
 	if len(analysis.Warnings) > 0 {
-		fmt.Printf("\n[Warnings]\n")
+		fmt.Fprintf(stdoutW, "\n[Warnings]\n")
 		for _, w := range analysis.Warnings {
-			fmt.Printf("  - %s\n", w)
+			fmt.Fprintf(stdoutW, "  - %s\n", w)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayTechnologies displays detected technologies
@@ -638,13 +687,13 @@ func DisplayTechnologies(techs []string) {
 		return
 	}
 
-	fmt.Println("\n[DETECTED TECHNOLOGIES]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[DETECTED TECHNOLOGIES]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for _, tech := range techs {
-		fmt.Printf("  - %s\n", tech)
+		fmt.Fprintf(stdoutW, "  - %s\n", tech)
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // FormatJSON formats JSON body for display

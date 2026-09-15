@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/tools/encode"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/encode"
 
 	"github.com/spf13/cobra"
 )

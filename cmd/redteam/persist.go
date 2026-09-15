@@ -5,8 +5,8 @@ import (
 	"os"
 	"runtime"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/persist"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/persist"
 
 	"github.com/spf13/cobra"
 )

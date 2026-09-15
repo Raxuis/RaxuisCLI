@@ -615,9 +615,9 @@ func containsPasswordPattern(content string) bool {
 
 // DisplayResults displays all check results
 func DisplayResults(results []CheckResult, showAll bool) {
-	fmt.Println("\n" + strings.Repeat("=", 70))
-	fmt.Println("  PRIVILEGE ESCALATION CHECK RESULTS")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n"+strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "  PRIVILEGE ESCALATION CHECK RESULTS")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	// Count vulnerabilities
 	vulnCount := 0
@@ -627,8 +627,8 @@ func DisplayResults(results []CheckResult, showAll bool) {
 		}
 	}
 
-	fmt.Printf("\nVulnerabilities found: %d\n", vulnCount)
-	fmt.Println()
+	fmt.Fprintf(stdoutW, "\nVulnerabilities found: %d\n", vulnCount)
+	fmt.Fprintln(stdoutW)
 
 	// Group by category
 	categories := make(map[string][]CheckResult)
@@ -637,8 +637,8 @@ func DisplayResults(results []CheckResult, showAll bool) {
 	}
 
 	for category, checks := range categories {
-		fmt.Printf("\n[%s]\n", category)
-		fmt.Println(strings.Repeat("-", 50))
+		fmt.Fprintf(stdoutW, "\n[%s]\n", category)
+		fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 		for _, check := range checks {
 			status := "OK"
@@ -658,35 +658,35 @@ func DisplayResults(results []CheckResult, showAll bool) {
 				severityColor = "INFO"
 			}
 
-			fmt.Printf("  %s [%s] - %s\n", check.Name, severityColor, status)
+			fmt.Fprintf(stdoutW, "  %s [%s] - %s\n", check.Name, severityColor, status)
 
 			if showAll || check.Vulnerable {
 				for _, detail := range check.Details {
-					fmt.Printf("    > %s\n", detail)
+					fmt.Fprintf(stdoutW, "    > %s\n", detail)
 				}
 			}
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplaySystemInfo displays system information
 func DisplaySystemInfo(info SystemInfo) {
-	fmt.Println("\n[SYSTEM INFORMATION]")
-	fmt.Println(strings.Repeat("-", 50))
-	fmt.Printf("  OS:           %s\n", info.OS)
-	fmt.Printf("  Architecture: %s\n", info.Architecture)
-	fmt.Printf("  Hostname:     %s\n", info.Hostname)
-	fmt.Printf("  User:         %s\n", info.CurrentUser)
-	fmt.Printf("  Groups:       %s\n", strings.Join(info.Groups, ", "))
-	fmt.Printf("  Shell:        %s\n", info.Shell)
+	fmt.Fprintln(stdoutW, "\n[SYSTEM INFORMATION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "  OS:           %s\n", info.OS)
+	fmt.Fprintf(stdoutW, "  Architecture: %s\n", info.Architecture)
+	fmt.Fprintf(stdoutW, "  Hostname:     %s\n", info.Hostname)
+	fmt.Fprintf(stdoutW, "  User:         %s\n", info.CurrentUser)
+	fmt.Fprintf(stdoutW, "  Groups:       %s\n", strings.Join(info.Groups, ", "))
+	fmt.Fprintf(stdoutW, "  Shell:        %s\n", info.Shell)
 	if info.Kernel != "" {
 		kernelShort := info.Kernel
 		if len(kernelShort) > 60 {
 			kernelShort = kernelShort[:60] + "..."
 		}
-		fmt.Printf("  Kernel:       %s\n", kernelShort)
+		fmt.Fprintf(stdoutW, "  Kernel:       %s\n", kernelShort)
 	}
 }
 

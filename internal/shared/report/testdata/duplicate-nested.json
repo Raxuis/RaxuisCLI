@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "tool": {"name":"raxuiscli","version":"1.0.0","commit":"abc","go_version":"go1.25","platform":"linux/amd64"},
+  "audit": {"id":"id","kind":"web","target":"https://example.test/","started_at":"2026-09-04T12:30:00Z","duration":0,"status":"success"},
+  "findings": [],
+  "observations": [],
+  "errors": [],
+  "future": {"nested":{"value":1,"value":2}}
+}

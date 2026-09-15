@@ -128,8 +128,8 @@ func DumpBytes(data []byte, opts Options) string {
 
 // printLine prints a single hexdump line
 func printLine(offset int64, data []byte, opts Options) {
-	fmt.Print(formatLine(offset, data, opts))
-	fmt.Println()
+	fmt.Fprint(stdoutW, formatLine(offset, data, opts))
+	fmt.Fprintln(stdoutW)
 }
 
 // formatLine formats a single hexdump line

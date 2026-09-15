@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
-	"raxuiscli/internal/tools/files"
+	"github.com/Raxuis/RaxuisCLI/internal/tools/files"
 
 	"github.com/spf13/cobra"
 )

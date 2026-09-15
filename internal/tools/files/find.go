@@ -78,7 +78,7 @@ func Find(paths []string, opts FindOptions) error {
 			}
 
 			matches = append(matches, currentPath)
-			fmt.Println(currentPath)
+			fmt.Fprintln(stdoutW, currentPath)
 
 			// Exécuter une commande si spécifiée
 			if opts.Exec != "" {
@@ -99,9 +99,9 @@ func Find(paths []string, opts FindOptions) error {
 	}
 
 	if len(matches) == 0 {
-		fmt.Println("No files found matching the criteria")
+		fmt.Fprintln(stdoutW, "No files found matching the criteria")
 	} else {
-		fmt.Printf("\nFound %d file(s)\n", len(matches))
+		fmt.Fprintf(stdoutW, "\nFound %d file(s)\n", len(matches))
 	}
 
 	return nil
@@ -157,7 +157,7 @@ func searchFileString(path string, searchStr string) bool {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", path, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", path, err)
 		}
 	}(file)
 
@@ -180,7 +180,7 @@ func searchFileRegex(path string, pattern *regexp.Regexp) bool {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", path, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", path, err)
 		}
 	}(file)
 

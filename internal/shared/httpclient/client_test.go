@@ -1,13 +1,207 @@
 package httpclient
 
 import (
+	"context"
+	"errors"
+	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (body *trackingReadCloser) Close() error {
+	body.closed = true
+	return nil
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("interrupted body")
+}
+
+func TestDoRequestContextHonorsCancellation(t *testing.T) {
+	started := make(chan struct{})
+	handlerDone := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		close(handlerDone)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		resp, _, _, err := DoRequestContext(ctx, CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		errs <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("request did not reach the blocking handler")
+	}
+	cancel()
+
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("DoRequestContext did not return after cancellation")
+	}
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not observe request cancellation")
+	}
+}
+
+func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("body"))
+	}))
+	defer srv.Close()
+
+	resp, body, truncated, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, math.MaxInt64)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("DoRequestContext returned error: %v", err)
+	}
+	if resp == nil || body != "body" || truncated {
+		t.Errorf("response = %v, body = %q, truncated = %t; want full body without truncation", resp, body, truncated)
+	}
+}
+
+func TestDoRequestContextWrapsRequestConstructionError(t *testing.T) {
+	resp, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), "://not-a-valid-url", models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "failed to create request:") {
+		t.Fatalf("DoRequestContext error = %v, want wrapped request-construction error", err)
+	}
+}
+
+func TestDoRequestContextWrapsTransportError(t *testing.T) {
+	want := errors.New("transport unavailable")
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, want
+	})}
+
+	resp, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err == want || !errors.Is(err, want) || !strings.Contains(err.Error(), "request failed:") {
+		t.Fatalf("DoRequestContext error = %v, want wrapped transport error", err)
+	}
+}
+
+func TestDoRequestContextTruncatesBodyAtConfiguredCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("abcdef"))
+	}))
+	defer srv.Close()
+
+	resp, body, truncated, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 4)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("DoRequestContext returned error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("DoRequestContext returned a nil response")
+	}
+	if body != "abcd" {
+		t.Errorf("body = %q, want %q", body, "abcd")
+	}
+	if !truncated {
+		t.Error("truncated = false, want true")
+	}
+}
+
+func TestDoRequestContextReturnsInterruptedBodyError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("response writer does not support hijacking")
+		}
+		conn, buf, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatalf("Hijack: %v", err)
+		}
+		_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nshort")
+		_ = buf.Flush()
+		_ = conn.Close()
+	}))
+	defer srv.Close()
+
+	resp, _, _, err := DoRequestContext(context.Background(), CreateClient(models.ScanOptions{}), srv.URL, models.ScanOptions{}, 1024)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for an interrupted response body")
+	}
+}
+
+func TestDoRequestContextClosesBodyAfterReadSuccessAndFailure(t *testing.T) {
+	tests := []struct {
+		name    string
+		reader  io.Reader
+		wantErr bool
+	}{
+		{name: "success", reader: strings.NewReader("ok")},
+		{name: "read failure", reader: failingReader{}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := &trackingReadCloser{Reader: tt.reader}
+			client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+			})}
+
+			resp, _, _, err := DoRequestContext(context.Background(), client, "http://example.com", models.ScanOptions{}, 1024)
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("DoRequestContext error = %v, want error=%t", err, tt.wantErr)
+			}
+			if !body.closed {
+				t.Fatal("response body was not closed")
+			}
+		})
+	}
+}
 
 func TestCreateClientAppliesTimeoutDefault(t *testing.T) {
 	client := CreateClient(models.ScanOptions{})

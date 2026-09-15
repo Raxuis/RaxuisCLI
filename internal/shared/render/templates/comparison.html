@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaxuisCLI Audit Comparison</title>
+  <style>
+{{ .EmbeddedCSS }}
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="hero">
+      <p class="eyebrow">RaxuisCLI · Audit comparison</p>
+      <h1>{{ .Comparison.After.Audit.Kind }} audit comparison</h1>
+      <p class="target">{{ .Comparison.Before.Audit.Target }} → {{ .Comparison.After.Audit.Target }}</p>
+    </header>
+
+    <section class="regressions">
+      <h2>Regressions</h2>
+{{- if or .Comparison.Findings.Added .Worsened }}
+      <div class="findings">
+{{- range .Comparison.Findings.Added }}
+        <article class="finding regression"><div class="finding-heading"><span class="badge {{ severityClass .Severity }}">ADDED {{ .Severity }}</span><h3>{{ .Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .RuleID }}</dd><dt>Resource</dt><dd>{{ .Resource }}</dd></dl></article>
+{{- end }}
+{{- range .Worsened }}
+        <article class="finding regression"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">WORSENED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
+{{- end }}
+      </div>
+{{- else }}
+      <p class="empty">No regressions were recorded.</p>
+{{- end }}
+    </section>
+
+    <section class="resolutions">
+      <h2>Resolutions</h2>
+{{- if or .Comparison.Findings.Resolved .Improved }}
+      <div class="findings">
+{{- range .Comparison.Findings.Resolved }}
+        <article class="finding resolution"><div class="finding-heading"><span class="badge {{ severityClass .Severity }}">RESOLVED {{ .Severity }}</span><h3>{{ .Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .RuleID }}</dd><dt>Resource</dt><dd>{{ .Resource }}</dd></dl></article>
+{{- end }}
+{{- range .Improved }}
+        <article class="finding resolution"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">IMPROVED {{ .Before.Severity }} → {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd><dt>Resource</dt><dd>{{ .After.Resource }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
+{{- end }}
+      </div>
+{{- else }}
+      <p class="empty">No resolutions were recorded.</p>
+{{- end }}
+    </section>
+
+    <section>
+      <h2>Other finding changes</h2>
+{{- if .Other }}
+      <div class="findings">
+{{- range .Other }}
+        <article class="finding"><div class="finding-heading"><span class="badge {{ severityClass .After.Severity }}">CHANGED {{ .After.Severity }}</span><h3>{{ .After.Title }}</h3></div><dl><dt>Rule</dt><dd>{{ .After.RuleID }}</dd>{{ if changeSummary . }}<dt>Changes</dt><dd>{{ changeSummary . }}</dd>{{ end }}</dl></article>
+{{- end }}
+      </div>
+{{- else }}
+      <p class="empty">No other finding changes were recorded.</p>
+{{- end }}
+    </section>
+
+    <section class="two-column">
+      <div><h2>Observations</h2><dl class="facts"><dt>Added</dt><dd>{{ len .Comparison.Observations.Added }}</dd><dt>Removed</dt><dd>{{ len .Comparison.Observations.Removed }}</dd><dt>Changed</dt><dd>{{ len .Comparison.Observations.Changed }}</dd></dl></div>
+      <div><h2>Snapshots</h2><dl class="facts"><dt>Before</dt><dd>{{ .Comparison.Before.Audit.ID }}</dd><dt>After</dt><dd>{{ .Comparison.After.Audit.ID }}</dd><dt>Schema</dt><dd>v{{ .Comparison.SchemaVersion }}</dd></dl></div>
+    </section>
+  </main>
+  <footer>Created by Raxuis · <a href="https://github.com/raxuis">github.com/raxuis</a></footer>
+</body>
+</html>

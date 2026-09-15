@@ -383,35 +383,35 @@ func ReconMultiple(opts ReconOptions) []ServiceResult {
 
 // DisplayResult displays a single recon result
 func DisplayResult(result ServiceResult) {
-	fmt.Printf("\n[RECON] %s:%d\n", result.Host, result.Port)
-	fmt.Println(strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "\n[RECON] %s:%d\n", result.Host, result.Port)
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 	if result.Error != nil {
-		fmt.Printf("  Status:  CLOSED/FILTERED\n")
-		fmt.Printf("  Error:   %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "  Status:  CLOSED/FILTERED\n")
+		fmt.Fprintf(stdoutW, "  Error:   %v\n", result.Error)
 		return
 	}
 
-	fmt.Printf("  Status:  OPEN\n")
-	fmt.Printf("  Service: %s\n", result.Service)
+	fmt.Fprintf(stdoutW, "  Status:  OPEN\n")
+	fmt.Fprintf(stdoutW, "  Service: %s\n", result.Service)
 
 	if result.Version != "" {
-		fmt.Printf("  Version: %s\n", result.Version)
+		fmt.Fprintf(stdoutW, "  Version: %s\n", result.Version)
 	}
 
 	if result.TLS {
-		fmt.Printf("  TLS:     Yes (%s)\n", result.TLSVersion)
+		fmt.Fprintf(stdoutW, "  TLS:     Yes (%s)\n", result.TLSVersion)
 	}
 
-	fmt.Printf("  Latency: %v\n", result.ResponseTime.Round(time.Millisecond))
+	fmt.Fprintf(stdoutW, "  Latency: %v\n", result.ResponseTime.Round(time.Millisecond))
 
 	if result.Banner != "" {
-		fmt.Println("\n  Banner:")
+		fmt.Fprintln(stdoutW, "\n  Banner:")
 		// Format banner nicely
 		lines := strings.Split(result.Banner, "\n")
 		for i, line := range lines {
 			if i >= 10 {
-				fmt.Printf("    ... (%d more lines)\n", len(lines)-10)
+				fmt.Fprintf(stdoutW, "    ... (%d more lines)\n", len(lines)-10)
 				break
 			}
 			// Sanitize line for display
@@ -419,17 +419,17 @@ func DisplayResult(result ServiceResult) {
 			if len(line) > 80 {
 				line = line[:77] + "..."
 			}
-			fmt.Printf("    %s\n", line)
+			fmt.Fprintf(stdoutW, "    %s\n", line)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayResults displays multiple recon results
 func DisplayResults(results []ServiceResult) {
 	if len(results) == 0 {
-		fmt.Println("No results")
+		fmt.Fprintln(stdoutW, "No results")
 		return
 	}
 
@@ -441,11 +441,11 @@ func DisplayResults(results []ServiceResult) {
 		}
 	}
 
-	fmt.Printf("\n[RECON SUMMARY] %s\n", results[0].Host)
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("Ports scanned: %d | Open: %d | Closed/Filtered: %d\n",
+	fmt.Fprintf(stdoutW, "\n[RECON SUMMARY] %s\n", results[0].Host)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "Ports scanned: %d | Open: %d | Closed/Filtered: %d\n",
 		len(results), openPorts, len(results)-openPorts)
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	// Display open ports first
 	for _, result := range results {
@@ -463,17 +463,17 @@ func DisplayResults(results []ServiceResult) {
 	}
 
 	if len(closedPorts) > 0 {
-		fmt.Printf("\nClosed/Filtered ports: ")
+		fmt.Fprintf(stdoutW, "\nClosed/Filtered ports: ")
 		for i, port := range closedPorts {
 			if i > 0 {
-				fmt.Print(", ")
+				fmt.Fprint(stdoutW, ", ")
 			}
-			fmt.Print(port)
+			fmt.Fprint(stdoutW, port)
 		}
-		fmt.Println()
+		fmt.Fprintln(stdoutW)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // displayCompactResult shows a single line result
@@ -488,7 +488,7 @@ func displayCompactResult(result ServiceResult) {
 		version = " (" + result.Version + ")"
 	}
 
-	fmt.Printf("  %-6d %-12s%s%s\n", result.Port, result.Service, version, tlsInfo)
+	fmt.Fprintf(stdoutW, "  %-6d %-12s%s%s\n", result.Port, result.Service, version, tlsInfo)
 }
 
 // sanitizeBanner removes non-printable characters from banner

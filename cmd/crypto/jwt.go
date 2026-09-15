@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/crypto/jwt"
+	"github.com/Raxuis/RaxuisCLI/internal/crypto/jwt"
 )
 
 var jwtCmd = &cobra.Command{

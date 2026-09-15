@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"raxuiscli/cmd"
+	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
-	"raxuiscli/internal/web/cookie"
+	"github.com/Raxuis/RaxuisCLI/internal/web/cookie"
 )
 
 var cookieCmd = &cobra.Command{

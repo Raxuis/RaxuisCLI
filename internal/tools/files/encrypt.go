@@ -77,7 +77,7 @@ func Encrypt(inputPath string, opts EncryptOptions) error {
 		return fmt.Errorf("error writing encrypted file: %w", err)
 	}
 
-	fmt.Printf("File encrypted successfully: %s\n", outputPath)
+	fmt.Fprintf(stdoutW, "File encrypted successfully: %s\n", outputPath)
 	return nil
 }
 
@@ -123,7 +123,7 @@ func Decrypt(inputPath string, opts DecryptOptions) error {
 		return fmt.Errorf("error writing decrypted file: %w", err)
 	}
 
-	fmt.Printf("File decrypted successfully: %s\n", outputPath)
+	fmt.Fprintf(stdoutW, "File decrypted successfully: %s\n", outputPath)
 	return nil
 }
 

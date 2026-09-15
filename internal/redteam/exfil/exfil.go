@@ -279,32 +279,32 @@ func simpleChecksum(data []byte) uint32 {
 
 // DisplayChunks displays chunk information
 func DisplayChunks(chunks []ChunkResult) {
-	fmt.Println("\n[EXFIL] File Chunks")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[EXFIL] File Chunks")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(chunks) == 0 {
-		fmt.Println("No chunks")
+		fmt.Fprintln(stdoutW, "No chunks")
 		return
 	}
 
-	fmt.Printf("Filename: %s\n", chunks[0].Filename)
-	fmt.Printf("Total Chunks: %d\n\n", len(chunks))
+	fmt.Fprintf(stdoutW, "Filename: %s\n", chunks[0].Filename)
+	fmt.Fprintf(stdoutW, "Total Chunks: %d\n\n", len(chunks))
 
 	var totalSize int
 	for _, chunk := range chunks {
 		totalSize += chunk.Size
-		fmt.Printf("  Chunk %d/%d: %d bytes (checksum: %d)\n",
+		fmt.Fprintf(stdoutW, "  Chunk %d/%d: %d bytes (checksum: %d)\n",
 			chunk.ChunkNum+1, chunk.TotalChnk, chunk.Size, chunk.Checksum)
 	}
 
-	fmt.Printf("\nTotal Size: %d bytes\n", totalSize)
-	fmt.Println()
+	fmt.Fprintf(stdoutW, "\nTotal Size: %d bytes\n", totalSize)
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayEncodedChunks displays encoded chunks
 func DisplayEncodedChunks(chunks []ChunkResult, method EncodingMethod, limit int) {
-	fmt.Printf("\n[EXFIL] Encoded Chunks (%s)\n", method)
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[EXFIL] Encoded Chunks (%s)\n", method)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	count := len(chunks)
 	if limit > 0 && limit < count {
@@ -316,16 +316,16 @@ func DisplayEncodedChunks(chunks []ChunkResult, method EncodingMethod, limit int
 		encoded := EncodeChunk(&chunk, method)
 
 		if len(encoded) > 80 {
-			fmt.Printf("  Chunk %d: %s... (%d chars)\n",
+			fmt.Fprintf(stdoutW, "  Chunk %d: %s... (%d chars)\n",
 				chunk.ChunkNum+1, encoded[:80], len(encoded))
 		} else {
-			fmt.Printf("  Chunk %d: %s\n", chunk.ChunkNum+1, encoded)
+			fmt.Fprintf(stdoutW, "  Chunk %d: %s\n", chunk.ChunkNum+1, encoded)
 		}
 	}
 
 	if limit > 0 && limit < len(chunks) {
-		fmt.Printf("  ... and %d more chunks\n", len(chunks)-limit)
+		fmt.Fprintf(stdoutW, "  ... and %d more chunks\n", len(chunks)-limit)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

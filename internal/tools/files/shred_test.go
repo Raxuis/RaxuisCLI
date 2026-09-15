@@ -28,9 +28,11 @@ func captureShredStdout(t *testing.T, fn func()) string {
 	orig := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
+	stdoutW = w
 	fn()
 	w.Close()
 	os.Stdout = orig
+	stdoutW = orig
 	data, _ := io.ReadAll(r)
 	return string(data)
 }

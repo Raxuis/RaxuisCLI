@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "raxuiscli",
+    "version": "1.0.0",
+    "commit": "abc123",
+    "go_version": "go1.25.0",
+    "platform": "linux/amd64"
+  },
+  "audit": {
+    "id": "untrusted-stored-id",
+    "kind": "web",
+    "target": "HTTPS://alice:password@EXAMPLE.test:443/a/../path?token=secret",
+    "started_at": "2026-09-04T12:30:00+02:00",
+    "duration": 250000000,
+    "status": "success"
+  },
+  "findings": [
+    {
+      "id": "untrusted-finding-id-2",
+      "rule_id": "http.header.z-last",
+      "title": "Z last",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "https://example.test/path?token=another-secret",
+      "evidence": "Authorization: Bearer evidence-secret",
+      "remediation": "Fix Z"
+    },
+    {
+      "id": "untrusted-finding-id-1",
+      "rule_id": "http.header.a-first",
+      "title": "A first",
+      "severity": "LOW",
+      "status": "open",
+      "resource": "https://example.test/path?token=secret",
+      "evidence": "Header not present",
+      "remediation": "Fix A"
+    }
+  ],
+  "observations": [
+    {"key": "tls.version", "value": "TLS 1.3"},
+    {"key": "http.status", "value": "200"}
+  ],
+  "errors": [
+    {"code": "z.collect", "message": "token=error-secret"},
+    {"code": "a.collect", "message": "safe failure"}
+  ]
+}

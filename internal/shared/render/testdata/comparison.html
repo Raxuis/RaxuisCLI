@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaxuisCLI Audit Comparison</title>
+  <style>
+:root { color-scheme: dark; --bg: #0b1220; --surface: #121c2d; --line: #26354c; --text: #e5edf5; --muted: #9aabc0; --mint: #72e3c1; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.report { max-width: 1040px; margin: 0 auto; padding: 48px 24px 32px; }
+.hero, section, .disclaimer { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+.eyebrow { color: var(--mint); font-size: .8rem; font-weight: 700; letter-spacing: .09em; margin: 0 0 8px; text-transform: uppercase; }
+h1, h2, h3, p { margin-top: 0; } h1 { font-size: 2.25rem; margin-bottom: 4px; } h2 { font-size: 1.1rem; margin-bottom: 16px; } h3 { font-size: 1rem; margin: 0; }
+.target, .empty { color: var(--muted); overflow-wrap: anywhere; } .status { color: var(--mint); font-weight: 700; margin: 16px 0 0; text-transform: uppercase; }
+.counts { display: grid; gap: 12px; grid-template-columns: repeat(5, minmax(0, 1fr)); }.count { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }.count span { color: var(--muted); display: block; font-size: .75rem; }.count strong { font-size: 1.7rem; }
+.critical { --severity: #e879f9; }.high { --severity: #fb7185; }.medium { --severity: #fbbf24; }.low { --severity: #38bdf8; }.info { --severity: #a3a3a3; }.count { border-bottom: 3px solid var(--severity); }
+.findings { display: grid; gap: 12px; }.finding { border: 1px solid var(--line); border-radius: 8px; padding: 18px; }.finding-heading { align-items: center; display: flex; gap: 10px; margin-bottom: 14px; }.badge { background: color-mix(in srgb, var(--severity) 18%, transparent); border: 1px solid var(--severity); border-radius: 999px; color: var(--severity); font-size: .7rem; font-weight: 700; padding: 2px 8px; }
+dl { margin: 0; }.finding dl, .facts { display: grid; gap: 6px 16px; grid-template-columns: max-content minmax(0, 1fr); }.finding dt, .facts dt { color: var(--muted); }.finding dd, .facts dd { margin: 0; overflow-wrap: anywhere; }
+.two-column { display: grid; gap: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); }.two-column > div + div { border-left: 1px solid var(--line); padding-left: 28px; }.disclaimer { color: var(--muted); }.disclaimer strong { color: var(--text); } footer { color: var(--muted); padding: 0 24px 40px; text-align: center; } a { color: var(--mint); }
+@media (max-width: 700px) { .report { padding: 24px 16px; }.counts, .two-column { grid-template-columns: 1fr; }.two-column > div + div { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: 24px; } }
+
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="hero">
+      <p class="eyebrow">RaxuisCLI · Audit comparison</p>
+      <h1>web audit comparison</h1>
+      <p class="target">https://example.com/login → https://example.com/login</p>
+    </header>
+
+    <section class="regressions">
+      <h2>Regressions</h2>
+      <div class="findings">
+        <article class="finding regression"><div class="finding-heading"><span class="badge high">ADDED HIGH</span><h3>CSP header is missing</h3></div><dl><dt>Rule</dt><dd>http.header.content-security-policy</dd><dt>Resource</dt><dd>https://example.com/login</dd></dl></article>
+        <article class="finding regression"><div class="finding-heading"><span class="badge critical">WORSENED MEDIUM → CRITICAL</span><h3>Deprecated TLS protocol accepted</h3></div><dl><dt>Rule</dt><dd>tls.protocol.deprecated</dd><dt>Resource</dt><dd>https://example.com/login</dd><dt>Changes</dt><dd>Evidence changed</dd></dl></article>
+      </div>
+    </section>
+
+    <section class="resolutions">
+      <h2>Resolutions</h2>
+      <div class="findings">
+        <article class="finding resolution"><div class="finding-heading"><span class="badge low">RESOLVED LOW</span><h3>X-Frame-Options missing</h3></div><dl><dt>Rule</dt><dd>http.header.x-frame-options</dd><dt>Resource</dt><dd>https://example.com/login</dd></dl></article>
+        <article class="finding resolution"><div class="finding-heading"><span class="badge low">IMPROVED HIGH → LOW</span><h3>HSTS header remains absent</h3></div><dl><dt>Rule</dt><dd>http.header.hsts</dd><dt>Resource</dt><dd>https://example.com/login</dd><dt>Changes</dt><dd>Evidence changed; Title changed; Status changed; Remediation changed</dd></dl></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Other finding changes</h2>
+      <p class="empty">No other finding changes were recorded.</p>
+    </section>
+
+    <section class="two-column">
+      <div><h2>Observations</h2><dl class="facts"><dt>Added</dt><dd>1</dd><dt>Removed</dt><dd>1</dd><dt>Changed</dt><dd>1</dd></dl></div>
+      <div><h2>Snapshots</h2><dl class="facts"><dt>Before</dt><dd>audit-demo-001</dd><dt>After</dt><dd>audit-demo-001</dd><dt>Schema</dt><dd>v1</dd></dl></div>
+    </section>
+  </main>
+  <footer>Created by Raxuis · <a href="https://github.com/raxuis">github.com/raxuis</a></footer>
+</body>
+</html>

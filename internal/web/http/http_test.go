@@ -2,14 +2,178 @@ package http
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestDoRequestContextHonorsCancellation(t *testing.T) {
+	started := make(chan struct{})
+	handlerDone := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		close(handlerDone)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		_, err := DoRequestContext(ctx, RequestOptions{URL: srv.URL}, 1024)
+		errs <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("request did not reach the blocking handler")
+	}
+	cancel()
+
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("DoRequestContext did not return after cancellation")
+	}
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not observe request cancellation")
+	}
+}
+
+func TestDoRequestContextUsesInjectedDialContext(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	var network, address string
+	dialer := &net.Dialer{}
+	response, err := DoRequestContext(context.Background(), RequestOptions{
+		URL: srv.URL,
+		DialContext: func(ctx context.Context, gotNetwork, gotAddress string) (net.Conn, error) {
+			network, address = gotNetwork, gotAddress
+			return dialer.DialContext(ctx, gotNetwork, gotAddress)
+		},
+	}, 1024)
+	if err != nil {
+		t.Fatalf("DoRequestContext: %v", err)
+	}
+	if response.Body != "ok" || network != "tcp" || address != srv.Listener.Addr().String() {
+		t.Fatalf("body=%q dial=%s/%s, want injected TCP dial to %s", response.Body, network, address, srv.Listener.Addr())
+	}
+}
+
+func TestDoRequestContextSupportsMaxInt64Cap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("body"))
+	}))
+	defer srv.Close()
+
+	resp, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, math.MaxInt64)
+	if err != nil {
+		t.Fatalf("DoRequestContext error = %v, want context.Canceled", err)
+	}
+	if resp.Body != "body" || resp.Truncated {
+		t.Errorf("response = %+v, want body without truncation", resp)
+	}
+}
+
+func TestDoRequestContextTruncatesBodyAtConfiguredCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("abcdef"))
+	}))
+	defer srv.Close()
+
+	resp, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 4)
+	if err != nil {
+		t.Fatalf("DoRequestContext returned error: %v", err)
+	}
+	if resp.Body != "abcd" {
+		t.Errorf("Body = %q, want %q", resp.Body, "abcd")
+	}
+	if !resp.Truncated {
+		t.Error("Truncated = false, want true")
+	}
+}
+
+func TestDoRequestContextReturnsInterruptedBodyError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("response writer does not support hijacking")
+		}
+		conn, buf, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatalf("Hijack: %v", err)
+		}
+		_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nshort")
+		_ = buf.Flush()
+		_ = conn.Close()
+	}))
+	defer srv.Close()
+
+	_, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 1024)
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for an interrupted response body")
+	}
+}
+
+func TestDoRequestContextRejectsMalformedProxy(t *testing.T) {
+	_, err := DoRequestContext(context.Background(), RequestOptions{
+		URL:   "http://example.com",
+		Proxy: "://not-a-valid-proxy",
+	}, 1024)
+	if err == nil {
+		t.Fatal("DoRequestContext returned nil error for a malformed proxy URL")
+	}
+}
+
+func TestDoRequestContextClosesFreshTransportIdleConnections(t *testing.T) {
+	closed := make(chan struct{}, 2)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			select {
+			case closed <- struct{}{}:
+			default:
+			}
+		}
+	}
+	srv.Start()
+	defer srv.Close()
+
+	for request := 0; request < 2; request++ {
+		response, err := DoRequestContext(context.Background(), RequestOptions{URL: srv.URL}, 1024)
+		if err != nil {
+			t.Fatalf("request %d returned error: %v", request, err)
+		}
+		if response.Body != "ok" {
+			t.Fatalf("request %d body = %q, want ok", request, response.Body)
+		}
+		select {
+		case <-closed:
+		case <-time.After(time.Second):
+			t.Fatalf("request %d left the fresh transport connection idle", request)
+		}
+	}
+}
 
 func TestDoRequestBasicGET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -410,9 +574,11 @@ func captureStdoutHelper(t *testing.T, fn func()) string {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
 	os.Stdout = w
+	stdoutW = w
 	fn()
 	w.Close()
 	os.Stdout = orig
+	stdoutW = orig
 
 	var buf bytes.Buffer
 	io.Copy(&buf, r)

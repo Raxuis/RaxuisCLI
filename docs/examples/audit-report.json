@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "raxuiscli",
+    "version": "0.0.0-example",
+    "commit": "local-fixture",
+    "go_version": "go1.25.0",
+    "platform": "linux/amd64"
+  },
+  "audit": {
+    "id": "974b60a9611c3acdafeb46810640298defa1008b43bb674325b7b6a1ee99087a",
+    "kind": "web",
+    "target": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+    "started_at": "2026-09-04T12:30:00Z",
+    "duration": 250000000,
+    "status": "success"
+  },
+  "findings": [
+    {
+      "id": "0028f5cea45ad41f9f3bd7394a88de680b30a8936abc2811f6f829430a316bf2",
+      "rule_id": "http.cookie.security-flags",
+      "title": "Cookie security flags are weak",
+      "type": "Security Headers",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Cookie: \u003credacted\u003e",
+      "evidence": "missing Secure flag, missing HttpOnly flag",
+      "description": "Cookie security flags are not properly set.",
+      "remediation": "Set Secure, HttpOnly, and SameSite=Strict flags on sensitive cookies."
+    },
+    {
+      "id": "0a94fa23a3168090dab1f4565a33c100cee3439fe9dca9a0d1005712ddf64ef4",
+      "rule_id": "http.header.server.version-disclosure",
+      "title": "Server version is disclosed",
+      "type": "Security Headers",
+      "severity": "INFO",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Server",
+      "evidence": "local-fixture/1.0",
+      "description": "Server version disclosed. This may help attackers identify vulnerabilities.",
+      "remediation": "Remove or obfuscate the Server header version information."
+    },
+    {
+      "id": "0f0037568517af3a24c8ca6233430080f80d80e785d65ecbf4e0b08308a73418",
+      "rule_id": "http.header.x-powered-by.disclosure",
+      "title": "Technology stack is disclosed",
+      "type": "Security Headers",
+      "severity": "INFO",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "X-Powered-By",
+      "evidence": "fixture",
+      "description": "Technology stack disclosed via X-Powered-By header.",
+      "remediation": "Remove the X-Powered-By header."
+    },
+    {
+      "id": "50ad7ef14e4cc167c3bf7b4cbf965a38463c7e870a7fdcfded9297c35ea3716b",
+      "rule_id": "http.header.x-frame-options.missing",
+      "title": "X-Frame-Options header is missing",
+      "type": "Security Headers",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "X-Frame-Options",
+      "evidence": "Header not present",
+      "description": "Missing X-Frame-Options header. The application may be vulnerable to clickjacking.",
+      "remediation": "Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' header."
+    },
+    {
+      "id": "52b486e56b76b2915909d1ed9503a3fa93f07513738f021a8917b867d6e83c35",
+      "rule_id": "http.header.content-security-policy.missing",
+      "title": "Content-Security-Policy header is missing",
+      "type": "Security Headers",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Content-Security-Policy",
+      "evidence": "Header not present",
+      "description": "Missing CSP header. The application may be vulnerable to XSS attacks.",
+      "remediation": "Implement a Content-Security-Policy header to restrict resource loading."
+    },
+    {
+      "id": "bdbe483baeca366706098668645a811932eb2e801bee417c414d75f2bcaaa8df",
+      "rule_id": "http.header.x-xss-protection.missing",
+      "title": "X-XSS-Protection header is missing",
+      "type": "Security Headers",
+      "severity": "LOW",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "X-XSS-Protection",
+      "evidence": "Header not present",
+      "description": "Missing X-XSS-Protection header. Browser XSS filter may not be enabled.",
+      "remediation": "Add 'X-XSS-Protection: 1; mode=block' header (note: deprecated in favor of CSP)."
+    },
+    {
+      "id": "da1f0237a721384bba1f1088c6bbdc40be836576c26c925ebdfc1078a675eb62",
+      "rule_id": "http.header.hsts.missing",
+      "title": "HSTS header is missing",
+      "type": "Security Headers",
+      "severity": "MEDIUM",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Strict-Transport-Security",
+      "evidence": "Header not present",
+      "description": "Missing HSTS header. The application may be vulnerable to SSL stripping attacks.",
+      "remediation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains' header."
+    },
+    {
+      "id": "df54588203262b78f3ef1d6352a47e783f1beea784ef31885575928ae5d462ae",
+      "rule_id": "http.header.referrer-policy.missing",
+      "title": "Referrer-Policy header is missing",
+      "type": "Security Headers",
+      "severity": "LOW",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Referrer-Policy",
+      "evidence": "Header not present",
+      "description": "Missing Referrer-Policy header. Sensitive information may leak in referrer.",
+      "remediation": "Add 'Referrer-Policy: strict-origin-when-cross-origin' header."
+    },
+    {
+      "id": "f5b4166f36eb3db49274c7edab65c1129c8f89b4114f93b6eef3a70f5212890e",
+      "rule_id": "http.header.permissions-policy.missing",
+      "title": "Permissions-Policy header is missing",
+      "type": "Security Headers",
+      "severity": "LOW",
+      "status": "open",
+      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
+      "parameter": "Permissions-Policy",
+      "evidence": "Header not present",
+      "description": "Missing Permissions-Policy header. Browser features are not restricted.",
+      "remediation": "Add Permissions-Policy header to control browser features."
+    }
+  ],
+  "observations": [
+    {
+      "key": "http.status",
+      "value": "200"
+    },
+    {
+      "key": "tls.skipped",
+      "value": "target scheme is http"
+    }
+  ],
+  "errors": []
+}

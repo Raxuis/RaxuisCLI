@@ -1,0 +1,82 @@
+package cmd_test
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/audit"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/cloud"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/container"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/crypto"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/interactive"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/network"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/redteam"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/tools"
+	_ "github.com/Raxuis/RaxuisCLI/cmd/web"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
+)
+
+func TestCatalogMatchesVisibleCommandTree(t *testing.T) {
+	t.Parallel()
+
+	want := visibleCommands(cmd.RootCmd)
+	got := make(map[string]catalog.Entry, len(catalog.All()))
+	var duplicates []string
+	for _, entry := range catalog.All() {
+		if _, exists := got[entry.Path]; exists {
+			duplicates = append(duplicates, entry.Path)
+		}
+		got[entry.Path] = entry
+	}
+
+	var missing, stale, summaryMismatch []string
+	for path, command := range want {
+		entry, exists := got[path]
+		if !exists {
+			missing = append(missing, fmt.Sprintf("%s | %s", path, command.Short))
+			continue
+		}
+		if entry.Summary != command.Short {
+			summaryMismatch = append(summaryMismatch, fmt.Sprintf("%s: catalog=%q cobra=%q", path, entry.Summary, command.Short))
+		}
+	}
+	for path := range got {
+		if _, exists := want[path]; !exists {
+			stale = append(stale, path)
+		}
+	}
+	for _, values := range [][]string{missing, stale, duplicates, summaryMismatch} {
+		sort.Strings(values)
+	}
+	if len(missing)+len(stale)+len(duplicates)+len(summaryMismatch) != 0 {
+		t.Fatalf("catalog/tree mismatch\nmissing:\n  %s\nstale:\n  %s\nduplicates:\n  %s\nsummary mismatch:\n  %s",
+			strings.Join(missing, "\n  "), strings.Join(stale, "\n  "),
+			strings.Join(duplicates, "\n  "), strings.Join(summaryMismatch, "\n  "))
+	}
+}
+
+func visibleCommands(root *cobra.Command) map[string]*cobra.Command {
+	// Force Cobra's lazily-attached help/completion commands into the tree
+	// so the catalog is checked against what a real user sees in --help.
+	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
+
+	result := make(map[string]*cobra.Command)
+	var visit func(*cobra.Command)
+	visit = func(command *cobra.Command) {
+		if command.Hidden {
+			return
+		}
+		result[command.CommandPath()] = command
+		for _, child := range command.Commands() {
+			visit(child)
+		}
+	}
+	visit(root)
+	return result
+}

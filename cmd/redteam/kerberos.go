@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/kerberos"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/kerberos"
 
 	"github.com/spf13/cobra"
 )

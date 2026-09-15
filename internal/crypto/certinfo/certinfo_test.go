@@ -1,11 +1,14 @@
 package certinfo
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http/httptest"
@@ -54,6 +57,72 @@ func makeCert(t *testing.T, mutate func(*x509.Certificate)) ([]byte, *x509.Certi
 		t.Fatalf("failed to parse created certificate: %v", err)
 	}
 	return der, cert
+}
+
+func testTLSServerCertificate(t *testing.T, notBefore, notAfter time.Time) tls.Certificate {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := certificateTemplate("127.0.0.1", notBefore.Add(time.Hour), false)
+	template.NotBefore, template.NotAfter = notBefore, notAfter
+	template.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
+func certificateTemplate(commonName string, at time.Time, isCA bool) *x509.Certificate {
+	keyUsage := x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment
+	if isCA {
+		keyUsage |= x509.KeyUsageCertSign
+	}
+	return &x509.Certificate{
+		SerialNumber:          big.NewInt(time.Now().UnixNano()),
+		Subject:               pkix.Name{CommonName: commonName},
+		NotBefore:             at.Add(-time.Hour),
+		NotAfter:              at.Add(time.Hour),
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IsCA:                  isCA,
+		BasicConstraintsValid: true,
+	}
+}
+
+func signedCertificate(t *testing.T, template, parent *x509.Certificate, parentKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent == nil {
+		parent, parentKey = template, key
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, parent, &key.PublicKey, parentKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key, certificate
+}
+
+func serverHostPort(t *testing.T, address string) (string, int) {
+	t.Helper()
+	host, portText, err := net.SplitHostPort(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return host, port
 }
 
 func writePEM(t *testing.T, der []byte) string {
@@ -199,6 +268,81 @@ func TestGetCertFromHostLocalTLSServer(t *testing.T) {
 	if chain.Valid == false && chain.Error == "" {
 		t.Error("expected either Valid=true or a non-empty Error explaining why verification failed")
 	}
+	if chain.Error != "" && chain.VerificationError == nil {
+		t.Error("expected the concrete certificate verification error to be retained")
+	}
+}
+
+func TestGetCertFromHostContextAtWithDialContextUsesInjectedDial(t *testing.T) {
+	srv := httptest.NewTLSServer(nil)
+	defer srv.Close()
+	host, port := serverHostPort(t, srv.Listener.Addr().String())
+
+	var network, address string
+	dialer := &net.Dialer{}
+	chain, err := GetCertFromHostContextAtWithDialContext(context.Background(), host, port, time.Now(), func(ctx context.Context, gotNetwork, gotAddress string) (net.Conn, error) {
+		network, address = gotNetwork, gotAddress
+		return dialer.DialContext(ctx, gotNetwork, gotAddress)
+	})
+	if err != nil {
+		t.Fatalf("GetCertFromHostContextAtWithDialContext: %v", err)
+	}
+	if len(chain.Certificates) == 0 || network != "tcp" || address != srv.Listener.Addr().String() {
+		t.Fatalf("chain=%+v dial=%s/%s, want injected TCP dial to %s", chain, network, address, srv.Listener.Addr())
+	}
+}
+
+func TestGetCertFromHostContextAtUsesRequestedVerificationTime(t *testing.T) {
+	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	server := httptest.NewUnstartedServer(nil)
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{testTLSServerCertificate(t, fixed.Add(-time.Hour), fixed.Add(time.Hour))}}
+	server.StartTLS()
+	defer server.Close()
+
+	host, port := serverHostPort(t, server.Listener.Addr().String())
+	atFixed, err := GetCertFromHostContextAt(context.Background(), host, port, fixed)
+	if err != nil {
+		t.Fatalf("GetCertFromHostContextAt returned error: %v", err)
+	}
+	if strings.Contains(strings.ToLower(atFixed.Error), "expired") {
+		t.Errorf("fixed-time verification reported wall-clock expiry: %q", atFixed.Error)
+	}
+
+	compatibility, err := GetCertFromHostContext(context.Background(), host, port)
+	if err != nil {
+		t.Fatalf("GetCertFromHostContext returned error: %v", err)
+	}
+	if compatibility.Host != host || compatibility.Port != port || len(compatibility.Certificates) == 0 {
+		t.Errorf("compatibility wrapper returned %#v, want the collected chain", compatibility)
+	}
+
+	zeroTime, err := GetCertFromHostContextAt(context.Background(), host, port, time.Time{})
+	if err != nil {
+		t.Fatalf("zero-time helper returned error: %v", err)
+	}
+	if zeroTime.Host != host || zeroTime.Port != port || len(zeroTime.Certificates) == 0 {
+		t.Errorf("zero-time helper returned %#v, want current-time compatibility behavior", zeroTime)
+	}
+}
+
+func TestVerifyPeerCertificatesUsesPeerIntermediates(t *testing.T) {
+	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	rootTemplate := certificateTemplate("Root", fixed, true)
+	rootKey, root := signedCertificate(t, rootTemplate, nil, nil)
+	intermediateTemplate := certificateTemplate("Intermediate", fixed, true)
+	intermediateKey, intermediate := signedCertificate(t, intermediateTemplate, root, rootKey)
+	leafTemplate := certificateTemplate("service.example", fixed, false)
+	leafTemplate.DNSNames = []string{"service.example"}
+	_, leaf := signedCertificate(t, leafTemplate, intermediate, intermediateKey)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	if err := verifyPeerCertificates([]*x509.Certificate{leaf, intermediate}, "service.example", fixed, roots); err != nil {
+		t.Fatalf("verification with peer intermediate failed: %v", err)
+	}
+	if err := verifyPeerCertificates([]*x509.Certificate{leaf, intermediate}, "service.example", time.Now(), roots); err == nil || !strings.Contains(strings.ToLower(err.Error()), "expired") {
+		t.Fatalf("wall-clock verification error = %v, want expiry outside the fixed validity window", err)
+	}
 }
 
 func TestGetCertFromHostDefaultPort(t *testing.T) {
@@ -214,6 +358,58 @@ func TestGetCertFromHostUnreachable(t *testing.T) {
 	_, err := GetCertFromHost("127.0.0.1", 1, 1)
 	if err == nil {
 		t.Error("GetCertFromHost against a closed port should return an error")
+	}
+}
+
+func TestGetCertFromHostContextHonorsCanceledContext(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		close(accepted)
+		defer conn.Close()
+		<-time.After(2 * time.Second)
+	}()
+
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split address: %v", err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		_, callErr := GetCertFromHostContext(ctx, host, port)
+		errs <- callErr
+	}()
+
+	select {
+	case <-accepted:
+		cancel()
+	case <-time.After(time.Second):
+		t.Fatal("TLS client did not connect")
+	}
+
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("GetCertFromHostContext did not stop after cancellation")
 	}
 }
 
@@ -250,6 +446,20 @@ func TestValidateCertificateNotYetValid(t *testing.T) {
 	}
 	if !result.NotYetValid {
 		t.Error("NotYetValid should be true")
+	}
+}
+
+func TestValidateCertificateAtUsesSuppliedInstant(t *testing.T) {
+	fixed := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	info := &CertInfo{
+		Subject: "CN=a", Issuer: "CN=b",
+		NotBefore: fixed.Add(24 * time.Hour),
+		NotAfter:  fixed.Add(48 * time.Hour),
+	}
+
+	result := ValidateCertificateAt(info, fixed)
+	if result.Expired || !result.NotYetValid {
+		t.Errorf("validation at %s = %#v, want not-yet-valid only", fixed, result)
 	}
 }
 

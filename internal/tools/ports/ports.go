@@ -41,14 +41,14 @@ func Scan(opts Options) {
 
 	portRange := expandPresetRanges(opts.PortRange)
 
-	fmt.Printf("🔍 Scanning %s ports on %s...\n", strings.ToUpper(scanner.scanType), scanner.host)
-	fmt.Printf("📊 Port range: %s\n", portRange)
-	fmt.Printf("⏱️  Timeout: %d seconds\n", opts.Timeout)
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintf(stdoutW, "🔍 Scanning %s ports on %s...\n", strings.ToUpper(scanner.scanType), scanner.host)
+	fmt.Fprintf(stdoutW, "📊 Port range: %s\n", portRange)
+	fmt.Fprintf(stdoutW, "⏱️  Timeout: %d seconds\n", opts.Timeout)
+	fmt.Fprintln(stdoutW, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	ports, err := parsePortRange(portRange)
 	if err != nil {
-		fmt.Printf("❌ Error parsing port range: %v\n", err)
+		fmt.Fprintf(stdoutW, "❌ Error parsing port range: %v\n", err)
 		return
 	}
 
@@ -174,7 +174,7 @@ func (ps *PortScanner) scanPorts(ports []int) {
 				ps.mutex.Unlock()
 
 				// Affichage en temps réel des ports ouverts
-				fmt.Printf("✅ Port %d/%s: %s %s\n", p, ps.scanType, result.Status, result.Service)
+				fmt.Fprintf(stdoutW, "✅ Port %d/%s: %s %s\n", p, ps.scanType, result.Status, result.Service)
 			}
 		}(port)
 	}
@@ -210,7 +210,7 @@ func (ps *PortScanner) scanTCP(target string) string {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("Error closing connection: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing connection: %v\n", err)
 		}
 	}(conn)
 	return "open"
@@ -224,7 +224,7 @@ func (ps *PortScanner) scanUDP(target string) string {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("Error closing connection: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing connection: %v\n", err)
 		}
 	}(conn)
 
@@ -294,19 +294,19 @@ func getServiceName(port int) string {
 }
 
 func (ps *PortScanner) displayResults(duration time.Duration, totalPorts int) {
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("📈 Scan completed in %v\n", duration.Round(time.Millisecond))
-	fmt.Printf("🎯 Scanned %d ports\n", totalPorts)
-	fmt.Printf("🔓 Found %d open ports\n", len(ps.results))
+	fmt.Fprintln(stdoutW, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintf(stdoutW, "📈 Scan completed in %v\n", duration.Round(time.Millisecond))
+	fmt.Fprintf(stdoutW, "🎯 Scanned %d ports\n", totalPorts)
+	fmt.Fprintf(stdoutW, "🔓 Found %d open ports\n", len(ps.results))
 
 	if len(ps.results) == 0 {
-		fmt.Println("🚫 No open ports found")
+		fmt.Fprintln(stdoutW, "🚫 No open ports found")
 		return
 	}
 
-	fmt.Println("\n📋 Summary of open ports:")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(stdoutW, "\n📋 Summary of open ports:")
+	fmt.Fprintln(stdoutW, "━━━━━━━━━━━━━━━━━━━━━━━━")
 	for _, result := range ps.results {
-		fmt.Printf("Port %-6d: %s %s\n", result.Port, result.Status, result.Service)
+		fmt.Fprintf(stdoutW, "Port %-6d: %s %s\n", result.Port, result.Status, result.Service)
 	}
 }

@@ -407,80 +407,80 @@ func getResolver(nameserver string, timeout int) *net.Resolver {
 // DisplayLookupResults displays DNS lookup results
 func DisplayLookupResults(results []LookupResult) {
 	for _, result := range results {
-		fmt.Printf("\n[%s] Records for %s:\n", result.RecordType, result.Domain)
-		fmt.Println(strings.Repeat("-", 50))
+		fmt.Fprintf(stdoutW, "\n[%s] Records for %s:\n", result.RecordType, result.Domain)
+		fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 		if result.Error != nil {
-			fmt.Printf("  Error: %v\n", result.Error)
+			fmt.Fprintf(stdoutW, "  Error: %v\n", result.Error)
 			continue
 		}
 
 		if len(result.Records) == 0 {
-			fmt.Println("  No records found")
+			fmt.Fprintln(stdoutW, "  No records found")
 			continue
 		}
 
 		for _, record := range result.Records {
-			fmt.Printf("  %s\n", record)
+			fmt.Fprintf(stdoutW, "  %s\n", record)
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayReverseResult displays reverse DNS lookup result
 func DisplayReverseResult(result ReverseResult) {
-	fmt.Printf("\n[PTR] Reverse lookup for %s:\n", result.IP)
-	fmt.Println(strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "\n[PTR] Reverse lookup for %s:\n", result.IP)
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 	if result.Error != nil {
-		fmt.Printf("  Error: %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "  Error: %v\n", result.Error)
 		return
 	}
 
 	if len(result.Hostname) == 0 {
-		fmt.Println("  No hostname found")
+		fmt.Fprintln(stdoutW, "  No hostname found")
 		return
 	}
 
 	for _, hostname := range result.Hostname {
-		fmt.Printf("  %s\n", hostname)
+		fmt.Fprintf(stdoutW, "  %s\n", hostname)
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayAXFRResult displays zone transfer result
 func DisplayAXFRResult(result AXFRResult) {
-	fmt.Printf("\n[AXFR] Zone transfer for %s via %s:\n", result.Domain, result.Server)
-	fmt.Println(strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "\n[AXFR] Zone transfer for %s via %s:\n", result.Domain, result.Server)
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 	if result.Error != nil {
-		fmt.Printf("  Status: FAILED\n")
-		fmt.Printf("  Error: %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "  Status: FAILED\n")
+		fmt.Fprintf(stdoutW, "  Error: %v\n", result.Error)
 		return
 	}
 
 	if result.Success {
-		fmt.Printf("  Status: POTENTIALLY VULNERABLE\n")
+		fmt.Fprintf(stdoutW, "  Status: POTENTIALLY VULNERABLE\n")
 		for _, record := range result.Records {
-			fmt.Printf("  %s\n", record)
+			fmt.Fprintf(stdoutW, "  %s\n", record)
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayBruteResult displays subdomain bruteforce results
 func DisplayBruteResult(result BruteResult) {
-	fmt.Printf("\n[BRUTE] Subdomain enumeration for %s:\n", result.Domain)
-	fmt.Println(strings.Repeat("-", 50))
-	fmt.Printf("  Tested: %d | Found: %d\n\n", result.Total, result.Found)
+	fmt.Fprintf(stdoutW, "\n[BRUTE] Subdomain enumeration for %s:\n", result.Domain)
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "  Tested: %d | Found: %d\n\n", result.Total, result.Found)
 
 	if result.Found == 0 {
-		fmt.Println("  No subdomains found")
+		fmt.Fprintln(stdoutW, "  No subdomains found")
 		return
 	}
 
 	for _, sub := range result.Subdomains {
-		fmt.Printf("  %-40s %s\n", sub.Subdomain, strings.Join(sub.IPs, ", "))
+		fmt.Fprintf(stdoutW, "  %-40s %s\n", sub.Subdomain, strings.Join(sub.IPs, ", "))
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

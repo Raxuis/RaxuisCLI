@@ -235,55 +235,55 @@ func GeneratePTHCommand(username, domain, hash, target, tool string) string {
 
 // DisplayHash displays NTLM hash information
 func DisplayHash(hash *NTLMHash) {
-	fmt.Println("\n[NTLM HASH]")
-	fmt.Println("===========")
-	fmt.Printf("Username: %s\n", hash.Username)
+	fmt.Fprintln(stdoutW, "\n[NTLM HASH]")
+	fmt.Fprintln(stdoutW, "===========")
+	fmt.Fprintf(stdoutW, "Username: %s\n", hash.Username)
 	if hash.Domain != "" {
-		fmt.Printf("Domain:   %s\n", hash.Domain)
+		fmt.Fprintf(stdoutW, "Domain:   %s\n", hash.Domain)
 	}
-	fmt.Printf("LM Hash:  %s\n", hash.LMHash)
-	fmt.Printf("NT Hash:  %s\n", hash.NTHash)
+	fmt.Fprintf(stdoutW, "LM Hash:  %s\n", hash.LMHash)
+	fmt.Fprintf(stdoutW, "NT Hash:  %s\n", hash.NTHash)
 	if hash.Password != "" {
-		fmt.Printf("Password: %s\n", hash.Password)
+		fmt.Fprintf(stdoutW, "Password: %s\n", hash.Password)
 	}
 
 	// Check for weak LM hash
 	if hash.LMHash == "AAD3B435B51404EEAAD3B435B51404EE" {
-		fmt.Println("\n[*] LM hash is empty (good security)")
+		fmt.Fprintln(stdoutW, "\n[*] LM hash is empty (good security)")
 	} else {
-		fmt.Println("\n[!] LM hash present (weak security)")
+		fmt.Fprintln(stdoutW, "\n[!] LM hash present (weak security)")
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayCrackResult displays crack result
 func DisplayCrackResult(result *CrackResult) {
-	fmt.Println("\n[NTLM CRACK]")
-	fmt.Println("============")
-	fmt.Printf("Hash:     %s\n", result.Hash)
-	fmt.Printf("Attempts: %d\n", result.Attempts)
+	fmt.Fprintln(stdoutW, "\n[NTLM CRACK]")
+	fmt.Fprintln(stdoutW, "============")
+	fmt.Fprintf(stdoutW, "Hash:     %s\n", result.Hash)
+	fmt.Fprintf(stdoutW, "Attempts: %d\n", result.Attempts)
 
 	if result.Found {
-		fmt.Printf("Status:   CRACKED\n")
-		fmt.Printf("Password: %s\n", result.Password)
+		fmt.Fprintf(stdoutW, "Status:   CRACKED\n")
+		fmt.Fprintf(stdoutW, "Password: %s\n", result.Password)
 	} else {
-		fmt.Printf("Status:   NOT FOUND\n")
+		fmt.Fprintf(stdoutW, "Status:   NOT FOUND\n")
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayPTHCommands displays pass-the-hash commands
 func DisplayPTHCommands(username, domain, hash, target string) {
-	fmt.Println("\n[PASS-THE-HASH COMMANDS]")
-	fmt.Println("========================")
+	fmt.Fprintln(stdoutW, "\n[PASS-THE-HASH COMMANDS]")
+	fmt.Fprintln(stdoutW, "========================")
 
 	tools := []string{"impacket", "crackmapexec", "evil-winrm", "wmiexec"}
 	for _, tool := range tools {
 		cmd := GeneratePTHCommand(username, domain, hash, target, tool)
-		fmt.Printf("\n%s:\n  %s\n", tool, cmd)
+		fmt.Fprintf(stdoutW, "\n%s:\n  %s\n", tool, cmd)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

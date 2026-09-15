@@ -6,6 +6,14 @@
 
 RaxuisCLI is a command-line tool designed for security professionals, pentesters, and CTF participants. It bundles many essential tools into a unified and portable interface.
 
+> **Maturity — read this first.** Commands carry a maturity label shown in their
+> `--help` and in the [command catalog](#command-catalog) at the bottom of this
+> file. Only `stable` commands (the passive **audit**, **compare**, **demo**, the
+> guided **interactive** interface, and core commands) are considered complete.
+> Many others are `experimental` (may be incomplete or change) or
+> `informational` (they mostly print guidance or generated examples rather than
+> performing the action end to end). Check the label before relying on a command.
+
 ## ⚠️ Legal Disclaimer
 
 RaxuisCLI is built for **authorized security testing, CTF competitions, and educational use only**. It includes offensive tooling (network poisoning, credential attacks, exfiltration helpers, etc.) that can be illegal to use against systems you do not own or lack explicit written permission to test.
@@ -43,6 +51,164 @@ raxuiscli <command> [subcommand] [options]
 raxuiscli --help
 raxuiscli <command> --help
 ```
+
+---
+
+## Passive web audit and reports
+
+`audit web` passively inspects exactly one HTTP or HTTPS URL that you are
+authorized to test. It makes one bounded GET request for HTTP response headers;
+HTTPS targets also have their certificate chain inspected. It does not crawl,
+fuzz, submit forms, attempt exploits, or enumerate other paths. Response bodies
+retained while collecting the audit are capped at the configured limit; one
+extra byte may be read only to detect truncation. The report does not persist
+response bodies because the audit needs headers, not content.
+
+Use a local server when trying the command. In one terminal, serve a directory
+that contains no sensitive files:
+
+```bash
+python3 -m http.server 8080 --bind 127.0.0.1
+```
+
+Then run the audit in another terminal:
+
+```bash
+# Human-readable text report on stdout (the default format)
+./bin/raxuiscli audit web http://127.0.0.1:8080/
+
+# Stable schema-v1 JSON on stdout; suitable for CI or other tools
+./bin/raxuiscli --output=json audit web http://127.0.0.1:8080/
+
+# Write JSON atomically to a file. Re-running against the same path needs --force.
+./bin/raxuiscli --output=json --output-file /tmp/raxuiscli-audit-report.json audit web http://127.0.0.1:8080/
+./bin/raxuiscli --output=json --output-file /tmp/raxuiscli-audit-report.json --force audit web http://127.0.0.1:8080/
+
+# HTML is a self-contained, human-readable report and always requires a file.
+./bin/raxuiscli --output=html --output-file /tmp/raxuiscli-audit-report.html audit web http://127.0.0.1:8080/
+```
+
+The report contains a versioned envelope with tool provenance, audit metadata,
+findings, observations, and partial-failure errors. JSON emitted to stdout
+contains only that envelope. The HTML report has embedded CSS and does not load
+scripts or other remote resources. A deterministic, local-fixture example is
+available at [`docs/examples/audit-report.json`](docs/examples/audit-report.json).
+
+### Compare saved audit reports
+
+`compare` accepts two schema-v1 JSON snapshots for the same audit kind and
+target, then writes a deterministic difference. It classifies findings as
+added, resolved, changed, or unchanged; use `--allow-target-mismatch` only when
+comparing intentionally different local targets. The following uses the bundled
+local fixture, so it makes no network request and always produces an empty diff:
+
+```bash
+mkdir -p /tmp/raxuiscli-compare
+cp docs/examples/audit-report.json /tmp/raxuiscli-compare/before.json
+cp docs/examples/audit-report.json /tmp/raxuiscli-compare/after.json
+
+# Text is the default; JSON is a standalone comparison envelope for CI.
+./bin/raxuiscli compare /tmp/raxuiscli-compare/before.json /tmp/raxuiscli-compare/after.json
+./bin/raxuiscli --output=json compare /tmp/raxuiscli-compare/before.json /tmp/raxuiscli-compare/after.json
+```
+
+Use snapshots captured before and after an authorized local configuration change
+to review regressions. `--fail-on-new=medium` returns status `2` only for an
+added finding or a finding whose severity worsened to at least `MEDIUM`; it does
+not fail for resolved, improved, or evidence-only changes. Comparison output
+uses the same `--output-file` and `--force` contract as audits, and HTML output
+requires an output file.
+
+### Scope, redirects, and request controls
+
+The audit accepts one absolute `http` or `https` URL. HTTP targets record that
+TLS was skipped; HTTPS targets inspect both headers and TLS certificates. By
+default redirects are not followed, so a redirect response does not cause the
+audit to contact a second target. Use `--follow-redirects` only when the
+redirect destination is also in your authorized scope. `--timeout`,
+`--max-body-bytes`, repeatable `--header 'Name: Value'`, `--cookie`,
+`--user-agent`, and `--insecure` are available for an authorized target;
+`--insecure` skips TLS verification for the HTTP request.
+
+Reports are designed to avoid retaining secrets: URL credentials are removed,
+query values become `<redacted>`, and sensitive request headers, cookies,
+authorization values, common secret-like text, and certificate private material
+are not persisted. Treat a report as security-sensitive nonetheless, because
+it retains the target's scheme, host, port, path, findings, and non-sensitive
+observations.
+
+### Policy and exit status
+
+`--fail-on` accepts `none`, `info`, `low`, `medium`, `high`, or `critical` and
+defaults to `none`. It lets a completed audit fail a CI job when its highest
+finding meets the chosen severity. The loopback server above intentionally lacks
+some security headers, so this local-only example returns `2` after rendering the
+report:
+
+```bash
+./bin/raxuiscli --output=json --fail-on=medium audit web http://127.0.0.1:8080/
+```
+
+The process exit statuses are exact:
+
+| Status | Meaning |
+|--------|---------|
+| `0` | The audit completed and no configured `--fail-on` threshold was met. |
+| `1` | Input or an operational step failed, such as URL validation, network/TLS/HTTP work, or writing a report. A partial audit still renders its available report, then exits `1`. |
+| `2` | The audit completed and one or more findings met `--fail-on`. |
+
+---
+
+## Guided interface
+
+`raxuiscli interactive` launches a keyboard-driven terminal interface for the
+passive audit, the local demo, and report comparison. It never starts
+implicitly: scripts and pipelines keep the stable non-interactive behavior, and
+the command refuses to run when standard input or output is not a terminal
+(for example under a pipe or in CI), printing the equivalent commands to use
+instead.
+
+```bash
+./bin/raxuiscli interactive
+```
+
+Every action mirrors an existing command, and the review screen shows the exact
+equivalent before anything runs (secret values such as cookies are masked):
+
+| Interface action | Equivalent command |
+|---|---|
+| Passive Web Audit | `raxuiscli audit web <url> --output <fmt>` |
+| Local Demo | `raxuiscli demo web` |
+| Compare Reports | `raxuiscli compare <before> <after>` |
+| Browse Commands | *(reads the built-in command catalog)* |
+
+Keyboard controls:
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` (or `k` / `j`) | Move between actions or fields |
+| `enter` | Select the action, continue, or run |
+| `esc` | Go back one screen (or cancel a run in progress) |
+| `ctrl+k` / `/` | Open the searchable command palette |
+| `tab` / `←` / `→` | Move between form fields and change selectors |
+| `1`–`5` / `a` | Filter results by severity, or show all |
+| `s` | Save the current report |
+| `q` | Quit |
+
+Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
+`TERM=dumb`, and non-terminal output all fall back to plain text.
+
+### Visual Preview
+
+![RaxuisCLI Interactive TUI - Home Screen](docs/assets/interactive.png)
+
+**Features:**
+- **Keyboard-first navigation** — Pure terminal UI, no mouse required
+- **Live audit forms** — Enter URL, cookies, select output format
+- **Review before running** — See the exact command with masked secrets
+- **Colorized results** — Passive audit findings with maturity/safety badges
+- **Report comparison** — Diff two audit snapshots to track regressions
+- **Command browser** — Search and explore the full command catalog
 
 ---
 
@@ -900,6 +1066,35 @@ raxuiscli metadata image.jpg
 raxuiscli metadata document.pdf
 ```
 
+#### `files` - File Operations
+Encrypt, decrypt, compress, extract, checksum, find, and securely shred files.
+```bash
+raxuiscli files checksum report.pdf
+raxuiscli files encrypt secret.txt --algo aes256 --key-file key.bin --out secret.enc
+raxuiscli files decrypt secret.enc --key-file key.bin --out secret.txt
+raxuiscli files compress logs/                 # archive a directory
+raxuiscli files extract archive.tar.gz
+raxuiscli files find /var --name '*.conf'
+raxuiscli files shred secret.txt               # secure delete
+```
+
+#### `todo` - Task Management
+A small local todo list.
+```bash
+raxuiscli todo add "Write the report"
+raxuiscli todo list
+raxuiscli todo complete 1
+raxuiscli todo incomplete 1
+```
+
+#### `ports` - Port Scanner
+TCP/UDP port scanner with preset ranges (`common`, `web`, `dev`, `database`, `system`, `extended`, `all`).
+```bash
+raxuiscli ports -H localhost -p common
+raxuiscli ports -H example.com -p 80,443,8080
+raxuiscli ports -H 192.168.1.1 -p 1-1024 --scan-type tcp --timeout 3
+```
+
 ---
 
 ## Project Structure
@@ -956,16 +1151,22 @@ Using this tool against systems without explicit authorization is illegal. The a
 
 See [ROADMAP.md](ROADMAP.md) for progress and upcoming features.
 
-| Sprint | Description | Status |
-|--------|-------------|--------|
-| Sprint 1 | Network (dns, whois, recon) | ✅ 100% |
-| Sprint 1.5 | Red Team Tools (15 commands) | ✅ 100% |
-| Sprint 2 | Cryptography (cipher, jwt, keygen, certinfo) | ✅ 100% |
-| Sprint 3 | Web Security (http, fuzz, vuln, cookie) | ✅ 100% |
-| Sprint 4 | Binary Analysis | ⏳ Coming soon |
-| Sprint 5 | Utilities | ⏳ Coming soon |
+## Command catalog
 
-**Current progress: 26/31 commands (84%)**
+<!-- BEGIN GENERATED COMMAND CATALOG -->
+This table is generated from the command catalog. `stable` means the implementation is supported; `experimental` means it may be incomplete or change; `informational` means it primarily provides guidance or generated examples.
+
+| Category | Stable | Experimental | Informational | Total |
+|---|---:|---:|---:|---:|
+| audit & reporting | 6 | 0 | 0 | 6 |
+| core | 7 | 0 | 0 | 7 |
+| cryptography | 0 | 30 | 0 | 30 |
+| infrastructure | 0 | 22 | 1 | 23 |
+| network | 0 | 7 | 0 | 7 |
+| offensive security | 0 | 57 | 14 | 71 |
+| utilities | 0 | 28 | 0 | 28 |
+| web security | 0 | 33 | 2 | 35 |
+<!-- END GENERATED COMMAND CATALOG -->
 
 ---
 

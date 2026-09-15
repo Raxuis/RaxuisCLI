@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaxuisCLI Audit Report</title>
+  <style>
+:root { color-scheme: dark; --bg: #0b1220; --surface: #121c2d; --line: #26354c; --text: #e5edf5; --muted: #9aabc0; --mint: #72e3c1; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.report { max-width: 1040px; margin: 0 auto; padding: 48px 24px 32px; }
+.hero, section, .disclaimer { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+.eyebrow { color: var(--mint); font-size: .8rem; font-weight: 700; letter-spacing: .09em; margin: 0 0 8px; text-transform: uppercase; }
+h1, h2, h3, p { margin-top: 0; } h1 { font-size: 2.25rem; margin-bottom: 4px; } h2 { font-size: 1.1rem; margin-bottom: 16px; } h3 { font-size: 1rem; margin: 0; }
+.target, .empty { color: var(--muted); overflow-wrap: anywhere; } .status { color: var(--mint); font-weight: 700; margin: 16px 0 0; text-transform: uppercase; }
+.counts { display: grid; gap: 12px; grid-template-columns: repeat(5, minmax(0, 1fr)); }.count { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }.count span { color: var(--muted); display: block; font-size: .75rem; }.count strong { font-size: 1.7rem; }
+.critical { --severity: #e879f9; }.high { --severity: #fb7185; }.medium { --severity: #fbbf24; }.low { --severity: #38bdf8; }.info { --severity: #a3a3a3; }.count { border-bottom: 3px solid var(--severity); }
+.findings { display: grid; gap: 12px; }.finding { border: 1px solid var(--line); border-radius: 8px; padding: 18px; }.finding-heading { align-items: center; display: flex; gap: 10px; margin-bottom: 14px; }.badge { background: color-mix(in srgb, var(--severity) 18%, transparent); border: 1px solid var(--severity); border-radius: 999px; color: var(--severity); font-size: .7rem; font-weight: 700; padding: 2px 8px; }
+dl { margin: 0; }.finding dl, .facts { display: grid; gap: 6px 16px; grid-template-columns: max-content minmax(0, 1fr); }.finding dt, .facts dt { color: var(--muted); }.finding dd, .facts dd { margin: 0; overflow-wrap: anywhere; }
+.two-column { display: grid; gap: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); }.two-column > div + div { border-left: 1px solid var(--line); padding-left: 28px; }.disclaimer { color: var(--muted); }.disclaimer strong { color: var(--text); } footer { color: var(--muted); padding: 0 24px 40px; text-align: center; } a { color: var(--mint); }
+@media (max-width: 700px) { .report { padding: 24px 16px; }.counts, .two-column { grid-template-columns: 1fr; }.two-column > div + div { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: 24px; } }
+
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="hero">
+      <p class="eyebrow">RaxuisCLI · Audit report</p>
+      <h1>web audit</h1>
+      <p class="target">https://example.com/login</p>
+      <p class="status status-partial">partial</p>
+    </header>
+
+    <section class="summary" aria-label="Finding summary">
+      <h2>Summary</h2>
+      <div class="counts">
+        <div class="count critical"><span>CRITICAL</span><strong>0</strong></div>
+        <div class="count high"><span>HIGH</span><strong>1</strong></div>
+        <div class="count medium"><span>MEDIUM</span><strong>1</strong></div>
+        <div class="count low"><span>LOW</span><strong>0</strong></div>
+        <div class="count info"><span>INFO</span><strong>0</strong></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Findings</h2>
+      <div class="findings">
+        <article class="finding">
+          <div class="finding-heading"><span class="badge medium">MEDIUM</span><h3>Deprecated TLS protocol accepted</h3></div>
+          <dl>
+            <dt>Rule</dt><dd>tls.protocol.deprecated</dd>
+            <dt>Status</dt><dd>open</dd>
+            <dt>Resource</dt><dd>https://example.com/login</dd>
+            <dt>Evidence</dt><dd>TLS 1.0 was accepted during the handshake.</dd>
+            <dt>Remediation</dt><dd>Disable TLS 1.0 and TLS 1.1.</dd>
+          </dl>
+        </article>
+        <article class="finding">
+          <div class="finding-heading"><span class="badge high">HIGH</span><h3>HSTS header is missing</h3></div>
+          <dl>
+            <dt>Rule</dt><dd>http.header.hsts</dd>
+            <dt>Status</dt><dd>open</dd>
+            <dt>Resource</dt><dd>https://example.com/login</dd>
+            <dt>Evidence</dt><dd>Strict-Transport-Security response header was absent.</dd>
+            <dt>Remediation</dt><dd>Set Strict-Transport-Security with an appropriate max-age.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="two-column">
+      <div>
+        <h2>Observations</h2>
+        <dl class="facts">
+          <dt>http.status</dt><dd>200</dd>
+          <dt>tls.version</dt><dd>TLS 1.3</dd>
+        </dl>
+      </div>
+      <div>
+        <h2>Partial errors</h2>
+        <dl class="facts">
+          <dt>tls.chain</dt><dd>certificate chain could not be fully verified</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="metadata">
+      <h2>Execution metadata</h2>
+      <dl class="facts">
+        <dt>Audit ID</dt><dd>audit-demo-001</dd>
+        <dt>Started</dt><dd>2026-09-04T12:30:00Z</dd>
+        <dt>Duration</dt><dd>1.25s</dd>
+        <dt>Tool</dt><dd>raxuiscli 1.2.3</dd>
+        <dt>Build</dt><dd>abc1234 · go1.25.13 · linux/amd64</dd>
+        <dt>Schema</dt><dd>v1</dd>
+      </dl>
+    </section>
+
+    <aside class="disclaimer"><strong>Disclaimer:</strong> This report records the checks performed during this audit. It is not a guarantee that the target is free from security issues.</aside>
+  </main>
+  <footer>Created by Raxuis · <a href="https://github.com/raxuis">github.com/raxuis</a></footer>
+</body>
+</html>

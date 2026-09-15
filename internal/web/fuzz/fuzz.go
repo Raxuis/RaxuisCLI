@@ -455,17 +455,17 @@ func shouldIncludeResult(result FuzzResult, opts FuzzOptions) bool {
 
 // DisplayResults displays fuzzing results
 func DisplayResults(results *FuzzResults) {
-	fmt.Printf("\n[FUZZING RESULTS - %s]\n", strings.ToUpper(string(results.Type)))
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintf(stdoutW, "\n[FUZZING RESULTS - %s]\n", strings.ToUpper(string(results.Type)))
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
-	fmt.Printf("Target: %s\n", results.BaseURL)
-	fmt.Printf("Total requests: %d\n", results.Total)
-	fmt.Printf("Found: %d\n", results.Found)
-	fmt.Printf("Errors: %d\n", results.Errors)
-	fmt.Printf("Duration: %v\n", results.Duration)
+	fmt.Fprintf(stdoutW, "Target: %s\n", results.BaseURL)
+	fmt.Fprintf(stdoutW, "Total requests: %d\n", results.Total)
+	fmt.Fprintf(stdoutW, "Found: %d\n", results.Found)
+	fmt.Fprintf(stdoutW, "Errors: %d\n", results.Errors)
+	fmt.Fprintf(stdoutW, "Duration: %v\n", results.Duration)
 
 	if len(results.Results) == 0 {
-		fmt.Println("\nNo results found")
+		fmt.Fprintln(stdoutW, "\nNo results found")
 		return
 	}
 
@@ -474,8 +474,8 @@ func DisplayResults(results *FuzzResults) {
 		return results.Results[i].StatusCode < results.Results[j].StatusCode
 	})
 
-	fmt.Printf("\n%-40s %-6s %-10s %-8s %s\n", "PATH/INPUT", "STATUS", "SIZE", "WORDS", "REDIRECT")
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Fprintf(stdoutW, "\n%-40s %-6s %-10s %-8s %s\n", "PATH/INPUT", "STATUS", "SIZE", "WORDS", "REDIRECT")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 70))
 
 	for _, r := range results.Results {
 		input := r.Input
@@ -491,7 +491,7 @@ func DisplayResults(results *FuzzResults) {
 			}
 		}
 
-		fmt.Printf("%-40s %-6d %-10d %-8d %s\n",
+		fmt.Fprintf(stdoutW, "%-40s %-6d %-10d %-8d %s\n",
 			input,
 			r.StatusCode,
 			r.ContentLength,
@@ -500,12 +500,12 @@ func DisplayResults(results *FuzzResults) {
 		)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayProgress displays fuzzing progress
 func DisplayProgress(current, total int, found int, rate float64) {
 	percent := float64(current) / float64(total) * 100
-	fmt.Printf("\r[%d/%d] %.1f%% | Found: %d | Rate: %.1f req/s",
+	fmt.Fprintf(stdoutW, "\r[%d/%d] %.1f%% | Found: %d | Rate: %.1f req/s",
 		current, total, percent, found, rate)
 }

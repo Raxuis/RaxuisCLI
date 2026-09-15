@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"raxuiscli/internal/shared/constants"
-	"raxuiscli/internal/shared/models"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/models"
 )
 
 // captureStdout runs fn with os.Stdout redirected and returns everything it printed.
@@ -21,11 +21,13 @@ func captureStdout(t *testing.T, fn func()) string {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
 	os.Stdout = w
+	stdoutW = w
 
 	fn()
 
 	w.Close()
 	os.Stdout = orig
+	stdoutW = orig
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {

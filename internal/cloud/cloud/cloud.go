@@ -444,11 +444,11 @@ func CheckAzureMetadata(timeout int) (map[string]interface{}, error) {
 
 // DisplayS3Results displays S3 enumeration results
 func DisplayS3Results(results []S3BucketResult) {
-	fmt.Println("\n[AWS S3] Bucket Enumeration Results")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[AWS S3] Bucket Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(results) == 0 {
-		fmt.Println("No buckets found")
+		fmt.Fprintln(stdoutW, "No buckets found")
 		return
 	}
 
@@ -461,19 +461,19 @@ func DisplayS3Results(results []S3BucketResult) {
 			status = "PUBLIC (LISTABLE)"
 		}
 
-		fmt.Printf("  %-40s [%s] Region: %s\n", r.Name, status, r.Region)
+		fmt.Fprintf(stdoutW, "  %-40s [%s] Region: %s\n", r.Name, status, r.Region)
 	}
 
-	fmt.Printf("\nTotal: %d buckets found\n", len(results))
+	fmt.Fprintf(stdoutW, "\nTotal: %d buckets found\n", len(results))
 }
 
 // DisplayAzureResults displays Azure enumeration results
 func DisplayAzureResults(results []AzureBlobResult) {
-	fmt.Println("\n[Azure Blob] Storage Enumeration Results")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[Azure Blob] Storage Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(results) == 0 {
-		fmt.Println("No storage containers found")
+		fmt.Fprintln(stdoutW, "No storage containers found")
 		return
 	}
 
@@ -486,19 +486,19 @@ func DisplayAzureResults(results []AzureBlobResult) {
 			status = "PUBLIC (LISTABLE)"
 		}
 
-		fmt.Printf("  %s/%s [%s]\n", r.Account, r.Container, status)
+		fmt.Fprintf(stdoutW, "  %s/%s [%s]\n", r.Account, r.Container, status)
 	}
 
-	fmt.Printf("\nTotal: %d containers found\n", len(results))
+	fmt.Fprintf(stdoutW, "\nTotal: %d containers found\n", len(results))
 }
 
 // DisplayGCPResults displays GCP enumeration results
 func DisplayGCPResults(results []GCPBucketResult) {
-	fmt.Println("\n[GCP Storage] Bucket Enumeration Results")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[GCP Storage] Bucket Enumeration Results")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(results) == 0 {
-		fmt.Println("No buckets found")
+		fmt.Fprintln(stdoutW, "No buckets found")
 		return
 	}
 
@@ -511,30 +511,30 @@ func DisplayGCPResults(results []GCPBucketResult) {
 			status = "PUBLIC (LISTABLE)"
 		}
 
-		fmt.Printf("  %-40s [%s]\n", r.Name, status)
+		fmt.Fprintf(stdoutW, "  %-40s [%s]\n", r.Name, status)
 	}
 
-	fmt.Printf("\nTotal: %d buckets found\n", len(results))
+	fmt.Fprintf(stdoutW, "\nTotal: %d buckets found\n", len(results))
 }
 
 // DisplayMetadata displays cloud metadata results
 func DisplayMetadata(provider string, metadata map[string]interface{}) {
-	fmt.Printf("\n[%s] Cloud Metadata\n", strings.ToUpper(provider))
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[%s] Cloud Metadata\n", strings.ToUpper(provider))
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if accessible, ok := metadata["accessible"].(bool); ok && accessible {
-		fmt.Println("[!] METADATA SERVICE ACCESSIBLE")
-		fmt.Println()
+		fmt.Fprintln(stdoutW, "[!] METADATA SERVICE ACCESSIBLE")
+		fmt.Fprintln(stdoutW)
 
 		for key, value := range metadata {
 			if key == "accessible" {
 				continue
 			}
-			fmt.Printf("  %s: %v\n", key, value)
+			fmt.Fprintf(stdoutW, "  %s: %v\n", key, value)
 		}
 	} else {
-		fmt.Println("Metadata service not accessible")
+		fmt.Fprintln(stdoutW, "Metadata service not accessible")
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

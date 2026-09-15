@@ -1,0 +1,54 @@
+$ raxuiscli interactive
+
+RaxuisCLI — Guided Interface
+
+  ▸ Passive Web Audit — Inspect HTTP headers and TLS for one target. [stable] [passive]
+    Local Demo — Audit a safe in-process fixture on loopback. [stable] [safe]
+    Compare Reports — Diff two saved audit snapshots. [stable] [safe]
+    Browse Commands — List every command with its maturity and safety. [stable] [safe]
+    Help / About — Learn what this interface can do. [stable] [safe]
+
+↑/↓ move · enter select · ctrl+k search · q quit
+
+Created by Raxuis · github.com/raxuis
+
+──────────────────────────────────────────────────────────────
+
+# After choosing "Local Demo" and running it:
+
+RaxuisCLI — Guided Interface
+
+Results — https://127.0.0.1/demo
+
+Summary  [critical 0] [high 3] [medium 4] [low 4] [info 2] 
+
+[low] Referrer-Policy header is missing
+    Add 'Referrer-Policy: strict-origin-when-cross-origin' header.
+[medium] Cookie security flags are weak
+    Set Secure, HttpOnly, and SameSite=Strict flags on sensitive cookies.
+[info] Server version is disclosed
+    Remove or obfuscate the Server header version information.
+[high] Certificate chain validation failed
+    Install the complete chain issued by a trusted certificate authority.
+[low] X-Content-Type-Options header is missing
+    Add 'X-Content-Type-Options: nosniff' header.
+[high] Certificate has expired
+    Replace the certificate with one valid for the current time.
+[low] Permissions-Policy header is missing
+    Add Permissions-Policy header to control browser features.
+[low] X-XSS-Protection header is missing
+    Add 'X-XSS-Protection: 1; mode=block' header (note: deprecated in favor of CSP).
+[medium] HSTS header is missing
+    Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains' header.
+[info] Technology stack is disclosed
+    Remove the X-Powered-By header.
+[medium] X-Frame-Options header is missing
+    Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' header.
+[medium] Content-Security-Policy header is missing
+    Implement a Content-Security-Policy header to restrict resource loading.
+[high] Certificate is self-signed
+    Use a certificate issued by a trusted certificate authority.
+
+1-5 filter · a all · s save · esc home · q quit
+
+Created by Raxuis · github.com/raxuis

@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/creds"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/creds"
 
 	"github.com/spf13/cobra"
 )

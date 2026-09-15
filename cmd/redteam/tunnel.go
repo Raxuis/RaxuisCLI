@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/tunnel"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/tunnel"
 
 	"github.com/spf13/cobra"
 )

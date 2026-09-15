@@ -10,7 +10,7 @@ import (
 
 // Build information. Populated at build time via -ldflags:
 //
-//	-X raxuiscli/cmd.version=... -X raxuiscli/cmd.commit=... -X raxuiscli/cmd.date=...
+//	-X github.com/Raxuis/RaxuisCLI/cmd.version=... -X github.com/Raxuis/RaxuisCLI/cmd.commit=... -X github.com/Raxuis/RaxuisCLI/cmd.date=...
 //
 // When built with `go install` (no ldflags) the values are recovered from the
 // embedded build info instead.

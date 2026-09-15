@@ -428,11 +428,11 @@ func parseASNWhois(result *WhoisResult) {
 
 // DisplayResult displays WHOIS result in a formatted way
 func DisplayResult(result WhoisResult) {
-	fmt.Printf("\n[WHOIS] %s (%s)\n", result.Query, result.QueryType)
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[WHOIS] %s (%s)\n", result.Query, result.QueryType)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if result.Error != nil {
-		fmt.Printf("Error: %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "Error: %v\n", result.Error)
 		return
 	}
 
@@ -447,48 +447,48 @@ func DisplayResult(result WhoisResult) {
 }
 
 func displayDomainResult(result WhoisResult) {
-	fmt.Println("\n--- Domain Information ---")
+	fmt.Fprintln(stdoutW, "\n--- Domain Information ---")
 
 	if result.Registrar != "" {
-		fmt.Printf("  Registrar:    %s\n", result.Registrar)
+		fmt.Fprintf(stdoutW, "  Registrar:    %s\n", result.Registrar)
 	}
 	if result.Created != "" {
-		fmt.Printf("  Created:      %s\n", result.Created)
+		fmt.Fprintf(stdoutW, "  Created:      %s\n", result.Created)
 	}
 	if result.Updated != "" {
-		fmt.Printf("  Updated:      %s\n", result.Updated)
+		fmt.Fprintf(stdoutW, "  Updated:      %s\n", result.Updated)
 	}
 	if result.Expires != "" {
-		fmt.Printf("  Expires:      %s\n", result.Expires)
+		fmt.Fprintf(stdoutW, "  Expires:      %s\n", result.Expires)
 	}
 
 	if len(result.Status) > 0 {
-		fmt.Println("\n--- Status ---")
+		fmt.Fprintln(stdoutW, "\n--- Status ---")
 		for _, status := range result.Status {
-			fmt.Printf("  %s\n", status)
+			fmt.Fprintf(stdoutW, "  %s\n", status)
 		}
 	}
 
 	if len(result.NameServer) > 0 {
-		fmt.Println("\n--- Name Servers ---")
+		fmt.Fprintln(stdoutW, "\n--- Name Servers ---")
 		for _, ns := range result.NameServer {
-			fmt.Printf("  %s\n", ns)
+			fmt.Fprintf(stdoutW, "  %s\n", ns)
 		}
 	}
 
 	// Additional parsed info
-	fmt.Println("\n--- Additional Info ---")
+	fmt.Fprintln(stdoutW, "\n--- Additional Info ---")
 	for key, value := range result.Parsed {
 		if key != "Registrar" && key != "Created" && key != "Updated" && key != "Expires" {
-			fmt.Printf("  %-20s %s\n", key+":", value)
+			fmt.Fprintf(stdoutW, "  %-20s %s\n", key+":", value)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 func displayIPResult(result WhoisResult) {
-	fmt.Println("\n--- IP Information ---")
+	fmt.Fprintln(stdoutW, "\n--- IP Information ---")
 
 	// Display in a specific order
 	order := []string{"IP Range", "CIDR", "Network Name", "Organization", "Org ID",
@@ -497,7 +497,7 @@ func displayIPResult(result WhoisResult) {
 
 	for _, key := range order {
 		if value, ok := result.Parsed[key]; ok {
-			fmt.Printf("  %-20s %s\n", key+":", value)
+			fmt.Fprintf(stdoutW, "  %-20s %s\n", key+":", value)
 		}
 	}
 
@@ -511,15 +511,15 @@ func displayIPResult(result WhoisResult) {
 			}
 		}
 		if !found {
-			fmt.Printf("  %-20s %s\n", key+":", value)
+			fmt.Fprintf(stdoutW, "  %-20s %s\n", key+":", value)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 func displayASNResult(result WhoisResult) {
-	fmt.Println("\n--- ASN Information ---")
+	fmt.Fprintln(stdoutW, "\n--- ASN Information ---")
 
 	order := []string{"ASN", "AS Name", "Description", "Organization",
 		"Country", "Admin Contact", "Tech Contact", "Maintained By",
@@ -527,7 +527,7 @@ func displayASNResult(result WhoisResult) {
 
 	for _, key := range order {
 		if value, ok := result.Parsed[key]; ok {
-			fmt.Printf("  %-20s %s\n", key+":", value)
+			fmt.Fprintf(stdoutW, "  %-20s %s\n", key+":", value)
 		}
 	}
 
@@ -541,22 +541,22 @@ func displayASNResult(result WhoisResult) {
 			}
 		}
 		if !found {
-			fmt.Printf("  %-20s %s\n", key+":", value)
+			fmt.Fprintf(stdoutW, "  %-20s %s\n", key+":", value)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayRaw displays raw WHOIS data
 func DisplayRaw(result WhoisResult) {
-	fmt.Printf("\n[WHOIS RAW] %s\n", result.Query)
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[WHOIS RAW] %s\n", result.Query)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if result.Error != nil {
-		fmt.Printf("Error: %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "Error: %v\n", result.Error)
 		return
 	}
 
-	fmt.Println(result.RawData)
+	fmt.Fprintln(stdoutW, result.RawData)
 }

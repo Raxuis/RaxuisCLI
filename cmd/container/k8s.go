@@ -3,8 +3,8 @@ package container
 import (
 	"fmt"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/container/k8s"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/container/k8s"
 
 	"github.com/spf13/cobra"
 )

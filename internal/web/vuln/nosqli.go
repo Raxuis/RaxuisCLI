@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestNoSQLi tests for NoSQL injection vulnerabilities

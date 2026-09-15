@@ -90,7 +90,7 @@ func compressZip(paths []string, opts CompressOptions) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(file)
 
@@ -98,7 +98,7 @@ func compressZip(paths []string, opts CompressOptions) error {
 	defer func(zipWriter *zip.Writer) {
 		err := zipWriter.Close()
 		if err != nil {
-			fmt.Printf("Error closing zip writer: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing zip writer: %v\n", err)
 		}
 	}(zipWriter)
 
@@ -108,7 +108,7 @@ func compressZip(paths []string, opts CompressOptions) error {
 		}
 	}
 
-	fmt.Printf("Created ZIP archive: %s\n", opts.Output)
+	fmt.Fprintf(stdoutW, "Created ZIP archive: %s\n", opts.Output)
 	return nil
 }
 
@@ -143,7 +143,7 @@ func addToZip(zipWriter *zip.Writer, path string, baseInZip string) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(file)
 
@@ -170,7 +170,7 @@ func extractZip(archivePath string, opts ExtractOptions) error {
 	defer func(reader *zip.ReadCloser) {
 		err := reader.Close()
 		if err != nil {
-			fmt.Printf("Error closing zip reader: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing zip reader: %v\n", err)
 		}
 	}(reader)
 
@@ -196,7 +196,7 @@ func extractZip(archivePath string, opts ExtractOptions) error {
 		// Vérifier si le fichier existe
 		if !opts.Overwrite {
 			if _, err := os.Stat(extractPath); err == nil {
-				fmt.Printf("Skipping existing file: %s\n", extractPath)
+				fmt.Fprintf(stdoutW, "Skipping existing file: %s\n", extractPath)
 				continue
 			}
 		}
@@ -211,10 +211,10 @@ func extractZip(archivePath string, opts ExtractOptions) error {
 			return err
 		}
 
-		fmt.Printf("Extracted: %s\n", extractPath)
+		fmt.Fprintf(stdoutW, "Extracted: %s\n", extractPath)
 	}
 
-	fmt.Println("Extraction complete")
+	fmt.Fprintln(stdoutW, "Extraction complete")
 	return nil
 }
 
@@ -227,7 +227,7 @@ func extractZipFile(file *zip.File, destPath string) error {
 	defer func(reader io.ReadCloser) {
 		err := reader.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(reader)
 
@@ -238,7 +238,7 @@ func extractZipFile(file *zip.File, destPath string) error {
 	defer func(writer *os.File) {
 		err := writer.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(writer)
 
@@ -255,7 +255,7 @@ func compressTar(paths []string, opts CompressOptions, compression string) error
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(file)
 
@@ -267,7 +267,7 @@ func compressTar(paths []string, opts CompressOptions, compression string) error
 		defer func(gzWriter *gzip.Writer) {
 			err := gzWriter.Close()
 			if err != nil {
-				fmt.Printf("Error closing gzip writer: %v\n", err)
+				fmt.Fprintf(stdoutW, "Error closing gzip writer: %v\n", err)
 			}
 		}(gzWriter)
 		writer = gzWriter
@@ -279,7 +279,7 @@ func compressTar(paths []string, opts CompressOptions, compression string) error
 		defer func(xzWriter *xz.Writer) {
 			err := xzWriter.Close()
 			if err != nil {
-				fmt.Printf("Error closing xz writer: %v\n", err)
+				fmt.Fprintf(stdoutW, "Error closing xz writer: %v\n", err)
 			}
 		}(xzWriter)
 		writer = xzWriter
@@ -289,7 +289,7 @@ func compressTar(paths []string, opts CompressOptions, compression string) error
 	defer func(tarWriter *tar.Writer) {
 		err := tarWriter.Close()
 		if err != nil {
-			fmt.Printf("Error closing tar writer: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing tar writer: %v\n", err)
 		}
 	}(tarWriter)
 
@@ -299,7 +299,7 @@ func compressTar(paths []string, opts CompressOptions, compression string) error
 		}
 	}
 
-	fmt.Printf("Created TAR archive: %s\n", opts.Output)
+	fmt.Fprintf(stdoutW, "Created TAR archive: %s\n", opts.Output)
 	return nil
 }
 
@@ -349,7 +349,7 @@ func addToTar(tarWriter *tar.Writer, path string, baseInTar string) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(file)
 
@@ -366,7 +366,7 @@ func extractTar(archivePath string, opts ExtractOptions, compression string) err
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			fmt.Fprintf(stdoutW, "Error closing file: %v\n", err)
 		}
 	}(file)
 
@@ -381,7 +381,7 @@ func extractTar(archivePath string, opts ExtractOptions, compression string) err
 		defer func(gzReader *gzip.Reader) {
 			err := gzReader.Close()
 			if err != nil {
-				fmt.Printf("Error closing gzip reader: %v\n", err)
+				fmt.Fprintf(stdoutW, "Error closing gzip reader: %v\n", err)
 			}
 		}(gzReader)
 		reader = gzReader
@@ -426,7 +426,7 @@ func extractTar(archivePath string, opts ExtractOptions, compression string) err
 			// Vérifier si le fichier existe
 			if !opts.Overwrite {
 				if _, err := os.Stat(extractPath); err == nil {
-					fmt.Printf("Skipping existing file: %s\n", extractPath)
+					fmt.Fprintf(stdoutW, "Skipping existing file: %s\n", extractPath)
 					continue
 				}
 			}
@@ -454,11 +454,11 @@ func extractTar(archivePath string, opts ExtractOptions, compression string) err
 				return err
 			}
 
-			fmt.Printf("Extracted: %s\n", extractPath)
+			fmt.Fprintf(stdoutW, "Extracted: %s\n", extractPath)
 		}
 	}
 
-	fmt.Println("Extraction complete")
+	fmt.Fprintln(stdoutW, "Extraction complete")
 	return nil
 }
 

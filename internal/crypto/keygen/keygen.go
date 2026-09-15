@@ -437,47 +437,47 @@ func SaveCertificate(cert *CertificateInfo, certFile, keyFile string) error {
 
 // DisplayKeyPair displays key pair information
 func DisplayKeyPair(kp *KeyPair) {
-	fmt.Println("\n[KEY PAIR GENERATED]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[KEY PAIR GENERATED]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("Algorithm: %s\n", kp.Algorithm)
-	fmt.Printf("Key Size:  %d bits\n", kp.Bits)
+	fmt.Fprintf(stdoutW, "Algorithm: %s\n", kp.Algorithm)
+	fmt.Fprintf(stdoutW, "Key Size:  %d bits\n", kp.Bits)
 
-	fmt.Println("\n[Private Key]")
+	fmt.Fprintln(stdoutW, "\n[Private Key]")
 	if len(kp.PrivateKey) > 500 {
-		fmt.Printf("%s...\n", kp.PrivateKey[:200])
+		fmt.Fprintf(stdoutW, "%s...\n", kp.PrivateKey[:200])
 	} else {
-		fmt.Println(kp.PrivateKey)
+		fmt.Fprintln(stdoutW, kp.PrivateKey)
 	}
 
-	fmt.Println("[Public Key]")
+	fmt.Fprintln(stdoutW, "[Public Key]")
 	if len(kp.PublicKey) > 500 {
-		fmt.Printf("%s...\n", kp.PublicKey[:200])
+		fmt.Fprintf(stdoutW, "%s...\n", kp.PublicKey[:200])
 	} else {
-		fmt.Println(kp.PublicKey)
+		fmt.Fprintln(stdoutW, kp.PublicKey)
 	}
 }
 
 // DisplayCertificate displays certificate information
 func DisplayCertificate(cert *CertificateInfo) {
-	fmt.Println("\n[CERTIFICATE GENERATED]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE GENERATED]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("Subject:      %s\n", cert.Subject)
-	fmt.Printf("Issuer:       %s\n", cert.Issuer)
-	fmt.Printf("Not Before:   %s\n", cert.NotBefore.Format(time.RFC3339))
-	fmt.Printf("Not After:    %s\n", cert.NotAfter.Format(time.RFC3339))
-	fmt.Printf("Serial:       %s\n", cert.SerialNumber)
+	fmt.Fprintf(stdoutW, "Subject:      %s\n", cert.Subject)
+	fmt.Fprintf(stdoutW, "Issuer:       %s\n", cert.Issuer)
+	fmt.Fprintf(stdoutW, "Not Before:   %s\n", cert.NotBefore.Format(time.RFC3339))
+	fmt.Fprintf(stdoutW, "Not After:    %s\n", cert.NotAfter.Format(time.RFC3339))
+	fmt.Fprintf(stdoutW, "Serial:       %s\n", cert.SerialNumber)
 
-	fmt.Println("\n[Certificate PEM]")
-	fmt.Println(string(cert.CertPEM))
+	fmt.Fprintln(stdoutW, "\n[Certificate PEM]")
+	fmt.Fprintln(stdoutW, string(cert.CertPEM))
 }
 
 // DisplayAESKey displays AES key
 func DisplayAESKey(hexKey string, bits int) {
-	fmt.Println("\n[AES KEY GENERATED]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[AES KEY GENERATED]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("Key Size:  %d bits\n", bits)
-	fmt.Printf("Key (hex): %s\n", hexKey)
+	fmt.Fprintf(stdoutW, "Key Size:  %d bits\n", bits)
+	fmt.Fprintf(stdoutW, "Key (hex): %s\n", hexKey)
 }

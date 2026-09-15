@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/network/dns"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/network/dns"
 
 	"github.com/spf13/cobra"
 )

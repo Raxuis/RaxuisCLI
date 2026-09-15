@@ -1,8 +1,8 @@
 package container
 
 import (
-	"raxuiscli/cmd"
-	"raxuiscli/internal/container/container"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/container/container"
 
 	"github.com/spf13/cobra"
 )

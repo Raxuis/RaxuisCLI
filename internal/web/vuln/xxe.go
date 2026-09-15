@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestXXE tests for XML External Entity vulnerabilities

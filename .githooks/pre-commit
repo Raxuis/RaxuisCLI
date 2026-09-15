@@ -1,0 +1,22 @@
+#!/bin/sh
+# Keep staged Go files formatted before a commit is created. Formatting may
+# stage all current changes in a staged Go file, so review the index afterward
+# when committing only selected hunks.
+set -eu
+
+staged_go_files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+[ -n "$staged_go_files" ] || exit 0
+
+printf '%s\n' "$staged_go_files" | while IFS= read -r file; do
+	[ -f "$file" ] || continue
+	was_read_only=false
+	if [ ! -w "$file" ]; then
+		chmod u+w "$file"
+		was_read_only=true
+	fi
+	gofmt -w "$file"
+	git add -- "$file"
+	if [ "$was_read_only" = true ]; then
+		chmod u-w "$file"
+	fi
+done

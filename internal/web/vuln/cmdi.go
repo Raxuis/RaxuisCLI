@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"raxuiscli/internal/shared/payloads"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/payloads"
 )
 
 // TestCommandInjection tests for command injection vulnerabilities

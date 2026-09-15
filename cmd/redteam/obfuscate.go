@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"raxuiscli/cmd"
-	"raxuiscli/internal/redteam/obfuscate"
+	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/redteam/obfuscate"
 
 	"github.com/spf13/cobra"
 )

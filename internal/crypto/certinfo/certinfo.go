@@ -1,12 +1,14 @@
 package certinfo
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +40,12 @@ type ChainInfo struct {
 	Port         int
 	Valid        bool
 	Error        string
+	// VerificationError preserves the concrete x509 error for callers that
+	// need to distinguish trust-chain failures from hostname, validity, and
+	// key-usage failures. It is runtime-only and never serialized.
+	VerificationError error `json:"-"`
+	TLSVersion        uint16
+	CipherSuite       uint16
 }
 
 // ValidationResult holds validation results
@@ -53,46 +61,102 @@ type ValidationResult struct {
 
 // GetCertFromHost retrieves certificate from a remote host
 func GetCertFromHost(host string, port int, timeout int) (*ChainInfo, error) {
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
+	return GetCertFromHostContext(ctx, host, port)
+}
+
+// GetCertFromHostContext retrieves a host's certificate chain while honoring
+// cancellation and deadlines supplied by the caller. GetCertFromHost remains
+// available for existing timeout-based callers.
+func GetCertFromHostContext(ctx context.Context, host string, port int) (*ChainInfo, error) {
+	return GetCertFromHostContextAt(ctx, host, port, time.Now())
+}
+
+// GetCertFromHostContextAt retrieves a host's certificate chain and verifies
+// it at at. A zero instant retains the compatibility behavior of using the
+// current time.
+func GetCertFromHostContextAt(ctx context.Context, host string, port int, at time.Time) (*ChainInfo, error) {
+	return GetCertFromHostContextAtWithDialContext(ctx, host, port, at, nil)
+}
+
+// GetCertFromHostContextAtWithDialContext retrieves and verifies a host certificate
+// using dialContext for socket creation. A nil callback preserves the default
+// net.Dialer behavior used by the compatibility wrappers.
+func GetCertFromHostContextAtWithDialContext(ctx context.Context, host string, port int, at time.Time, dialContext func(context.Context, string, string) (net.Conn, error)) (*ChainInfo, error) {
+	if at.IsZero() {
+		at = time.Now()
+	}
 	if port == 0 {
 		port = 443
 	}
 
-	address := fmt.Sprintf("%s:%d", host, port)
-
-	dialer := &net.Dialer{
-		Timeout: time.Duration(timeout) * time.Second,
+	address := net.JoinHostPort(host, strconv.Itoa(port))
+	if dialContext == nil {
+		dialContext = (&net.Dialer{}).DialContext
 	}
-
-	conn, err := tls.DialWithDialer(dialer, "tcp", address, &tls.Config{
-		InsecureSkipVerify: true,
-	})
+	rawConnection, err := dialContext(ctx, "tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %v", err)
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
+	conn := tls.Client(rawConnection, &tls.Config{InsecureSkipVerify: true, ServerName: host})
 	defer conn.Close()
+	if err := conn.HandshakeContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
 
 	chain := &ChainInfo{
 		Host: host,
 		Port: port,
 	}
 
-	certs := conn.ConnectionState().PeerCertificates
+	state := conn.ConnectionState()
+	chain.TLSVersion = state.Version
+	chain.CipherSuite = state.CipherSuite
+	certs := state.PeerCertificates
 	for _, cert := range certs {
 		chain.Certificates = append(chain.Certificates, parseCertificate(cert))
 	}
 
 	// Check if chain is valid
 	if len(certs) > 0 {
-		_, err := certs[0].Verify(x509.VerifyOptions{
-			DNSName: host,
-		})
+		err := verifyPeerCertificates(certs, host, at, nil)
 		chain.Valid = err == nil
 		if err != nil {
 			chain.Error = err.Error()
+			chain.VerificationError = err
 		}
 	}
 
 	return chain, nil
+}
+
+// verifyPeerCertificates verifies the leaf using the peer-provided
+// intermediates. roots is nil in production, which deliberately retains the
+// system trust store; the parameter makes chain construction testable without
+// adding a production trust bypass.
+func verifyPeerCertificates(certs []*x509.Certificate, host string, at time.Time, roots *x509.CertPool) error {
+	if len(certs) == 0 {
+		return fmt.Errorf("no peer certificates")
+	}
+	if at.IsZero() {
+		at = time.Now()
+	}
+	intermediates := x509.NewCertPool()
+	for _, certificate := range certs[1:] {
+		intermediates.AddCert(certificate)
+	}
+	_, err := certs[0].Verify(x509.VerifyOptions{
+		DNSName:       host,
+		CurrentTime:   at,
+		Intermediates: intermediates,
+		Roots:         roots,
+	})
+	return err
 }
 
 // GetCertFromFile reads certificate from a file
@@ -226,11 +290,16 @@ func parseExtKeyUsage(usages []x509.ExtKeyUsage) []string {
 
 // ValidateCertificate performs validation checks
 func ValidateCertificate(info *CertInfo) *ValidationResult {
+	return ValidateCertificateAt(info, time.Now())
+}
+
+// ValidateCertificateAt performs validation checks at the supplied instant.
+// It lets callers make certificate findings deterministic for one audit while
+// ValidateCertificate retains the legacy wall-clock behavior.
+func ValidateCertificateAt(info *CertInfo, now time.Time) *ValidationResult {
 	result := &ValidationResult{
 		Valid: true,
 	}
-
-	now := time.Now()
 
 	// Check expiration
 	if now.After(info.NotAfter) {
@@ -284,150 +353,150 @@ func ValidateCertificate(info *CertInfo) *ValidationResult {
 
 // DisplayCertInfo displays certificate information
 func DisplayCertInfo(info *CertInfo) {
-	fmt.Println("\n[CERTIFICATE INFORMATION]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE INFORMATION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
-	fmt.Printf("\nSubject: %s\n", info.Subject)
-	fmt.Printf("Issuer:  %s\n", info.Issuer)
+	fmt.Fprintf(stdoutW, "\nSubject: %s\n", info.Subject)
+	fmt.Fprintf(stdoutW, "Issuer:  %s\n", info.Issuer)
 
-	fmt.Printf("\nSerial Number: %s\n", info.SerialNumber)
-	fmt.Printf("Version:       %d\n", info.Version)
+	fmt.Fprintf(stdoutW, "\nSerial Number: %s\n", info.SerialNumber)
+	fmt.Fprintf(stdoutW, "Version:       %d\n", info.Version)
 
-	fmt.Println("\n[Validity]")
-	fmt.Printf("Not Before: %s\n", info.NotBefore.Format(time.RFC3339))
-	fmt.Printf("Not After:  %s\n", info.NotAfter.Format(time.RFC3339))
+	fmt.Fprintln(stdoutW, "\n[Validity]")
+	fmt.Fprintf(stdoutW, "Not Before: %s\n", info.NotBefore.Format(time.RFC3339))
+	fmt.Fprintf(stdoutW, "Not After:  %s\n", info.NotAfter.Format(time.RFC3339))
 
 	daysLeft := int(time.Until(info.NotAfter).Hours() / 24)
 	if daysLeft > 0 {
-		fmt.Printf("Days Left:  %d\n", daysLeft)
+		fmt.Fprintf(stdoutW, "Days Left:  %d\n", daysLeft)
 	} else {
-		fmt.Printf("Status:     EXPIRED (%d days ago)\n", -daysLeft)
+		fmt.Fprintf(stdoutW, "Status:     EXPIRED (%d days ago)\n", -daysLeft)
 	}
 
-	fmt.Println("\n[Algorithms]")
-	fmt.Printf("Public Key: %s\n", info.PublicKeyAlgorithm)
-	fmt.Printf("Signature:  %s\n", info.SignatureAlgorithm)
+	fmt.Fprintln(stdoutW, "\n[Algorithms]")
+	fmt.Fprintf(stdoutW, "Public Key: %s\n", info.PublicKeyAlgorithm)
+	fmt.Fprintf(stdoutW, "Signature:  %s\n", info.SignatureAlgorithm)
 
 	if len(info.KeyUsage) > 0 {
-		fmt.Println("\n[Key Usage]")
+		fmt.Fprintln(stdoutW, "\n[Key Usage]")
 		for _, usage := range info.KeyUsage {
-			fmt.Printf("  - %s\n", usage)
+			fmt.Fprintf(stdoutW, "  - %s\n", usage)
 		}
 	}
 
 	if len(info.ExtKeyUsage) > 0 {
-		fmt.Println("\n[Extended Key Usage]")
+		fmt.Fprintln(stdoutW, "\n[Extended Key Usage]")
 		for _, usage := range info.ExtKeyUsage {
-			fmt.Printf("  - %s\n", usage)
+			fmt.Fprintf(stdoutW, "  - %s\n", usage)
 		}
 	}
 
 	if len(info.DNSNames) > 0 {
-		fmt.Println("\n[Subject Alternative Names - DNS]")
+		fmt.Fprintln(stdoutW, "\n[Subject Alternative Names - DNS]")
 		for _, name := range info.DNSNames {
-			fmt.Printf("  - %s\n", name)
+			fmt.Fprintf(stdoutW, "  - %s\n", name)
 		}
 	}
 
 	if len(info.IPAddresses) > 0 {
-		fmt.Println("\n[Subject Alternative Names - IP]")
+		fmt.Fprintln(stdoutW, "\n[Subject Alternative Names - IP]")
 		for _, ip := range info.IPAddresses {
-			fmt.Printf("  - %s\n", ip)
+			fmt.Fprintf(stdoutW, "  - %s\n", ip)
 		}
 	}
 
 	if len(info.EmailAddresses) > 0 {
-		fmt.Println("\n[Email Addresses]")
+		fmt.Fprintln(stdoutW, "\n[Email Addresses]")
 		for _, email := range info.EmailAddresses {
-			fmt.Printf("  - %s\n", email)
+			fmt.Fprintf(stdoutW, "  - %s\n", email)
 		}
 	}
 
-	fmt.Printf("\nIs CA: %v\n", info.IsCA)
+	fmt.Fprintf(stdoutW, "\nIs CA: %v\n", info.IsCA)
 }
 
 // DisplayChain displays certificate chain
 func DisplayChain(chain *ChainInfo) {
-	fmt.Println("\n[CERTIFICATE CHAIN]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE CHAIN]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if chain.Host != "" {
-		fmt.Printf("Host: %s:%d\n", chain.Host, chain.Port)
+		fmt.Fprintf(stdoutW, "Host: %s:%d\n", chain.Host, chain.Port)
 		if chain.Valid {
-			fmt.Println("Chain Status: VALID")
+			fmt.Fprintln(stdoutW, "Chain Status: VALID")
 		} else {
-			fmt.Printf("Chain Status: INVALID - %s\n", chain.Error)
+			fmt.Fprintf(stdoutW, "Chain Status: INVALID - %s\n", chain.Error)
 		}
 	}
 
-	fmt.Printf("Certificates in chain: %d\n", len(chain.Certificates))
+	fmt.Fprintf(stdoutW, "Certificates in chain: %d\n", len(chain.Certificates))
 
 	for i, cert := range chain.Certificates {
-		fmt.Printf("\n[Certificate %d]", i+1)
+		fmt.Fprintf(stdoutW, "\n[Certificate %d]", i+1)
 		if i == 0 {
-			fmt.Print(" (End Entity)")
+			fmt.Fprint(stdoutW, " (End Entity)")
 		} else if cert.IsCA {
-			fmt.Print(" (CA)")
+			fmt.Fprint(stdoutW, " (CA)")
 		}
-		fmt.Println()
-		fmt.Println(strings.Repeat("-", 50))
+		fmt.Fprintln(stdoutW)
+		fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
-		fmt.Printf("Subject: %s\n", cert.Subject)
-		fmt.Printf("Issuer:  %s\n", cert.Issuer)
-		fmt.Printf("Valid:   %s to %s\n",
+		fmt.Fprintf(stdoutW, "Subject: %s\n", cert.Subject)
+		fmt.Fprintf(stdoutW, "Issuer:  %s\n", cert.Issuer)
+		fmt.Fprintf(stdoutW, "Valid:   %s to %s\n",
 			cert.NotBefore.Format("2006-01-02"),
 			cert.NotAfter.Format("2006-01-02"))
 
 		daysLeft := int(time.Until(cert.NotAfter).Hours() / 24)
 		if daysLeft > 0 {
-			fmt.Printf("Expires: in %d days\n", daysLeft)
+			fmt.Fprintf(stdoutW, "Expires: in %d days\n", daysLeft)
 		} else {
-			fmt.Printf("Expires: EXPIRED %d days ago\n", -daysLeft)
+			fmt.Fprintf(stdoutW, "Expires: EXPIRED %d days ago\n", -daysLeft)
 		}
 	}
 }
 
 // DisplayValidation displays validation results
 func DisplayValidation(result *ValidationResult) {
-	fmt.Println("\n[VALIDATION RESULTS]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[VALIDATION RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if result.Valid {
-		fmt.Println("Status: VALID")
+		fmt.Fprintln(stdoutW, "Status: VALID")
 	} else {
-		fmt.Println("Status: INVALID")
+		fmt.Fprintln(stdoutW, "Status: INVALID")
 	}
 
 	if result.SelfSigned {
-		fmt.Println("Type:   Self-Signed")
+		fmt.Fprintln(stdoutW, "Type:   Self-Signed")
 	}
 
 	if result.DaysToExpiry > 0 {
-		fmt.Printf("Expiry: %d days remaining\n", result.DaysToExpiry)
+		fmt.Fprintf(stdoutW, "Expiry: %d days remaining\n", result.DaysToExpiry)
 	}
 
 	if len(result.ChainErrors) > 0 {
-		fmt.Println("\n[Errors]")
+		fmt.Fprintln(stdoutW, "\n[Errors]")
 		for _, err := range result.ChainErrors {
-			fmt.Printf("  [!] %s\n", err)
+			fmt.Fprintf(stdoutW, "  [!] %s\n", err)
 		}
 	}
 
 	if len(result.Warnings) > 0 {
-		fmt.Println("\n[Warnings]")
+		fmt.Fprintln(stdoutW, "\n[Warnings]")
 		for _, warn := range result.Warnings {
-			fmt.Printf("  [*] %s\n", warn)
+			fmt.Fprintf(stdoutW, "  [*] %s\n", warn)
 		}
 	}
 }
 
 // CompareCertificates compares two certificates
 func CompareCertificates(cert1, cert2 *CertInfo) {
-	fmt.Println("\n[CERTIFICATE COMPARISON]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE COMPARISON]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
-	fmt.Printf("%-20s %-25s %-25s\n", "Field", "Certificate 1", "Certificate 2")
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Fprintf(stdoutW, "%-20s %-25s %-25s\n", "Field", "Certificate 1", "Certificate 2")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 70))
 
 	printCompare := func(field, val1, val2 string) {
 		match := ""
@@ -441,7 +510,7 @@ func CompareCertificates(cert1, cert2 *CertInfo) {
 		if len(val2) > 24 {
 			val2 = val2[:21] + "..."
 		}
-		fmt.Printf("%-20s %-25s %-25s%s\n", field, val1, val2, match)
+		fmt.Fprintf(stdoutW, "%-20s %-25s %-25s%s\n", field, val1, val2, match)
 	}
 
 	printCompare("Serial", cert1.SerialNumber[:min(24, len(cert1.SerialNumber))],

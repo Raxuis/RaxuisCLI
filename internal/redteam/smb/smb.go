@@ -306,35 +306,35 @@ func BuildSMB2Header(command uint16, messageID uint64) []byte {
 
 // DisplayScanResult displays SMB scan results
 func DisplayScanResult(result *ScanResult) {
-	fmt.Printf("\n[SMB] %s:%d\n", result.Host, result.Port)
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Fprintf(stdoutW, "\n[SMB] %s:%d\n", result.Host, result.Port)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
 
 	if result.Error != nil {
-		fmt.Printf("Error: %v\n", result.Error)
+		fmt.Fprintf(stdoutW, "Error: %v\n", result.Error)
 		return
 	}
 
-	fmt.Printf("SMB Version:   %s\n", result.SMBVersion)
+	fmt.Fprintf(stdoutW, "SMB Version:   %s\n", result.SMBVersion)
 
 	if result.Hostname != "" {
-		fmt.Printf("Hostname:      %s\n", result.Hostname)
+		fmt.Fprintf(stdoutW, "Hostname:      %s\n", result.Hostname)
 	}
 	if result.Domain != "" {
-		fmt.Printf("Domain:        %s\n", result.Domain)
+		fmt.Fprintf(stdoutW, "Domain:        %s\n", result.Domain)
 	}
 	if result.OS != "" {
-		fmt.Printf("OS:            %s\n", result.OS)
+		fmt.Fprintf(stdoutW, "OS:            %s\n", result.OS)
 	}
 
-	fmt.Printf("Signing:       %v\n", result.Signing)
-	fmt.Printf("Sign Required: %v\n", result.SignRequired)
+	fmt.Fprintf(stdoutW, "Signing:       %v\n", result.Signing)
+	fmt.Fprintf(stdoutW, "Sign Required: %v\n", result.SignRequired)
 
 	if !result.SignRequired {
-		fmt.Println("\n[!] SMB Signing not required - vulnerable to relay attacks")
+		fmt.Fprintln(stdoutW, "\n[!] SMB Signing not required - vulnerable to relay attacks")
 	}
 
 	if len(result.Shares) > 0 {
-		fmt.Println("\nShares:")
+		fmt.Fprintln(stdoutW, "\nShares:")
 		for _, share := range result.Shares {
 			perms := ""
 			if share.Readable {
@@ -346,25 +346,25 @@ func DisplayScanResult(result *ScanResult) {
 			if perms == "" {
 				perms = "-"
 			}
-			fmt.Printf("  %-20s [%s] %s\n", share.Name, share.Type, perms)
+			fmt.Fprintf(stdoutW, "  %-20s [%s] %s\n", share.Name, share.Type, perms)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayShares displays share enumeration results
 func DisplayShares(shares []ShareInfo, host string) {
-	fmt.Printf("\n[SMB SHARES] %s\n", host)
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Fprintf(stdoutW, "\n[SMB SHARES] %s\n", host)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
 
 	if len(shares) == 0 {
-		fmt.Println("No shares found")
+		fmt.Fprintln(stdoutW, "No shares found")
 		return
 	}
 
-	fmt.Printf("%-20s %-10s %-6s %s\n", "NAME", "TYPE", "PERMS", "REMARK")
-	fmt.Println(strings.Repeat("-", 50))
+	fmt.Fprintf(stdoutW, "%-20s %-10s %-6s %s\n", "NAME", "TYPE", "PERMS", "REMARK")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
 	for _, share := range shares {
 		perms := ""
@@ -377,8 +377,8 @@ func DisplayShares(shares []ShareInfo, host string) {
 		if perms == "" {
 			perms = "-"
 		}
-		fmt.Printf("%-20s %-10s %-6s %s\n", share.Name, share.Type, perms, share.Remark)
+		fmt.Fprintf(stdoutW, "%-20s %-10s %-6s %s\n", share.Name, share.Type, perms, share.Remark)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
