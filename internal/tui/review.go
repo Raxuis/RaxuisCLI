@@ -15,13 +15,13 @@ type reviewData struct {
 
 func renderReview(styles Styles, data reviewData) string {
 	rows := [][2]string{
-		{"Scope", data.Scope},
-		{"Expected duration", data.Duration},
-		{"Output", data.Output},
-		{"Safety level", data.Safety},
+		{uiText.ReviewScope, data.Scope},
+		{uiText.ReviewDuration, data.Duration},
+		{uiText.ReviewOutput, data.Output},
+		{uiText.ReviewSafety, data.Safety},
 	}
 	var b strings.Builder
-	b.WriteString(styles.Title.Render("Review"))
+	b.WriteString(styles.Title.Render(uiText.ReviewHeading))
 	b.WriteString("\n\n")
 	for _, row := range rows {
 		b.WriteString(styles.Muted.Render(fmt.Sprintf("%-18s", row[0]+":")))
@@ -30,7 +30,7 @@ func renderReview(styles Styles, data reviewData) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(styles.Muted.Render("Equivalent command"))
+	b.WriteString(styles.Muted.Render(uiText.ReviewCommandHeading))
 	b.WriteString("\n")
 	b.WriteString(styles.Accent.Render("  " + data.Command))
 	return b.String()

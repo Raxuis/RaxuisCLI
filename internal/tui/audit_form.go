@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -28,9 +29,9 @@ const auditFieldCount = 4
 
 func newAuditForm() auditForm {
 	target := textinput.New()
-	target.Placeholder = "https://example.com"
+	target.Placeholder = uiText.PlaceholderURL
 	cookie := textinput.New()
-	cookie.Placeholder = "session=…"
+	cookie.Placeholder = uiText.PlaceholderCookie
 	form := auditForm{inputs: []textinput.Model{target, cookie}}
 	form.inputs[0].Focus()
 	return form
@@ -44,17 +45,17 @@ func (f auditForm) failOn() string { return thresholds[f.failOnIndex] }
 func (f auditForm) validate() error {
 	raw := f.target()
 	if raw == "" {
-		return fmt.Errorf("enter a target URL")
+		return errors.New(uiText.ErrEnterURL)
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("invalid URL: %v", err)
+		return fmt.Errorf("%s: %w", uiText.ErrInvalidURL, err)
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("URL must start with http:// or https://")
+		return errors.New(uiText.ErrURLScheme)
 	}
 	if parsed.Host == "" {
-		return fmt.Errorf("URL must include a host")
+		return errors.New(uiText.ErrURLHost)
 	}
 	return nil
 }
@@ -113,14 +114,14 @@ func (f auditForm) moveFocus(delta int) auditForm {
 
 func (f auditForm) view(styles Styles) string {
 	var b strings.Builder
-	labels := []string{"Target URL", "Cookie (optional)"}
+	labels := []string{uiText.FieldTargetURL, uiText.FieldCookie}
 	for i, input := range f.inputs {
 		b.WriteString(fieldLine(styles, labels[i], input.View(), f.focus == i))
 		b.WriteString("\n")
 	}
-	b.WriteString(fieldLine(styles, "Output", f.output(), f.focus == 2))
+	b.WriteString(fieldLine(styles, uiText.FieldOutput, f.output(), f.focus == 2))
 	b.WriteString("\n")
-	b.WriteString(fieldLine(styles, "Fail on", f.failOn(), f.focus == 3))
+	b.WriteString(fieldLine(styles, uiText.FieldFailOn, f.failOn(), f.focus == 3))
 	if f.errText != "" {
 		b.WriteString("\n")
 		b.WriteString(styles.Accent.Render("! " + f.errText))
@@ -136,9 +137,9 @@ type compareForm struct {
 
 func newCompareForm() compareForm {
 	before := textinput.New()
-	before.Placeholder = "before.json"
+	before.Placeholder = uiText.PlaceholderBefore
 	after := textinput.New()
-	after.Placeholder = "after.json"
+	after.Placeholder = uiText.PlaceholderAfter
 	form := compareForm{inputs: []textinput.Model{before, after}}
 	form.inputs[0].Focus()
 	return form
@@ -149,7 +150,7 @@ func (f compareForm) after() string  { return strings.TrimSpace(f.inputs[1].Valu
 
 func (f compareForm) validate() error {
 	if f.before() == "" || f.after() == "" {
-		return fmt.Errorf("enter both report paths")
+		return errors.New(uiText.ErrBothPaths)
 	}
 	return nil
 }
@@ -187,7 +188,7 @@ func (f compareForm) refocus() compareForm {
 
 func (f compareForm) view(styles Styles) string {
 	var b strings.Builder
-	labels := []string{"Before report", "After report"}
+	labels := []string{uiText.FieldBefore, uiText.FieldAfter}
 	for i, input := range f.inputs {
 		b.WriteString(fieldLine(styles, labels[i], input.View(), f.focus == i))
 		b.WriteString("\n")

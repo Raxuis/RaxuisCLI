@@ -36,11 +36,11 @@ func initialActions() []paletteItem {
 		summary string
 		path    string
 	}{
-		{actionAudit, "Passive Web Audit", "Inspect HTTP headers and TLS for one target.", "raxuiscli audit web"},
-		{actionDemo, "Local Demo", "Audit a safe in-process fixture on loopback.", "raxuiscli demo web"},
-		{actionCompare, "Compare Reports", "Diff two saved audit snapshots.", "raxuiscli compare"},
-		{actionBrowse, "Browse Commands", "List every command with its maturity and safety.", ""},
-		{actionAbout, "Help / About", "Learn what this interface can do.", ""},
+		{actionAudit, uiText.ActionAuditTitle, uiText.ActionAuditSummary, "raxuiscli audit web"},
+		{actionDemo, uiText.ActionDemoTitle, uiText.ActionDemoSummary, "raxuiscli demo web"},
+		{actionCompare, uiText.ActionCompareTitle, uiText.ActionCompareSummary, "raxuiscli compare"},
+		{actionBrowse, uiText.ActionBrowseTitle, uiText.ActionBrowseSummary, ""},
+		{actionAbout, uiText.ActionAboutTitle, uiText.ActionAboutSummary, ""},
 	}
 	items := make([]paletteItem, 0, len(specs))
 	for _, spec := range specs {
@@ -115,11 +115,11 @@ func maturityBadge(styles Styles, maturity catalog.Maturity) string {
 	label := string(maturity)
 	switch maturity {
 	case catalog.MaturityStable:
-		label = "stable"
+		label = uiText.MaturityStable
 	case catalog.MaturityExperimental:
-		label = "exp"
+		label = uiText.MaturityExperimental
 	case catalog.MaturityInformational:
-		label = "info"
+		label = uiText.MaturityInformational
 	}
 	return badge(styles.Color, maturityColor(maturity), label)
 }

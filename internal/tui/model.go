@@ -40,39 +40,6 @@ const (
 
 const narrowWidth = 72
 
-// Centralized so a future release can localize without touching update logic.
-var uiText = struct {
-	AppTitle     string
-	Loading      string
-	HomeHint     string
-	SearchPrompt string
-	SearchEmpty  string
-	FormHint     string
-	ReviewHint   string
-	Running      string
-	Cancelled    string
-	ErrorHeading string
-	AboutHeading string
-	AboutBody    string
-	CreditText   string
-	CreditURL    string
-}{
-	AppTitle:     "RaxuisCLI — Guided Interface",
-	Loading:      "Loading…",
-	HomeHint:     "↑/↓ move · enter select · ctrl+k search · q quit",
-	SearchPrompt: "Search actions",
-	SearchEmpty:  "No matching actions.",
-	FormHint:     "tab move · ←/→ change · enter continue · esc back",
-	ReviewHint:   "enter run · esc back",
-	Running:      "Running…  esc cancels",
-	Cancelled:    "Run cancelled.",
-	ErrorHeading: "Something went wrong",
-	AboutHeading: "About",
-	AboutBody:    "RaxuisCLI is a passive security auditing toolkit.",
-	CreditText:   "Created by Raxuis · github.com/raxuis",
-	CreditURL:    "https://github.com/raxuis",
-}
-
 type Config struct {
 	Color    bool   // compute with ColorEnabled to honor the flag, env, and terminal
 	Force    bool   // allow a saved report to overwrite an existing file
@@ -543,13 +510,13 @@ func (m Model) body() string {
 	case stateBrowse:
 		return renderBrowse(m.styles, m.browse, m.browseCursor, m.narrow())
 	case stateError:
-		message := "unknown error"
+		message := uiText.ErrorUnknown
 		if m.err != nil {
 			message = m.err.Error()
 		}
 		return m.styles.Title.Render(uiText.ErrorHeading) + "\n" +
 			m.styles.App.Render(message) + "\n\n" +
-			m.styles.Muted.Render("esc home · q quit")
+			m.styles.Muted.Render(uiText.InfoHint)
 	case stateAbout:
 		return m.aboutBody()
 	}
@@ -560,26 +527,26 @@ func (m Model) reviewData() reviewData {
 	switch m.selected {
 	case actionDemo:
 		return reviewData{
-			Scope:    "https://127.0.0.1/demo (loopback fixture)",
-			Duration: "up to 5s",
-			Output:   "stdout (text)",
-			Safety:   "safe",
+			Scope:    uiText.DemoScope,
+			Duration: uiText.DemoDuration,
+			Output:   uiText.OutputStdoutText,
+			Safety:   uiText.SafetySafe,
 			Command:  "raxuiscli demo web",
 		}
 	case actionCompare:
 		return reviewData{
-			Scope:    m.compareForm.before() + " → " + m.compareForm.after(),
-			Duration: "instant",
-			Output:   "stdout (text)",
-			Safety:   "safe",
+			Scope:    m.compareForm.before() + uiText.CompareScopeSep + m.compareForm.after(),
+			Duration: uiText.CompareDuration,
+			Output:   uiText.OutputStdoutText,
+			Safety:   uiText.SafetySafe,
 			Command:  m.compareForm.equivalentCommand(),
 		}
 	default:
 		return reviewData{
 			Scope:    m.form.target(),
-			Duration: "up to 10s",
-			Output:   "stdout (" + m.form.output() + ")",
-			Safety:   "passive",
+			Duration: uiText.AuditDuration,
+			Output:   fmt.Sprintf(uiText.OutputStdoutFmt, m.form.output()),
+			Safety:   uiText.SafetyPassive,
 			Command:  m.form.equivalentCommand(),
 		}
 	}
@@ -631,7 +598,7 @@ func (m Model) aboutBody() string {
 	b.WriteString("\n")
 	b.WriteString(m.styles.Muted.Render(uiText.CreditURL))
 	b.WriteString("\n\n")
-	b.WriteString(m.styles.Muted.Render("esc home · q quit"))
+	b.WriteString(m.styles.Muted.Render(uiText.InfoHint))
 	return b.String()
 }
 

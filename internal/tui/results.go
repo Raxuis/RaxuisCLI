@@ -59,10 +59,10 @@ func visibleFindings(findings []models.VulnResult, filter constants.Severity) []
 
 func renderReport(styles Styles, value report.Report, filter constants.Severity, savedPath string, narrow bool) string {
 	var b strings.Builder
-	b.WriteString(styles.Title.Render("Results — " + value.Audit.Target))
+	b.WriteString(styles.Title.Render(fmt.Sprintf(uiText.ResultsTitleFmt, value.Audit.Target)))
 	b.WriteString("\n\n")
 
-	b.WriteString(styles.Muted.Render("Summary  "))
+	b.WriteString(styles.Muted.Render(uiText.ResultsSummary))
 	for _, count := range countBySeverity(value.Findings) {
 		b.WriteString(badge(styles.Color, severityColors[count.Severity], fmt.Sprintf("%s %d", severityLabel(count.Severity), count.Count)))
 		b.WriteString(" ")
@@ -71,11 +71,11 @@ func renderReport(styles Styles, value report.Report, filter constants.Severity,
 
 	filtered := visibleFindings(value.Findings, filter)
 	if filter != constants.SeverityNone && filter != "" {
-		b.WriteString(styles.Muted.Render("Filter: " + severityLabel(filter) + " (press a to clear)"))
+		b.WriteString(styles.Muted.Render(fmt.Sprintf(uiText.ResultsFilterFmt, severityLabel(filter))))
 		b.WriteString("\n")
 	}
 	if len(filtered) == 0 {
-		b.WriteString(styles.Muted.Render("No findings to show."))
+		b.WriteString(styles.Muted.Render(uiText.ResultsNoFindings))
 	}
 	for _, finding := range filtered {
 		b.WriteString(badge(styles.Color, severityColors[finding.Severity], severityLabel(finding.Severity)))
@@ -90,26 +90,26 @@ func renderReport(styles Styles, value report.Report, filter constants.Severity,
 
 	b.WriteString("\n")
 	if savedPath != "" {
-		b.WriteString(styles.Accent.Render("Saved report: " + savedPath))
+		b.WriteString(styles.Accent.Render(fmt.Sprintf(uiText.ResultsSavedFmt, savedPath)))
 		b.WriteString("\n")
 	}
-	b.WriteString(styles.Muted.Render("1-5 filter · a all · s save · esc home · q quit"))
+	b.WriteString(styles.Muted.Render(uiText.ResultsHint))
 	return b.String()
 }
 
 func renderComparison(styles Styles, comparison report.Comparison, narrow bool) string {
 	var b strings.Builder
-	b.WriteString(styles.Title.Render("Comparison"))
+	b.WriteString(styles.Title.Render(uiText.ComparisonHeading))
 	b.WriteString("\n\n")
 
 	summary := []struct {
 		label string
 		count int
 	}{
-		{"Added", len(comparison.Findings.Added)},
-		{"Resolved", len(comparison.Findings.Resolved)},
-		{"Changed", len(comparison.Findings.Changed)},
-		{"Unchanged", len(comparison.Findings.Unchanged)},
+		{uiText.CmpAdded, len(comparison.Findings.Added)},
+		{uiText.CmpResolved, len(comparison.Findings.Resolved)},
+		{uiText.CmpChanged, len(comparison.Findings.Changed)},
+		{uiText.CmpUnchanged, len(comparison.Findings.Unchanged)},
 	}
 	for _, row := range summary {
 		b.WriteString(styles.Muted.Render(fmt.Sprintf("%-12s", row.label+":")))
@@ -120,27 +120,27 @@ func renderComparison(styles Styles, comparison report.Comparison, narrow bool) 
 
 	b.WriteString("\n")
 	if comparison.HasRegressionAt(constants.SeverityLow) {
-		b.WriteString(styles.Accent.Render("Regressions detected."))
+		b.WriteString(styles.Accent.Render(uiText.CmpRegressions))
 	} else {
-		b.WriteString(styles.Muted.Render("No regressions at or above low severity."))
+		b.WriteString(styles.Muted.Render(uiText.CmpNoRegressions))
 	}
 	if !narrow {
 		b.WriteString("\n")
 		for _, added := range comparison.Findings.Added {
-			b.WriteString(badge(styles.Color, severityColors[added.Severity], "new"))
+			b.WriteString(badge(styles.Color, severityColors[added.Severity], uiText.CmpNewBadge))
 			b.WriteString(" ")
 			b.WriteString(styles.App.Render(added.Title))
 			b.WriteString("\n")
 		}
 	}
 	b.WriteString("\n")
-	b.WriteString(styles.Muted.Render("esc home · q quit"))
+	b.WriteString(styles.Muted.Render(uiText.InfoHint))
 	return b.String()
 }
 
 func renderBrowse(styles Styles, items []paletteItem, cursor int, narrow bool) string {
 	var b strings.Builder
-	b.WriteString(styles.Title.Render(fmt.Sprintf("Commands (%d)", len(items))))
+	b.WriteString(styles.Title.Render(fmt.Sprintf(uiText.BrowseTitleFmt, len(items))))
 	b.WriteString("\n\n")
 	for i, item := range items {
 		marker := "  "
@@ -165,7 +165,7 @@ func renderBrowse(styles Styles, items []paletteItem, cursor int, narrow bool) s
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(styles.Muted.Render("↑/↓ move · esc home · q quit"))
+	b.WriteString(styles.Muted.Render(uiText.BrowseHint))
 	return b.String()
 }
 
