@@ -1,7 +1,6 @@
 package smb
 
 import (
-	"bytes"
 	"testing"
 )
 
@@ -41,7 +40,7 @@ func TestEnumerateShares(t *testing.T) {
 }
 
 func TestCheckNullSession(t *testing.T) {
-	err := CheckNullSession("localhost", 445, 2)
+	_, err := CheckNullSession("localhost", 445, 2)
 	if err == nil {
 		t.Logf("CheckNullSession may require real SMB server")
 	}

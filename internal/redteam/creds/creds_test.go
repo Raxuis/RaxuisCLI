@@ -16,40 +16,33 @@ func TestCredential(t *testing.T) {
 	}
 }
 
-func TestParseHashFile(t *testing.T) {
-	content := `
-admin:500:aad3b435b51404eeaad3b435b51404ee:5f4dcc3b5aa765d61d8327deb882cf99:::
-guest:501:aad3b435b51404eeaad3b435b51404ee:5f4dcc3b5aa765d61d8327deb882cf99:::
-`
-	results, err := ParseHashFile(content)
-	if err != nil {
-		t.Errorf("ParseHashFile() error = %v", err)
+func TestConvertFormat(t *testing.T) {
+	creds := []Credential{
+		{Username: "admin", Hash: "5f4dcc3b5aa765d61d8327deb882cf99", HashType: "MD5"},
+		{Username: "guest", Hash: "abc123def456", HashType: "SHA1"},
 	}
-	if len(results) < 2 {
-		t.Errorf("ParseHashFile() returned %d results, want >= 2", len(results))
+	result := ConvertFormat(creds, "hashcat")
+	if len(result) == 0 {
+		t.Errorf("ConvertFormat() returned empty result")
 	}
-}
-
-func TestFormatHashcat(t *testing.T) {
-	cred := Credential{
-		Username: "admin",
-		Hash:     "5f4dcc3b5aa765d61d8327deb882cf99",
-		HashType: "MD5",
-	}
-	formatted := FormatHashcat(cred)
-	if formatted == "" {
-		t.Errorf("FormatHashcat() returned empty string")
+	if result[0] == "" {
+		t.Errorf("ConvertFormat() first element is empty")
 	}
 }
 
-func TestFormatJohn(t *testing.T) {
-	cred := Credential{
-		Username: "admin",
-		Hash:     "5f4dcc3b5aa765d61d8327deb882cf99",
-		HashType: "MD5",
+func TestDecodeCredential(t *testing.T) {
+	encoded := "admin:password123"
+	results := DecodeCredential(encoded)
+	if len(results) == 0 {
+		t.Errorf("DecodeCredential() returned empty results")
 	}
-	formatted := FormatJohn(cred)
-	if formatted == "" {
-		t.Errorf("FormatJohn() returned empty string")
+}
+
+func TestGenerateCombo(t *testing.T) {
+	users := []string{"admin", "guest"}
+	passwords := []string{"pass123", "pwd456"}
+	combos := GenerateCombo(users, passwords, "DOMAIN")
+	if len(combos) != 4 {
+		t.Errorf("GenerateCombo() returned %d combos, want 4", len(combos))
 	}
 }

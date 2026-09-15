@@ -1,6 +1,6 @@
 module github.com/Raxuis/RaxuisCLI
 
-go 1.25.13
+go 1.26
 
 require (
 	charm.land/bubbles/v2 v2.2.1

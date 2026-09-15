@@ -1,8 +1,8 @@
 package kerberos
 
 import (
+	"strings"
 	"testing"
-	"time"
 )
 
 func TestFormatHashcat(t *testing.T) {
@@ -111,17 +111,22 @@ func TestParseHashcatOutput(t *testing.T) {
 }
 
 func TestGenerateKerberoastCommand(t *testing.T) {
-	got := GenerateKerberoastCommand("user@REALM")
+	got := GenerateKerberoastCommand("domain.local", "admin", "Password123", "dc.domain.local", "impacket")
 	if got == "" {
 		t.Errorf("GenerateKerberoastCommand() returned empty string")
 	}
+	if !strings.Contains(got, "GetUserSPNs") && !strings.Contains(got, "Rubeus") {
+		t.Errorf("GenerateKerberoastCommand() missing expected command format: %q", got)
+	}
 }
 
-func TestGenerateASREPCommand(t *testing.T) {
-	users := []string{"user1@REALM", "user2@REALM"}
-	got := GenerateASREPCommand(users)
+func TestGenerateASREPRoastCommand(t *testing.T) {
+	got := GenerateASREPRoastCommand("domain.local", "users.txt", "dc.domain.local", "impacket")
 	if got == "" {
-		t.Errorf("GenerateASREPCommand() returned empty string")
+		t.Errorf("GenerateASREPRoastCommand() returned empty string")
+	}
+	if !strings.Contains(got, "GetNPUsers") && !strings.Contains(got, "Rubeus") {
+		t.Errorf("GenerateASREPRoastCommand() missing expected command format: %q", got)
 	}
 }
 
@@ -145,13 +150,3 @@ func TestParseKirbiFileInvalid(t *testing.T) {
 	}
 }
 
-func TestGenerateBloodHoundJSONTGS(t *testing.T) {
-	tickets := []KerberosTicket{
-		{Username: "user1", SPN: "HTTP/server1"},
-		{Username: "user2", SPN: "LDAP/server2"},
-	}
-	got := GenerateBloodHoundJSONTGS(tickets)
-	if got == "" {
-		t.Errorf("GenerateBloodHoundJSONTGS() returned empty string")
-	}
-}

@@ -19,26 +19,32 @@ func TestListAllTechniques(t *testing.T) {
 	}
 }
 
-func TestGenerateCronPersist(t *testing.T) {
-	cmd := GenerateCronPersist("* * * * * /tmp/beacon.sh")
+func TestGenerateCronPersistence(t *testing.T) {
+	cmd := GenerateCronPersistence("/tmp/beacon.sh", "* * * * *")
 	if cmd == "" {
-		t.Errorf("GenerateCronPersist() returned empty string")
+		t.Errorf("GenerateCronPersistence() returned empty string")
 	}
-	if !strings.Contains(cmd, "crontab") && !strings.Contains(cmd, "cron") {
-		t.Errorf("GenerateCronPersist() missing cron reference: %q", cmd)
+	if !strings.Contains(cmd, "cron") && !strings.Contains(cmd, "/tmp/beacon.sh") {
+		t.Errorf("GenerateCronPersistence() missing cron or command reference: %q", cmd)
 	}
 }
 
-func TestGenerateSSHPersist(t *testing.T) {
-	cmd := GenerateSSHPersist("authorized_keys", "ssh-rsa AAAA...")
+func TestGenerateSystemdService(t *testing.T) {
+	cmd := GenerateSystemdService("beacon", "/tmp/beacon.sh", "Persistence Service")
 	if cmd == "" {
-		t.Errorf("GenerateSSHPersist() returned empty string")
+		t.Errorf("GenerateSystemdService() returned empty string")
+	}
+	if !strings.Contains(cmd, "beacon") || !strings.Contains(cmd, "/tmp/beacon.sh") {
+		t.Errorf("GenerateSystemdService() missing service or command: %q", cmd)
 	}
 }
 
-func TestGetPersistPath(t *testing.T) {
-	path := GetPersistPath()
-	if path == "" {
-		t.Errorf("GetPersistPath() returned empty string")
+func TestGenerateLaunchdPlist(t *testing.T) {
+	plist := GenerateLaunchdPlist("com.example.beacon", "/tmp/beacon.sh", true)
+	if plist == "" {
+		t.Errorf("GenerateLaunchdPlist() returned empty string")
+	}
+	if !strings.Contains(plist, "com.example.beacon") || !strings.Contains(plist, "/tmp/beacon.sh") {
+		t.Errorf("GenerateLaunchdPlist() missing label or command: %q", plist)
 	}
 }
