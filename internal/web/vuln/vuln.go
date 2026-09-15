@@ -107,12 +107,12 @@ func QuickScan(opts ScanOptions, resultChan chan<- VulnResult, doneChan chan<- b
 // DisplayResults displays vulnerability results
 func DisplayResults(results []VulnResult) {
 	if len(results) == 0 {
-		fmt.Println("\n[NO VULNERABILITIES FOUND]")
+		fmt.Fprintln(stdoutW, "\n[NO VULNERABILITIES FOUND]")
 		return
 	}
 
-	fmt.Println("\n[VULNERABILITY SCAN RESULTS]")
-	fmt.Println(strings.Repeat("=", 80))
+	fmt.Fprintln(stdoutW, "\n[VULNERABILITY SCAN RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 80))
 
 	// Group by severity
 	bySeverity := map[Severity][]VulnResult{
@@ -128,12 +128,12 @@ func DisplayResults(results []VulnResult) {
 	}
 
 	// Summary
-	fmt.Printf("\nSummary:\n")
-	fmt.Printf("  Critical: %d\n", len(bySeverity[SeverityCritical]))
-	fmt.Printf("  High:     %d\n", len(bySeverity[SeverityHigh]))
-	fmt.Printf("  Medium:   %d\n", len(bySeverity[SeverityMedium]))
-	fmt.Printf("  Low:      %d\n", len(bySeverity[SeverityLow]))
-	fmt.Printf("  Info:     %d\n", len(bySeverity[SeverityInfo]))
+	fmt.Fprintf(stdoutW, "\nSummary:\n")
+	fmt.Fprintf(stdoutW, "  Critical: %d\n", len(bySeverity[SeverityCritical]))
+	fmt.Fprintf(stdoutW, "  High:     %d\n", len(bySeverity[SeverityHigh]))
+	fmt.Fprintf(stdoutW, "  Medium:   %d\n", len(bySeverity[SeverityMedium]))
+	fmt.Fprintf(stdoutW, "  Low:      %d\n", len(bySeverity[SeverityLow]))
+	fmt.Fprintf(stdoutW, "  Info:     %d\n", len(bySeverity[SeverityInfo]))
 
 	// Display by severity
 	for _, severity := range []Severity{SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo} {
@@ -142,25 +142,25 @@ func DisplayResults(results []VulnResult) {
 			continue
 		}
 
-		fmt.Printf("\n[%s]\n", severity)
-		fmt.Println(strings.Repeat("-", 40))
+		fmt.Fprintf(stdoutW, "\n[%s]\n", severity)
+		fmt.Fprintln(stdoutW, strings.Repeat("-", 40))
 
 		for i, v := range vulns {
-			fmt.Printf("\n%d. %s\n", i+1, v.Type)
-			fmt.Printf("   URL: %s\n", truncate(v.URL, 70))
+			fmt.Fprintf(stdoutW, "\n%d. %s\n", i+1, v.Type)
+			fmt.Fprintf(stdoutW, "   URL: %s\n", truncate(v.URL, 70))
 			if v.Parameter != "" {
-				fmt.Printf("   Parameter: %s\n", v.Parameter)
+				fmt.Fprintf(stdoutW, "   Parameter: %s\n", v.Parameter)
 			}
 			if v.Payload != "" {
-				fmt.Printf("   Payload: %s\n", truncate(v.Payload, 50))
+				fmt.Fprintf(stdoutW, "   Payload: %s\n", truncate(v.Payload, 50))
 			}
-			fmt.Printf("   Evidence: %s\n", truncate(v.Evidence, 60))
-			fmt.Printf("   Description: %s\n", v.Description)
-			fmt.Printf("   Remediation: %s\n", v.Remediation)
+			fmt.Fprintf(stdoutW, "   Evidence: %s\n", truncate(v.Evidence, 60))
+			fmt.Fprintf(stdoutW, "   Description: %s\n", v.Description)
+			fmt.Fprintf(stdoutW, "   Remediation: %s\n", v.Remediation)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // GetPayloads returns payloads for a specific vulnerability type

@@ -475,25 +475,25 @@ func FilterByDomain(creds []Credential, domain string) []Credential {
 
 // DisplayResult displays extraction results
 func DisplayResult(result *ExtractResult, showAll bool) {
-	fmt.Println("\n[CREDENTIAL EXTRACTION RESULTS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CREDENTIAL EXTRACTION RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("\nStatistics:\n")
-	fmt.Printf("  Lines processed: %d\n", result.Stats.TotalLines)
-	fmt.Printf("  Credentials:     %d\n", result.Stats.Credentials)
-	fmt.Printf("  Hashes:          %d\n", result.Stats.Hashes)
-	fmt.Printf("  Emails:          %d\n", result.Stats.Emails)
-	fmt.Printf("  URLs:            %d\n", result.Stats.URLs)
+	fmt.Fprintf(stdoutW, "\nStatistics:\n")
+	fmt.Fprintf(stdoutW, "  Lines processed: %d\n", result.Stats.TotalLines)
+	fmt.Fprintf(stdoutW, "  Credentials:     %d\n", result.Stats.Credentials)
+	fmt.Fprintf(stdoutW, "  Hashes:          %d\n", result.Stats.Hashes)
+	fmt.Fprintf(stdoutW, "  Emails:          %d\n", result.Stats.Emails)
+	fmt.Fprintf(stdoutW, "  URLs:            %d\n", result.Stats.URLs)
 
 	if len(result.Credentials) > 0 {
-		fmt.Println("\n--- Credentials ---")
+		fmt.Fprintln(stdoutW, "\n--- Credentials ---")
 		limit := 20
 		if showAll {
 			limit = len(result.Credentials)
 		}
 		for i, cred := range result.Credentials {
 			if i >= limit {
-				fmt.Printf("  ... and %d more\n", len(result.Credentials)-limit)
+				fmt.Fprintf(stdoutW, "  ... and %d more\n", len(result.Credentials)-limit)
 				break
 			}
 			displayCred(cred)
@@ -501,43 +501,43 @@ func DisplayResult(result *ExtractResult, showAll bool) {
 	}
 
 	if len(result.Hashes) > 0 {
-		fmt.Println("\n--- Hashes ---")
+		fmt.Fprintln(stdoutW, "\n--- Hashes ---")
 		limit := 10
 		if showAll {
 			limit = len(result.Hashes)
 		}
 		for i, hash := range result.Hashes {
 			if i >= limit {
-				fmt.Printf("  ... and %d more\n", len(result.Hashes)-limit)
+				fmt.Fprintf(stdoutW, "  ... and %d more\n", len(result.Hashes)-limit)
 				break
 			}
-			fmt.Printf("  [%s] %s", hash.Type, truncateHash(hash.Hash))
+			fmt.Fprintf(stdoutW, "  [%s] %s", hash.Type, truncateHash(hash.Hash))
 			if hash.Username != "" {
-				fmt.Printf(" (user: %s)", hash.Username)
+				fmt.Fprintf(stdoutW, " (user: %s)", hash.Username)
 			}
-			fmt.Println()
+			fmt.Fprintln(stdoutW)
 		}
 	}
 
 	if len(result.Emails) > 0 && showAll {
-		fmt.Println("\n--- Emails ---")
+		fmt.Fprintln(stdoutW, "\n--- Emails ---")
 		for _, email := range result.Emails {
-			fmt.Printf("  %s\n", email)
+			fmt.Fprintf(stdoutW, "  %s\n", email)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 func displayCred(cred Credential) {
 	if cred.Domain != "" {
-		fmt.Printf("  %s\\%s:%s\n", cred.Domain, cred.Username, maskPassword(cred.Password))
+		fmt.Fprintf(stdoutW, "  %s\\%s:%s\n", cred.Domain, cred.Username, maskPassword(cred.Password))
 	} else if cred.Email != "" {
-		fmt.Printf("  %s:%s\n", cred.Email, maskPassword(cred.Password))
+		fmt.Fprintf(stdoutW, "  %s:%s\n", cred.Email, maskPassword(cred.Password))
 	} else if cred.Hash != "" {
-		fmt.Printf("  %s:%s [%s]\n", cred.Username, truncateHash(cred.Hash), cred.HashType)
+		fmt.Fprintf(stdoutW, "  %s:%s [%s]\n", cred.Username, truncateHash(cred.Hash), cred.HashType)
 	} else {
-		fmt.Printf("  %s:%s\n", cred.Username, maskPassword(cred.Password))
+		fmt.Fprintf(stdoutW, "  %s:%s\n", cred.Username, maskPassword(cred.Password))
 	}
 }
 

@@ -591,34 +591,34 @@ func DetectTechnology(headers http.Header, body string) []string {
 
 // DisplayResponse displays HTTP response
 func DisplayResponse(resp *Response, showBody bool, maxBodyLen int) {
-	fmt.Println("\n[HTTP RESPONSE]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[HTTP RESPONSE]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	// Status
-	fmt.Printf("\nStatus: %s\n", resp.Status)
-	fmt.Printf("Duration: %v\n", resp.Duration)
+	fmt.Fprintf(stdoutW, "\nStatus: %s\n", resp.Status)
+	fmt.Fprintf(stdoutW, "Duration: %v\n", resp.Duration)
 
 	if resp.ContentLength > 0 {
-		fmt.Printf("Content-Length: %d bytes\n", resp.ContentLength)
+		fmt.Fprintf(stdoutW, "Content-Length: %d bytes\n", resp.ContentLength)
 	}
 
 	// TLS info
 	if resp.TLS != nil {
-		fmt.Printf("\n[TLS]\n")
-		fmt.Printf("Version: %s\n", resp.TLS.Version)
-		fmt.Printf("Cipher: %s\n", resp.TLS.CipherSuite)
+		fmt.Fprintf(stdoutW, "\n[TLS]\n")
+		fmt.Fprintf(stdoutW, "Version: %s\n", resp.TLS.Version)
+		fmt.Fprintf(stdoutW, "Cipher: %s\n", resp.TLS.CipherSuite)
 	}
 
 	// Redirects
 	if len(resp.RedirectChain) > 0 {
-		fmt.Printf("\n[Redirect Chain]\n")
+		fmt.Fprintf(stdoutW, "\n[Redirect Chain]\n")
 		for i, url := range resp.RedirectChain {
-			fmt.Printf("  %d. %s\n", i+1, url)
+			fmt.Fprintf(stdoutW, "  %d. %s\n", i+1, url)
 		}
 	}
 
 	// Headers
-	fmt.Printf("\n[Headers]\n")
+	fmt.Fprintf(stdoutW, "\n[Headers]\n")
 	keys := make([]string, 0, len(resp.Headers))
 	for k := range resp.Headers {
 		keys = append(keys, k)
@@ -627,30 +627,30 @@ func DisplayResponse(resp *Response, showBody bool, maxBodyLen int) {
 
 	for _, k := range keys {
 		for _, v := range resp.Headers[k] {
-			fmt.Printf("  %s: %s\n", k, v)
+			fmt.Fprintf(stdoutW, "  %s: %s\n", k, v)
 		}
 	}
 
 	// Body
 	if showBody && resp.Body != "" {
-		fmt.Printf("\n[Body]\n")
+		fmt.Fprintf(stdoutW, "\n[Body]\n")
 		body := resp.Body
 		if maxBodyLen > 0 && len(body) > maxBodyLen {
 			body = body[:maxBodyLen] + "\n... (truncated)"
 		}
-		fmt.Println(body)
+		fmt.Fprintln(stdoutW, body)
 	}
 }
 
 // DisplayHeaderAnalysis displays security header analysis
 func DisplayHeaderAnalysis(analysis *HeaderAnalysis) {
-	fmt.Println("\n[SECURITY HEADERS ANALYSIS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[SECURITY HEADERS ANALYSIS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("\nSecurity Score: %d/%d (Grade: %s)\n", analysis.Score, analysis.MaxScore, analysis.Grade)
+	fmt.Fprintf(stdoutW, "\nSecurity Score: %d/%d (Grade: %s)\n", analysis.Score, analysis.MaxScore, analysis.Grade)
 
-	fmt.Printf("\n%-35s %-10s %s\n", "HEADER", "STATUS", "DETAILS")
-	fmt.Println(strings.Repeat("-", 60))
+	fmt.Fprintf(stdoutW, "\n%-35s %-10s %s\n", "HEADER", "STATUS", "DETAILS")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 60))
 
 	for _, h := range analysis.Headers {
 		status := "OK"
@@ -661,24 +661,24 @@ func DisplayHeaderAnalysis(analysis *HeaderAnalysis) {
 			status = "MISSING"
 		}
 
-		fmt.Printf("%-35s %-10s %s\n", h.Name, status, h.Description)
+		fmt.Fprintf(stdoutW, "%-35s %-10s %s\n", h.Name, status, h.Description)
 	}
 
 	if len(analysis.Missing) > 0 {
-		fmt.Printf("\n[Missing Headers]\n")
+		fmt.Fprintf(stdoutW, "\n[Missing Headers]\n")
 		for _, h := range analysis.Missing {
-			fmt.Printf("  - %s\n", h)
+			fmt.Fprintf(stdoutW, "  - %s\n", h)
 		}
 	}
 
 	if len(analysis.Warnings) > 0 {
-		fmt.Printf("\n[Warnings]\n")
+		fmt.Fprintf(stdoutW, "\n[Warnings]\n")
 		for _, w := range analysis.Warnings {
-			fmt.Printf("  - %s\n", w)
+			fmt.Fprintf(stdoutW, "  - %s\n", w)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayTechnologies displays detected technologies
@@ -687,13 +687,13 @@ func DisplayTechnologies(techs []string) {
 		return
 	}
 
-	fmt.Println("\n[DETECTED TECHNOLOGIES]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[DETECTED TECHNOLOGIES]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for _, tech := range techs {
-		fmt.Printf("  - %s\n", tech)
+		fmt.Fprintf(stdoutW, "  - %s\n", tech)
 	}
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // FormatJSON formats JSON body for display

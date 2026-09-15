@@ -611,11 +611,11 @@ func IsPrintable(data []byte) bool {
 
 // DisplayFrequencyAnalysis displays frequency analysis results
 func DisplayFrequencyAnalysis(results []FrequencyResult) {
-	fmt.Println("\n[FREQUENCY ANALYSIS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[FREQUENCY ANALYSIS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("\n%-6s %-8s %-10s %s\n", "CHAR", "COUNT", "FREQ %", "BAR")
-	fmt.Println(strings.Repeat("-", 60))
+	fmt.Fprintf(stdoutW, "\n%-6s %-8s %-10s %s\n", "CHAR", "COUNT", "FREQ %", "BAR")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 60))
 
 	for _, r := range results {
 		barLen := int(r.Frequency / 2)
@@ -631,16 +631,16 @@ func DisplayFrequencyAnalysis(results []FrequencyResult) {
 			diffStr = fmt.Sprintf(" (%.1f)", diff)
 		}
 
-		fmt.Printf("%-6c %-8d %-10.2f %s%s\n", r.Char, r.Count, r.Frequency, bar, diffStr)
+		fmt.Fprintf(stdoutW, "%-6c %-8d %-10.2f %s%s\n", r.Char, r.Count, r.Frequency, bar, diffStr)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayXORResults displays XOR brute force results
 func DisplayXORResults(results []XORResult, maxResults int) {
-	fmt.Println("\n[XOR BRUTE FORCE RESULTS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[XOR BRUTE FORCE RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	count := 0
 	for _, r := range results {
@@ -652,7 +652,7 @@ func DisplayXORResults(results []XORResult, maxResults int) {
 			continue
 		}
 
-		fmt.Printf("\nKey: %s (score: %.2f)\n", r.KeyString, r.Score)
+		fmt.Fprintf(stdoutW, "\nKey: %s (score: %.2f)\n", r.KeyString, r.Score)
 
 		// Show preview of result
 		preview := string(r.Result)
@@ -667,20 +667,20 @@ func DisplayXORResults(results []XORResult, maxResults int) {
 			return r
 		}, preview)
 
-		fmt.Printf("Result: %s\n", preview)
+		fmt.Fprintf(stdoutW, "Result: %s\n", preview)
 		count++
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayVigenereResults displays Vigenere crack results
 func DisplayVigenereResults(results []VigenereResult, maxResults int) {
-	fmt.Println("\n[VIGENERE CRACK RESULTS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[VIGENERE CRACK RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(results) == 0 {
-		fmt.Println("No results found. Text may be too short or not Vigenere encrypted.")
+		fmt.Fprintln(stdoutW, "No results found. Text may be too short or not Vigenere encrypted.")
 		return
 	}
 
@@ -690,17 +690,17 @@ func DisplayVigenereResults(results []VigenereResult, maxResults int) {
 			break
 		}
 
-		fmt.Printf("\nKey: %s (length: %d, score: %.2f)\n", r.Key, r.KeyLength, r.Score)
+		fmt.Fprintf(stdoutW, "\nKey: %s (length: %d, score: %.2f)\n", r.Key, r.KeyLength, r.Score)
 
 		preview := r.Plaintext
 		if len(preview) > 200 {
 			preview = preview[:200] + "..."
 		}
-		fmt.Printf("Plaintext: %s\n", preview)
+		fmt.Fprintf(stdoutW, "Plaintext: %s\n", preview)
 		count++
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayCaesarResults displays Caesar brute force results
@@ -709,8 +709,8 @@ func DisplayCaesarResults(results []struct {
 	Text  string
 	Score float64
 }, maxResults int) {
-	fmt.Println("\n[CAESAR BRUTE FORCE RESULTS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CAESAR BRUTE FORCE RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for i, r := range results {
 		if i >= maxResults {
@@ -727,10 +727,10 @@ func DisplayCaesarResults(results []struct {
 			preview = preview[:80] + "..."
 		}
 
-		fmt.Printf("\nShift %2d%s (score: %.2f): %s\n", r.Shift, rotName, r.Score, preview)
+		fmt.Fprintf(stdoutW, "\nShift %2d%s (score: %.2f): %s\n", r.Shift, rotName, r.Score, preview)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 func min(a, b int) int {

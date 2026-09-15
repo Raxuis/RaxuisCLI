@@ -315,35 +315,35 @@ func NewReversePortForward(controlAddr string, localPort int) *ReversePortForwar
 
 // DisplayProxyInfo displays proxy information
 func DisplayProxyInfo(proxyType ProxyType, listenAddr string, auth bool) {
-	fmt.Printf("\n[PIVOT] %s Proxy\n", proxyType)
-	fmt.Println("========================")
-	fmt.Printf("Type:    %s\n", proxyType)
-	fmt.Printf("Listen:  %s\n", listenAddr)
-	fmt.Printf("Auth:    %v\n", auth)
+	fmt.Fprintf(stdoutW, "\n[PIVOT] %s Proxy\n", proxyType)
+	fmt.Fprintln(stdoutW, "========================")
+	fmt.Fprintf(stdoutW, "Type:    %s\n", proxyType)
+	fmt.Fprintf(stdoutW, "Listen:  %s\n", listenAddr)
+	fmt.Fprintf(stdoutW, "Auth:    %v\n", auth)
 
 	switch proxyType {
 	case SOCKS5Proxy:
-		fmt.Println("\nUsage:")
-		fmt.Printf("  curl --socks5 %s http://target\n", listenAddr)
-		fmt.Printf("  proxychains -q ./tool\n")
-		fmt.Printf("  ssh -D %s user@host (creates SOCKS proxy)\n", listenAddr)
+		fmt.Fprintln(stdoutW, "\nUsage:")
+		fmt.Fprintf(stdoutW, "  curl --socks5 %s http://target\n", listenAddr)
+		fmt.Fprintf(stdoutW, "  proxychains -q ./tool\n")
+		fmt.Fprintf(stdoutW, "  ssh -D %s user@host (creates SOCKS proxy)\n", listenAddr)
 	case ForwardProxy:
-		fmt.Println("\nUsage:")
-		fmt.Printf("  nc %s\n", listenAddr)
+		fmt.Fprintln(stdoutW, "\nUsage:")
+		fmt.Fprintf(stdoutW, "  nc %s\n", listenAddr)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayForwardInfo displays port forward information
 func DisplayForwardInfo(localAddr, remoteAddr string) {
-	fmt.Println("\n[PIVOT] Port Forward")
-	fmt.Println("====================")
-	fmt.Printf("Local:   %s\n", localAddr)
-	fmt.Printf("Remote:  %s\n", remoteAddr)
-	fmt.Println("\nTraffic Flow:")
-	fmt.Printf("  Client -> %s -> %s\n", localAddr, remoteAddr)
-	fmt.Println()
+	fmt.Fprintln(stdoutW, "\n[PIVOT] Port Forward")
+	fmt.Fprintln(stdoutW, "====================")
+	fmt.Fprintf(stdoutW, "Local:   %s\n", localAddr)
+	fmt.Fprintf(stdoutW, "Remote:  %s\n", remoteAddr)
+	fmt.Fprintln(stdoutW, "\nTraffic Flow:")
+	fmt.Fprintf(stdoutW, "  Client -> %s -> %s\n", localAddr, remoteAddr)
+	fmt.Fprintln(stdoutW)
 }
 
 // TestConnectivity tests if a remote address is reachable

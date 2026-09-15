@@ -353,150 +353,150 @@ func ValidateCertificateAt(info *CertInfo, now time.Time) *ValidationResult {
 
 // DisplayCertInfo displays certificate information
 func DisplayCertInfo(info *CertInfo) {
-	fmt.Println("\n[CERTIFICATE INFORMATION]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE INFORMATION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
-	fmt.Printf("\nSubject: %s\n", info.Subject)
-	fmt.Printf("Issuer:  %s\n", info.Issuer)
+	fmt.Fprintf(stdoutW, "\nSubject: %s\n", info.Subject)
+	fmt.Fprintf(stdoutW, "Issuer:  %s\n", info.Issuer)
 
-	fmt.Printf("\nSerial Number: %s\n", info.SerialNumber)
-	fmt.Printf("Version:       %d\n", info.Version)
+	fmt.Fprintf(stdoutW, "\nSerial Number: %s\n", info.SerialNumber)
+	fmt.Fprintf(stdoutW, "Version:       %d\n", info.Version)
 
-	fmt.Println("\n[Validity]")
-	fmt.Printf("Not Before: %s\n", info.NotBefore.Format(time.RFC3339))
-	fmt.Printf("Not After:  %s\n", info.NotAfter.Format(time.RFC3339))
+	fmt.Fprintln(stdoutW, "\n[Validity]")
+	fmt.Fprintf(stdoutW, "Not Before: %s\n", info.NotBefore.Format(time.RFC3339))
+	fmt.Fprintf(stdoutW, "Not After:  %s\n", info.NotAfter.Format(time.RFC3339))
 
 	daysLeft := int(time.Until(info.NotAfter).Hours() / 24)
 	if daysLeft > 0 {
-		fmt.Printf("Days Left:  %d\n", daysLeft)
+		fmt.Fprintf(stdoutW, "Days Left:  %d\n", daysLeft)
 	} else {
-		fmt.Printf("Status:     EXPIRED (%d days ago)\n", -daysLeft)
+		fmt.Fprintf(stdoutW, "Status:     EXPIRED (%d days ago)\n", -daysLeft)
 	}
 
-	fmt.Println("\n[Algorithms]")
-	fmt.Printf("Public Key: %s\n", info.PublicKeyAlgorithm)
-	fmt.Printf("Signature:  %s\n", info.SignatureAlgorithm)
+	fmt.Fprintln(stdoutW, "\n[Algorithms]")
+	fmt.Fprintf(stdoutW, "Public Key: %s\n", info.PublicKeyAlgorithm)
+	fmt.Fprintf(stdoutW, "Signature:  %s\n", info.SignatureAlgorithm)
 
 	if len(info.KeyUsage) > 0 {
-		fmt.Println("\n[Key Usage]")
+		fmt.Fprintln(stdoutW, "\n[Key Usage]")
 		for _, usage := range info.KeyUsage {
-			fmt.Printf("  - %s\n", usage)
+			fmt.Fprintf(stdoutW, "  - %s\n", usage)
 		}
 	}
 
 	if len(info.ExtKeyUsage) > 0 {
-		fmt.Println("\n[Extended Key Usage]")
+		fmt.Fprintln(stdoutW, "\n[Extended Key Usage]")
 		for _, usage := range info.ExtKeyUsage {
-			fmt.Printf("  - %s\n", usage)
+			fmt.Fprintf(stdoutW, "  - %s\n", usage)
 		}
 	}
 
 	if len(info.DNSNames) > 0 {
-		fmt.Println("\n[Subject Alternative Names - DNS]")
+		fmt.Fprintln(stdoutW, "\n[Subject Alternative Names - DNS]")
 		for _, name := range info.DNSNames {
-			fmt.Printf("  - %s\n", name)
+			fmt.Fprintf(stdoutW, "  - %s\n", name)
 		}
 	}
 
 	if len(info.IPAddresses) > 0 {
-		fmt.Println("\n[Subject Alternative Names - IP]")
+		fmt.Fprintln(stdoutW, "\n[Subject Alternative Names - IP]")
 		for _, ip := range info.IPAddresses {
-			fmt.Printf("  - %s\n", ip)
+			fmt.Fprintf(stdoutW, "  - %s\n", ip)
 		}
 	}
 
 	if len(info.EmailAddresses) > 0 {
-		fmt.Println("\n[Email Addresses]")
+		fmt.Fprintln(stdoutW, "\n[Email Addresses]")
 		for _, email := range info.EmailAddresses {
-			fmt.Printf("  - %s\n", email)
+			fmt.Fprintf(stdoutW, "  - %s\n", email)
 		}
 	}
 
-	fmt.Printf("\nIs CA: %v\n", info.IsCA)
+	fmt.Fprintf(stdoutW, "\nIs CA: %v\n", info.IsCA)
 }
 
 // DisplayChain displays certificate chain
 func DisplayChain(chain *ChainInfo) {
-	fmt.Println("\n[CERTIFICATE CHAIN]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE CHAIN]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if chain.Host != "" {
-		fmt.Printf("Host: %s:%d\n", chain.Host, chain.Port)
+		fmt.Fprintf(stdoutW, "Host: %s:%d\n", chain.Host, chain.Port)
 		if chain.Valid {
-			fmt.Println("Chain Status: VALID")
+			fmt.Fprintln(stdoutW, "Chain Status: VALID")
 		} else {
-			fmt.Printf("Chain Status: INVALID - %s\n", chain.Error)
+			fmt.Fprintf(stdoutW, "Chain Status: INVALID - %s\n", chain.Error)
 		}
 	}
 
-	fmt.Printf("Certificates in chain: %d\n", len(chain.Certificates))
+	fmt.Fprintf(stdoutW, "Certificates in chain: %d\n", len(chain.Certificates))
 
 	for i, cert := range chain.Certificates {
-		fmt.Printf("\n[Certificate %d]", i+1)
+		fmt.Fprintf(stdoutW, "\n[Certificate %d]", i+1)
 		if i == 0 {
-			fmt.Print(" (End Entity)")
+			fmt.Fprint(stdoutW, " (End Entity)")
 		} else if cert.IsCA {
-			fmt.Print(" (CA)")
+			fmt.Fprint(stdoutW, " (CA)")
 		}
-		fmt.Println()
-		fmt.Println(strings.Repeat("-", 50))
+		fmt.Fprintln(stdoutW)
+		fmt.Fprintln(stdoutW, strings.Repeat("-", 50))
 
-		fmt.Printf("Subject: %s\n", cert.Subject)
-		fmt.Printf("Issuer:  %s\n", cert.Issuer)
-		fmt.Printf("Valid:   %s to %s\n",
+		fmt.Fprintf(stdoutW, "Subject: %s\n", cert.Subject)
+		fmt.Fprintf(stdoutW, "Issuer:  %s\n", cert.Issuer)
+		fmt.Fprintf(stdoutW, "Valid:   %s to %s\n",
 			cert.NotBefore.Format("2006-01-02"),
 			cert.NotAfter.Format("2006-01-02"))
 
 		daysLeft := int(time.Until(cert.NotAfter).Hours() / 24)
 		if daysLeft > 0 {
-			fmt.Printf("Expires: in %d days\n", daysLeft)
+			fmt.Fprintf(stdoutW, "Expires: in %d days\n", daysLeft)
 		} else {
-			fmt.Printf("Expires: EXPIRED %d days ago\n", -daysLeft)
+			fmt.Fprintf(stdoutW, "Expires: EXPIRED %d days ago\n", -daysLeft)
 		}
 	}
 }
 
 // DisplayValidation displays validation results
 func DisplayValidation(result *ValidationResult) {
-	fmt.Println("\n[VALIDATION RESULTS]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[VALIDATION RESULTS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
 	if result.Valid {
-		fmt.Println("Status: VALID")
+		fmt.Fprintln(stdoutW, "Status: VALID")
 	} else {
-		fmt.Println("Status: INVALID")
+		fmt.Fprintln(stdoutW, "Status: INVALID")
 	}
 
 	if result.SelfSigned {
-		fmt.Println("Type:   Self-Signed")
+		fmt.Fprintln(stdoutW, "Type:   Self-Signed")
 	}
 
 	if result.DaysToExpiry > 0 {
-		fmt.Printf("Expiry: %d days remaining\n", result.DaysToExpiry)
+		fmt.Fprintf(stdoutW, "Expiry: %d days remaining\n", result.DaysToExpiry)
 	}
 
 	if len(result.ChainErrors) > 0 {
-		fmt.Println("\n[Errors]")
+		fmt.Fprintln(stdoutW, "\n[Errors]")
 		for _, err := range result.ChainErrors {
-			fmt.Printf("  [!] %s\n", err)
+			fmt.Fprintf(stdoutW, "  [!] %s\n", err)
 		}
 	}
 
 	if len(result.Warnings) > 0 {
-		fmt.Println("\n[Warnings]")
+		fmt.Fprintln(stdoutW, "\n[Warnings]")
 		for _, warn := range result.Warnings {
-			fmt.Printf("  [*] %s\n", warn)
+			fmt.Fprintf(stdoutW, "  [*] %s\n", warn)
 		}
 	}
 }
 
 // CompareCertificates compares two certificates
 func CompareCertificates(cert1, cert2 *CertInfo) {
-	fmt.Println("\n[CERTIFICATE COMPARISON]")
-	fmt.Println(strings.Repeat("=", 70))
+	fmt.Fprintln(stdoutW, "\n[CERTIFICATE COMPARISON]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 70))
 
-	fmt.Printf("%-20s %-25s %-25s\n", "Field", "Certificate 1", "Certificate 2")
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Fprintf(stdoutW, "%-20s %-25s %-25s\n", "Field", "Certificate 1", "Certificate 2")
+	fmt.Fprintln(stdoutW, strings.Repeat("-", 70))
 
 	printCompare := func(field, val1, val2 string) {
 		match := ""
@@ -510,7 +510,7 @@ func CompareCertificates(cert1, cert2 *CertInfo) {
 		if len(val2) > 24 {
 			val2 = val2[:21] + "..."
 		}
-		fmt.Printf("%-20s %-25s %-25s%s\n", field, val1, val2, match)
+		fmt.Fprintf(stdoutW, "%-20s %-25s %-25s%s\n", field, val1, val2, match)
 	}
 
 	printCompare("Serial", cert1.SerialNumber[:min(24, len(cert1.SerialNumber))],

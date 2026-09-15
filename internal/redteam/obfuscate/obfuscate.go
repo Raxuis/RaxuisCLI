@@ -394,26 +394,26 @@ func formatAsMAC(data []byte) string {
 
 // DisplayResult displays obfuscation result
 func DisplayResult(result *ObfuscationResult) {
-	fmt.Printf("\n[OBFUSCATE] %s\n", result.Method)
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[OBFUSCATE] %s\n", result.Method)
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Println("\nOriginal:")
+	fmt.Fprintln(stdoutW, "\nOriginal:")
 	if len(result.Original) > 200 {
-		fmt.Printf("  %s... (%d bytes)\n", result.Original[:200], len(result.Original))
+		fmt.Fprintf(stdoutW, "  %s... (%d bytes)\n", result.Original[:200], len(result.Original))
 	} else {
-		fmt.Printf("  %s\n", result.Original)
+		fmt.Fprintf(stdoutW, "  %s\n", result.Original)
 	}
 
-	fmt.Println("\nObfuscated:")
+	fmt.Fprintln(stdoutW, "\nObfuscated:")
 	if len(result.Obfuscated) > 500 {
-		fmt.Printf("  %s... (%d bytes)\n", result.Obfuscated[:500], len(result.Obfuscated))
+		fmt.Fprintf(stdoutW, "  %s... (%d bytes)\n", result.Obfuscated[:500], len(result.Obfuscated))
 	} else {
-		fmt.Printf("  %s\n", result.Obfuscated)
+		fmt.Fprintf(stdoutW, "  %s\n", result.Obfuscated)
 	}
 
 	if result.Encoded {
-		fmt.Println("\n[*] Output is encoded")
+		fmt.Fprintln(stdoutW, "\n[*] Output is encoded")
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

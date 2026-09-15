@@ -435,43 +435,43 @@ func truncateSecret(s string) string {
 
 // DisplayContainerInfo displays container information
 func DisplayContainerInfo(info *ContainerInfo) {
-	fmt.Println("\n[CONTAINER DETECTION]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CONTAINER DETECTION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if !info.IsContainer {
-		fmt.Println("Not running inside a container")
+		fmt.Fprintln(stdoutW, "Not running inside a container")
 		return
 	}
 
-	fmt.Printf("Container Type:  %s\n", info.ContainerType)
-	fmt.Printf("Container ID:    %s\n", info.ContainerID)
-	fmt.Printf("Hostname:        %s\n", info.Hostname)
-	fmt.Printf("Privileged:      %v\n", info.Privileged)
+	fmt.Fprintf(stdoutW, "Container Type:  %s\n", info.ContainerType)
+	fmt.Fprintf(stdoutW, "Container ID:    %s\n", info.ContainerID)
+	fmt.Fprintf(stdoutW, "Hostname:        %s\n", info.Hostname)
+	fmt.Fprintf(stdoutW, "Privileged:      %v\n", info.Privileged)
 
 	if len(info.Capabilities) > 0 {
-		fmt.Println("\nCapabilities:")
+		fmt.Fprintln(stdoutW, "\nCapabilities:")
 		for _, cap := range info.Capabilities {
-			fmt.Printf("  %s\n", cap)
+			fmt.Fprintf(stdoutW, "  %s\n", cap)
 		}
 	}
 
 	if len(info.Environment) > 0 {
-		fmt.Println("\nContainer Environment Variables:")
+		fmt.Fprintln(stdoutW, "\nContainer Environment Variables:")
 		for k, v := range info.Environment {
-			fmt.Printf("  %s=%s\n", k, v)
+			fmt.Fprintf(stdoutW, "  %s=%s\n", k, v)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayEscapeVectors displays escape vectors
 func DisplayEscapeVectors(vectors []EscapeVector) {
-	fmt.Println("\n[CONTAINER ESCAPE VECTORS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CONTAINER ESCAPE VECTORS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(vectors) == 0 {
-		fmt.Println("No obvious escape vectors found")
+		fmt.Fprintln(stdoutW, "No obvious escape vectors found")
 		return
 	}
 
@@ -482,7 +482,7 @@ func DisplayEscapeVectors(vectors []EscapeVector) {
 		}
 	}
 
-	fmt.Printf("Found: %d vectors (%d exploitable)\n\n", len(vectors), exploitable)
+	fmt.Fprintf(stdoutW, "Found: %d vectors (%d exploitable)\n\n", len(vectors), exploitable)
 
 	for _, v := range vectors {
 		status := "INFO"
@@ -490,34 +490,34 @@ func DisplayEscapeVectors(vectors []EscapeVector) {
 			status = "VULNERABLE"
 		}
 
-		fmt.Printf("[%s] %s\n", status, v.Name)
-		fmt.Printf("  %s\n", v.Description)
+		fmt.Fprintf(stdoutW, "[%s] %s\n", status, v.Name)
+		fmt.Fprintf(stdoutW, "  %s\n", v.Description)
 		if v.CVE != "" {
-			fmt.Printf("  CVE: %s\n", v.CVE)
+			fmt.Fprintf(stdoutW, "  CVE: %s\n", v.CVE)
 		}
 		if v.Details != "" {
-			fmt.Printf("  Details: %s\n", v.Details)
+			fmt.Fprintf(stdoutW, "  Details: %s\n", v.Details)
 		}
-		fmt.Println()
+		fmt.Fprintln(stdoutW)
 	}
 }
 
 // DisplaySecrets displays found secrets
 func DisplaySecrets(findings []SecretFinding) {
-	fmt.Println("\n[CONTAINER SECRETS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CONTAINER SECRETS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(findings) == 0 {
-		fmt.Println("No secrets found")
+		fmt.Fprintln(stdoutW, "No secrets found")
 		return
 	}
 
-	fmt.Printf("Found: %d secrets\n\n", len(findings))
+	fmt.Fprintf(stdoutW, "Found: %d secrets\n\n", len(findings))
 
 	for _, f := range findings {
-		fmt.Printf("  [%s] %s\n", f.Type, f.Path)
-		fmt.Printf("    Value: %s\n", f.Content)
+		fmt.Fprintf(stdoutW, "  [%s] %s\n", f.Type, f.Path)
+		fmt.Fprintf(stdoutW, "    Value: %s\n", f.Content)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

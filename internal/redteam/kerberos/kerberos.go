@@ -212,61 +212,61 @@ func DecodeKirbiBase64(encoded string) ([]byte, error) {
 
 // DisplayTicket displays Kerberos ticket information
 func DisplayTicket(ticket *KerberosTicket) {
-	fmt.Printf("\n[KERBEROS TICKET]\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Type:       %s\n", ticket.Type)
-	fmt.Printf("Username:   %s\n", ticket.Username)
-	fmt.Printf("Domain:     %s\n", ticket.Domain)
+	fmt.Fprintf(stdoutW, "\n[KERBEROS TICKET]\n")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
+	fmt.Fprintf(stdoutW, "Type:       %s\n", ticket.Type)
+	fmt.Fprintf(stdoutW, "Username:   %s\n", ticket.Username)
+	fmt.Fprintf(stdoutW, "Domain:     %s\n", ticket.Domain)
 	if ticket.SPN != "" {
-		fmt.Printf("SPN:        %s\n", ticket.SPN)
+		fmt.Fprintf(stdoutW, "SPN:        %s\n", ticket.SPN)
 	}
 	if encName, ok := EncryptionTypes[ticket.EncType]; ok {
-		fmt.Printf("Encryption: %s (etype %d)\n", encName, ticket.EncType)
+		fmt.Fprintf(stdoutW, "Encryption: %s (etype %d)\n", encName, ticket.EncType)
 	} else {
-		fmt.Printf("Encryption: etype %d\n", ticket.EncType)
+		fmt.Fprintf(stdoutW, "Encryption: etype %d\n", ticket.EncType)
 	}
 
-	fmt.Println("\nHashcat format:")
-	fmt.Printf("  %s\n", FormatHashcat(ticket))
+	fmt.Fprintln(stdoutW, "\nHashcat format:")
+	fmt.Fprintf(stdoutW, "  %s\n", FormatHashcat(ticket))
 
-	fmt.Println("\nJohn format:")
-	fmt.Printf("  %s\n", FormatJohn(ticket))
+	fmt.Fprintln(stdoutW, "\nJohn format:")
+	fmt.Fprintf(stdoutW, "  %s\n", FormatJohn(ticket))
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayKerberoastHelp displays Kerberoasting help
 func DisplayKerberoastHelp(domain, dc string) {
-	fmt.Println("\n[KERBEROAST COMMANDS]")
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Fprintln(stdoutW, "\n[KERBEROAST COMMANDS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
 
 	tools := []string{"impacket", "rubeus", "powerview"}
 	for _, tool := range tools {
 		cmd := GenerateKerberoastCommand(domain, "<user>", "<pass>", dc, tool)
-		fmt.Printf("\n%s:\n  %s\n", tool, cmd)
+		fmt.Fprintf(stdoutW, "\n%s:\n  %s\n", tool, cmd)
 	}
 
-	fmt.Println("\nCracking:")
-	fmt.Println("  hashcat -m 13100 hashes.txt wordlist.txt")
-	fmt.Println("  john --format=krb5tgs hashes.txt --wordlist=wordlist.txt")
+	fmt.Fprintln(stdoutW, "\nCracking:")
+	fmt.Fprintln(stdoutW, "  hashcat -m 13100 hashes.txt wordlist.txt")
+	fmt.Fprintln(stdoutW, "  john --format=krb5tgs hashes.txt --wordlist=wordlist.txt")
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayASREPHelp displays AS-REP roasting help
 func DisplayASREPHelp(domain, dc string) {
-	fmt.Println("\n[AS-REP ROAST COMMANDS]")
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Fprintln(stdoutW, "\n[AS-REP ROAST COMMANDS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
 
 	tools := []string{"impacket", "rubeus", "powerview"}
 	for _, tool := range tools {
 		cmd := GenerateASREPRoastCommand(domain, "users.txt", dc, tool)
-		fmt.Printf("\n%s:\n  %s\n", tool, cmd)
+		fmt.Fprintf(stdoutW, "\n%s:\n  %s\n", tool, cmd)
 	}
 
-	fmt.Println("\nCracking:")
-	fmt.Println("  hashcat -m 18200 hashes.txt wordlist.txt")
-	fmt.Println("  john --format=krb5asrep hashes.txt --wordlist=wordlist.txt")
+	fmt.Fprintln(stdoutW, "\nCracking:")
+	fmt.Fprintln(stdoutW, "  hashcat -m 18200 hashes.txt wordlist.txt")
+	fmt.Fprintln(stdoutW, "  john --format=krb5asrep hashes.txt --wordlist=wordlist.txt")
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

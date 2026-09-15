@@ -587,88 +587,88 @@ func truncateString(s string, max int) string {
 
 // DisplayCookieInfo displays parsed cookie information
 func DisplayCookieInfo(cookie *CookieInfo) {
-	fmt.Println("\n[COOKIE ANALYSIS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[COOKIE ANALYSIS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("Name: %s\n", cookie.Name)
-	fmt.Printf("Value: %s\n", truncateString(cookie.Value, 60))
+	fmt.Fprintf(stdoutW, "Name: %s\n", cookie.Name)
+	fmt.Fprintf(stdoutW, "Value: %s\n", truncateString(cookie.Value, 60))
 
 	if cookie.DecodedVal != cookie.Value {
-		fmt.Printf("\n[Decoded Value]\n")
-		fmt.Printf("Encoding: %s\n", cookie.Encoding)
-		fmt.Printf("Decoded: %s\n", truncateString(cookie.DecodedVal, 100))
+		fmt.Fprintf(stdoutW, "\n[Decoded Value]\n")
+		fmt.Fprintf(stdoutW, "Encoding: %s\n", cookie.Encoding)
+		fmt.Fprintf(stdoutW, "Decoded: %s\n", truncateString(cookie.DecodedVal, 100))
 	}
 
-	fmt.Printf("\n[Attributes]\n")
+	fmt.Fprintf(stdoutW, "\n[Attributes]\n")
 	if cookie.Domain != "" {
-		fmt.Printf("  Domain: %s\n", cookie.Domain)
+		fmt.Fprintf(stdoutW, "  Domain: %s\n", cookie.Domain)
 	}
 	if cookie.Path != "" {
-		fmt.Printf("  Path: %s\n", cookie.Path)
+		fmt.Fprintf(stdoutW, "  Path: %s\n", cookie.Path)
 	}
 	if !cookie.Expires.IsZero() {
-		fmt.Printf("  Expires: %s\n", cookie.Expires.Format(time.RFC1123))
+		fmt.Fprintf(stdoutW, "  Expires: %s\n", cookie.Expires.Format(time.RFC1123))
 	}
 	if cookie.MaxAge > 0 {
-		fmt.Printf("  Max-Age: %d seconds\n", cookie.MaxAge)
+		fmt.Fprintf(stdoutW, "  Max-Age: %d seconds\n", cookie.MaxAge)
 	}
-	fmt.Printf("  Secure: %t\n", cookie.Secure)
-	fmt.Printf("  HttpOnly: %t\n", cookie.HttpOnly)
+	fmt.Fprintf(stdoutW, "  Secure: %t\n", cookie.Secure)
+	fmt.Fprintf(stdoutW, "  HttpOnly: %t\n", cookie.HttpOnly)
 	if cookie.SameSite != "" {
-		fmt.Printf("  SameSite: %s\n", cookie.SameSite)
+		fmt.Fprintf(stdoutW, "  SameSite: %s\n", cookie.SameSite)
 	}
 
 	if len(cookie.Issues) > 0 {
-		fmt.Printf("\n[Security Issues]\n")
+		fmt.Fprintf(stdoutW, "\n[Security Issues]\n")
 		for _, issue := range cookie.Issues {
-			fmt.Printf("  [%s] %s\n", issue.Severity, issue.Title)
-			fmt.Printf("    %s\n", issue.Description)
+			fmt.Fprintf(stdoutW, "  [%s] %s\n", issue.Severity, issue.Title)
+			fmt.Fprintf(stdoutW, "    %s\n", issue.Description)
 		}
 	}
 }
 
 // DisplayDecodedCookie displays decoded cookie information
 func DisplayDecodedCookie(decoded *DecodedCookie) {
-	fmt.Println("\n[DECODED COOKIE]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[DECODED COOKIE]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
-	fmt.Printf("Original: %s\n", truncateString(decoded.Original, 60))
-	fmt.Printf("Encoding: %s\n", decoded.Encoding)
-	fmt.Printf("Session Type: %s\n", decoded.SessionType)
+	fmt.Fprintf(stdoutW, "Original: %s\n", truncateString(decoded.Original, 60))
+	fmt.Fprintf(stdoutW, "Encoding: %s\n", decoded.Encoding)
+	fmt.Fprintf(stdoutW, "Session Type: %s\n", decoded.SessionType)
 
 	if decoded.IsJSON {
-		fmt.Printf("\n[JSON Data]\n")
+		fmt.Fprintf(stdoutW, "\n[JSON Data]\n")
 		formatted, _ := json.MarshalIndent(decoded.JSONData, "", "  ")
-		fmt.Println(string(formatted))
+		fmt.Fprintln(stdoutW, string(formatted))
 	} else {
-		fmt.Printf("\nDecoded: %s\n", decoded.Decoded)
+		fmt.Fprintf(stdoutW, "\nDecoded: %s\n", decoded.Decoded)
 	}
 
 	if len(decoded.Sensitive) > 0 {
-		fmt.Printf("\n[Sensitive Data Detected]\n")
+		fmt.Fprintf(stdoutW, "\n[Sensitive Data Detected]\n")
 		for _, s := range decoded.Sensitive {
-			fmt.Printf("  [%s] %s: %s\n", s.Risk, s.Type, s.Value)
+			fmt.Fprintf(stdoutW, "  [%s] %s: %s\n", s.Risk, s.Type, s.Value)
 		}
 	}
 }
 
 // DisplayFlaskSession displays Flask session information
 func DisplayFlaskSession(session *FlaskSession) {
-	fmt.Println("\n[FLASK SESSION]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[FLASK SESSION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if !session.Timestamp.IsZero() {
-		fmt.Printf("Timestamp: %s\n", session.Timestamp.Format(time.RFC3339))
+		fmt.Fprintf(stdoutW, "Timestamp: %s\n", session.Timestamp.Format(time.RFC3339))
 	}
 
 	if session.Signature != "" {
-		fmt.Printf("Signature: %s\n", truncateString(session.Signature, 40))
+		fmt.Fprintf(stdoutW, "Signature: %s\n", truncateString(session.Signature, 40))
 		if session.Valid {
-			fmt.Println("Signature: VALID")
+			fmt.Fprintln(stdoutW, "Signature: VALID")
 		}
 	}
 
-	fmt.Printf("\n[Payload]\n")
+	fmt.Fprintf(stdoutW, "\n[Payload]\n")
 	formatted, _ := json.MarshalIndent(session.Payload, "", "  ")
-	fmt.Println(string(formatted))
+	fmt.Fprintln(stdoutW, string(formatted))
 }

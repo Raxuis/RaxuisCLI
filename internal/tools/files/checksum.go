@@ -57,7 +57,7 @@ func Checksum(paths []string, opts ChecksumOptions) error {
 				return err
 			}
 		} else {
-			fmt.Printf("%s  %s\n", result.Checksum, result.Path)
+			fmt.Fprintf(stdoutW, "%s  %s\n", result.Checksum, result.Path)
 		}
 	}
 
@@ -131,7 +131,7 @@ func calculateChecksum(path string, algorithm string) (string, error) {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", path, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", path, err)
 		}
 	}(file)
 
@@ -170,7 +170,7 @@ func saveChecksums(results []ChecksumResult, outputPath string) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", outputPath, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", outputPath, err)
 		}
 	}(file)
 
@@ -178,7 +178,7 @@ func saveChecksums(results []ChecksumResult, outputPath string) error {
 	defer func(writer *bufio.Writer) {
 		err := writer.Flush()
 		if err != nil {
-			fmt.Printf("Error flushing to file %s: %v\n", outputPath, err)
+			fmt.Fprintf(stdoutW, "Error flushing to file %s: %v\n", outputPath, err)
 		}
 	}(writer)
 
@@ -191,7 +191,7 @@ func saveChecksums(results []ChecksumResult, outputPath string) error {
 		}
 	}
 
-	fmt.Printf("Checksums saved to: %s\n", outputPath)
+	fmt.Fprintf(stdoutW, "Checksums saved to: %s\n", outputPath)
 	return nil
 }
 
@@ -204,7 +204,7 @@ func verifyChecksums(manifestPath string) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("Error closing file %s: %v\n", manifestPath, err)
+			fmt.Fprintf(stdoutW, "Error closing file %s: %v\n", manifestPath, err)
 		}
 	}(file)
 
@@ -257,10 +257,10 @@ func verifyChecksums(manifestPath string) error {
 
 		// Comparer
 		if actualChecksum == expectedChecksum {
-			fmt.Printf("%s: OK\n", filePath)
+			fmt.Fprintf(stdoutW, "%s: OK\n", filePath)
 			verified++
 		} else {
-			fmt.Printf("%s: FAILED\n", filePath)
+			fmt.Fprintf(stdoutW, "%s: FAILED\n", filePath)
 			failed++
 		}
 	}
@@ -269,7 +269,7 @@ func verifyChecksums(manifestPath string) error {
 		return err
 	}
 
-	fmt.Printf("\nTotal: %d verified, %d failed\n", verified, failed)
+	fmt.Fprintf(stdoutW, "\nTotal: %d verified, %d failed\n", verified, failed)
 
 	if failed > 0 {
 		return fmt.Errorf("%d file(s) failed verification", failed)

@@ -256,8 +256,8 @@ func BuildLLMNRResponse(transactionID []byte, queryName string, spoofIP string) 
 
 // DisplayProtocols displays available poisoning protocols
 func DisplayProtocols() {
-	fmt.Println("\n[NETWORK POISONING PROTOCOLS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[NETWORK POISONING PROTOCOLS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for pType, info := range Protocols {
 		detectStr := "Yes"
@@ -265,42 +265,42 @@ func DisplayProtocols() {
 			detectStr = "No"
 		}
 
-		fmt.Printf("\n%s (%s)\n", info.Name, pType)
-		fmt.Printf("  Port:       %d\n", info.Port)
-		fmt.Printf("  Detectable: %s\n", detectStr)
-		fmt.Printf("  %s\n", info.Description)
+		fmt.Fprintf(stdoutW, "\n%s (%s)\n", info.Name, pType)
+		fmt.Fprintf(stdoutW, "  Port:       %d\n", info.Port)
+		fmt.Fprintf(stdoutW, "  Detectable: %s\n", detectStr)
+		fmt.Fprintf(stdoutW, "  %s\n", info.Description)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayAnalysis displays network analysis results
 func DisplayAnalysis(findings []string) {
-	fmt.Println("\n[NETWORK ANALYSIS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[NETWORK ANALYSIS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for _, finding := range findings {
-		fmt.Println(finding)
+		fmt.Fprintln(stdoutW, finding)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayCommands displays poisoning commands
 func DisplayCommands(poisonType PoisonType, iface string) {
-	fmt.Printf("\n[%s POISONING COMMANDS]\n", strings.ToUpper(string(poisonType)))
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintf(stdoutW, "\n[%s POISONING COMMANDS]\n", strings.ToUpper(string(poisonType)))
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	switch poisonType {
 	case LLMNR, MDNS, NBT_NS:
-		fmt.Println("\n# Using Responder (recommended)")
-		fmt.Println(GenerateResponderCommand(iface, map[string]bool{
+		fmt.Fprintln(stdoutW, "\n# Using Responder (recommended)")
+		fmt.Fprintln(stdoutW, GenerateResponderCommand(iface, map[string]bool{
 			"analyze": false,
 			"wpad":    true,
 			"smb":     true,
 		}))
 
-		fmt.Println("\n# Using Bettercap")
+		fmt.Fprintln(stdoutW, "\n# Using Bettercap")
 		modules := []string{
 			"net.probe on",
 			"net.sniff on",
@@ -308,38 +308,38 @@ func DisplayCommands(poisonType PoisonType, iface string) {
 		if poisonType == LLMNR {
 			modules = append(modules, "net.recon on")
 		}
-		fmt.Println(GenerateBettercapCommand(iface, modules))
+		fmt.Fprintln(stdoutW, GenerateBettercapCommand(iface, modules))
 
 	case ARP:
 		for _, line := range GetARPPoisonCommand("<target>", "<gateway>", iface) {
-			fmt.Println(line)
+			fmt.Fprintln(stdoutW, line)
 		}
 
 	case DHCP:
 		for _, line := range GetDHCPPoisonInfo() {
-			fmt.Println(line)
+			fmt.Fprintln(stdoutW, line)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayCapturedHashes displays captured hashes
 func DisplayCapturedHashes(hashes []CapturedHash) {
-	fmt.Println("\n[CAPTURED HASHES]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[CAPTURED HASHES]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(hashes) == 0 {
-		fmt.Println("No hashes captured")
+		fmt.Fprintln(stdoutW, "No hashes captured")
 		return
 	}
 
 	for _, h := range hashes {
-		fmt.Printf("\n[%s] %s\\%s\n", h.Protocol, h.Domain, h.Username)
-		fmt.Printf("  Source: %s\n", h.SourceIP)
-		fmt.Printf("  Time:   %s\n", h.Timestamp.Format(time.RFC3339))
-		fmt.Printf("  Hash:   %s\n", h.Hash)
+		fmt.Fprintf(stdoutW, "\n[%s] %s\\%s\n", h.Protocol, h.Domain, h.Username)
+		fmt.Fprintf(stdoutW, "  Source: %s\n", h.SourceIP)
+		fmt.Fprintf(stdoutW, "  Time:   %s\n", h.Timestamp.Format(time.RFC3339))
+		fmt.Fprintf(stdoutW, "  Hash:   %s\n", h.Hash)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

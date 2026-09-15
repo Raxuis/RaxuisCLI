@@ -363,36 +363,36 @@ func checkMacOSPersistence() []string {
 
 // DisplayTechniques displays persistence techniques
 func DisplayTechniques(techniques []TechniqueInfo, detailed bool) {
-	fmt.Println("\n[PERSISTENCE TECHNIQUES]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[PERSISTENCE TECHNIQUES]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	for i, tech := range techniques {
-		fmt.Printf("\n%d. %s [%s] [%s]\n", i+1, tech.Name, tech.Privilege, tech.Stealth)
-		fmt.Printf("   OS: %s\n", tech.OS)
-		fmt.Printf("   %s\n", tech.Description)
+		fmt.Fprintf(stdoutW, "\n%d. %s [%s] [%s]\n", i+1, tech.Name, tech.Privilege, tech.Stealth)
+		fmt.Fprintf(stdoutW, "   OS: %s\n", tech.OS)
+		fmt.Fprintf(stdoutW, "   %s\n", tech.Description)
 
 		if detailed {
-			fmt.Printf("\n   Syntax:\n   %s\n", tech.Syntax)
-			fmt.Printf("\n   Example:\n   %s\n", tech.Example)
+			fmt.Fprintf(stdoutW, "\n   Syntax:\n   %s\n", tech.Syntax)
+			fmt.Fprintf(stdoutW, "\n   Example:\n   %s\n", tech.Example)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayExistingPersistence displays existing persistence findings
 func DisplayExistingPersistence(findings []string) {
-	fmt.Println("\n[EXISTING PERSISTENCE]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[EXISTING PERSISTENCE]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(findings) == 0 {
-		fmt.Println("No obvious persistence mechanisms found")
+		fmt.Fprintln(stdoutW, "No obvious persistence mechanisms found")
 		return
 	}
 
 	for _, finding := range findings {
-		fmt.Printf("  [!] %s\n", finding)
+		fmt.Fprintf(stdoutW, "  [!] %s\n", finding)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

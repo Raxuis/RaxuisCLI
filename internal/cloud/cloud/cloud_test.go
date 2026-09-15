@@ -18,9 +18,11 @@ func captureCloudStdout(t *testing.T, fn func()) string {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
 	os.Stdout = w
+	stdoutW = w
 	fn()
 	w.Close()
 	os.Stdout = orig
+	stdoutW = orig
 	var buf bytes.Buffer
 	io.Copy(&buf, r)
 	return buf.String()

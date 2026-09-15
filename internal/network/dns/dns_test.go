@@ -419,7 +419,8 @@ func TestDisplayFunctions(t *testing.T) {
 	orig := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
-	defer func() { os.Stdout = orig }()
+	stdoutW = w
+	defer func() { os.Stdout = orig; stdoutW = orig }()
 	go io.Copy(io.Discard, r)
 
 	DisplayLookupResults([]LookupResult{

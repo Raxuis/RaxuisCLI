@@ -337,53 +337,53 @@ func GenerateKubectlCommands(info *K8sInfo) []string {
 
 // DisplayK8sInfo displays Kubernetes info
 func DisplayK8sInfo(info *K8sInfo) {
-	fmt.Println("\n[KUBERNETES DETECTION]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[KUBERNETES DETECTION]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if !info.InCluster {
-		fmt.Println("Not running inside Kubernetes")
+		fmt.Fprintln(stdoutW, "Not running inside Kubernetes")
 		return
 	}
 
-	fmt.Println("Running inside Kubernetes cluster!")
-	fmt.Printf("Namespace:   %s\n", info.Namespace)
-	fmt.Printf("API Server:  %s\n", info.APIServer)
+	fmt.Fprintln(stdoutW, "Running inside Kubernetes cluster!")
+	fmt.Fprintf(stdoutW, "Namespace:   %s\n", info.Namespace)
+	fmt.Fprintf(stdoutW, "API Server:  %s\n", info.APIServer)
 
 	if info.Token != "" {
-		fmt.Printf("Token:       %s...%s (%d chars)\n",
+		fmt.Fprintf(stdoutW, "Token:       %s...%s (%d chars)\n",
 			info.Token[:20], info.Token[len(info.Token)-10:], len(info.Token))
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplaySecrets displays Kubernetes secrets
 func DisplaySecrets(secrets []SecretEntry) {
-	fmt.Println("\n[KUBERNETES SECRETS]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[KUBERNETES SECRETS]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(secrets) == 0 {
-		fmt.Println("No accessible secrets found")
+		fmt.Fprintln(stdoutW, "No accessible secrets found")
 		return
 	}
 
-	fmt.Printf("Found: %d secrets\n\n", len(secrets))
+	fmt.Fprintf(stdoutW, "Found: %d secrets\n\n", len(secrets))
 
 	for _, s := range secrets {
-		fmt.Printf("  %s/%s [%s]\n", s.Namespace, s.Name, s.Type)
-		fmt.Printf("    Keys: %s\n", strings.Join(s.Keys, ", "))
+		fmt.Fprintf(stdoutW, "  %s/%s [%s]\n", s.Namespace, s.Name, s.Type)
+		fmt.Fprintf(stdoutW, "    Keys: %s\n", strings.Join(s.Keys, ", "))
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }
 
 // DisplayVulnerabilities displays K8s vulnerabilities
 func DisplayVulnerabilities(vulns []K8sVulnerability) {
-	fmt.Println("\n[KUBERNETES VULNERABILITIES]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[KUBERNETES VULNERABILITIES]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(vulns) == 0 {
-		fmt.Println("No vulnerabilities found")
+		fmt.Fprintln(stdoutW, "No vulnerabilities found")
 		return
 	}
 
@@ -394,32 +394,32 @@ func DisplayVulnerabilities(vulns []K8sVulnerability) {
 		}
 	}
 
-	fmt.Printf("Found: %d issues (%d exploitable)\n\n", len(vulns), exploitable)
+	fmt.Fprintf(stdoutW, "Found: %d issues (%d exploitable)\n\n", len(vulns), exploitable)
 
 	for _, v := range vulns {
-		fmt.Printf("[%s] %s\n", v.Severity, v.Name)
-		fmt.Printf("  %s\n", v.Description)
+		fmt.Fprintf(stdoutW, "[%s] %s\n", v.Severity, v.Name)
+		fmt.Fprintf(stdoutW, "  %s\n", v.Description)
 		if v.Details != "" {
-			fmt.Printf("  Details: %s\n", v.Details)
+			fmt.Fprintf(stdoutW, "  Details: %s\n", v.Details)
 		}
-		fmt.Println()
+		fmt.Fprintln(stdoutW)
 	}
 }
 
 // DisplayRBAC displays RBAC permissions
 func DisplayRBAC(rbac []RBACInfo) {
-	fmt.Println("\n[KUBERNETES RBAC]")
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Fprintln(stdoutW, "\n[KUBERNETES RBAC]")
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 60))
 
 	if len(rbac) == 0 {
-		fmt.Println("No accessible resources found")
+		fmt.Fprintln(stdoutW, "No accessible resources found")
 		return
 	}
 
-	fmt.Println("Accessible resources:")
+	fmt.Fprintln(stdoutW, "Accessible resources:")
 	for _, r := range rbac {
-		fmt.Printf("  %s: %v\n", r.Resources[0], r.Verbs)
+		fmt.Fprintf(stdoutW, "  %s: %v\n", r.Resources[0], r.Verbs)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(stdoutW)
 }

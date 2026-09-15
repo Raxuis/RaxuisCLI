@@ -370,10 +370,10 @@ func SimpleChecksum(data []byte) uint32 {
 
 // DisplayTunnelInfo displays tunnel information
 func DisplayTunnelInfo(tunnelType TunnelType, local, remote string) {
-	fmt.Printf("\n[TUNNEL] %s\n", strings.ToUpper(string(tunnelType)))
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Type:   %s\n", tunnelType)
-	fmt.Printf("Local:  %s\n", local)
-	fmt.Printf("Remote: %s\n", remote)
-	fmt.Println()
+	fmt.Fprintf(stdoutW, "\n[TUNNEL] %s\n", strings.ToUpper(string(tunnelType)))
+	fmt.Fprintln(stdoutW, strings.Repeat("=", 50))
+	fmt.Fprintf(stdoutW, "Type:   %s\n", tunnelType)
+	fmt.Fprintf(stdoutW, "Local:  %s\n", local)
+	fmt.Fprintf(stdoutW, "Remote: %s\n", remote)
+	fmt.Fprintln(stdoutW)
 }
