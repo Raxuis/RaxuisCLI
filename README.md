@@ -196,9 +196,19 @@ Keyboard controls:
 | `q` | Quit |
 
 Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
-`TERM=dumb`, and non-terminal output all fall back to plain text. A capture of
-the home screen and a demo result is in
-[`docs/assets/interactive.txt`](docs/assets/interactive.txt).
+`TERM=dumb`, and non-terminal output all fall back to plain text.
+
+### Visual Preview
+
+![RaxuisCLI Interactive TUI - Home Screen](docs/assets/interactive.png)
+
+**Features:**
+- **Keyboard-first navigation** — Pure terminal UI, no mouse required
+- **Live audit forms** — Enter URL, cookies, select output format
+- **Review before running** — See the exact command with masked secrets
+- **Colorized results** — Passive audit findings with maturity/safety badges
+- **Report comparison** — Diff two audit snapshots to track regressions
+- **Command browser** — Search and explore the full command catalog
 
 ---
 
