@@ -193,6 +193,7 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli smb scan` | Scan SMB service | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli smb shares` | Enumerate SMB shares | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli strings` | Extract printable strings from files | utilities | `experimental` | `safe` | no |
+| `raxuiscli tlsscan` | Audit a server's TLS/SSL posture | cryptography | `experimental` | `active` | no |
 | `raxuiscli todo` | Manage your todo list | utilities | `experimental` | `safe` | no |
 | `raxuiscli todo add` | Add a new todo item | utilities | `experimental` | `safe` | no |
 | `raxuiscli todo complete` | Mark a todo item as complete | utilities | `experimental` | `safe` | no |

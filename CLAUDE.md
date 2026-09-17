@@ -311,6 +311,17 @@ raxuiscli certinfo san example.com                # Extract SANs
 raxuiscli certinfo compare site1.com site2.com    # Compare certificates
 ```
 
+#### `tlsscan` - TLS/SSL Posture Audit
+Assess a server's TLS configuration (protocols, cipher suites, certificate) and
+grade it. Passive: only ordinary handshakes. Findings carry a severity.
+
+```bash
+raxuiscli tlsscan example.com                     # Audit TLS posture (port 443)
+raxuiscli tlsscan example.com:8443                # Custom port
+raxuiscli tlsscan example.com --output json       # Machine-readable findings
+raxuiscli tlsscan example.com --timeout 5         # Per-connection timeout
+```
+
 ---
 
 ### Active Directory / LDAP

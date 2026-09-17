@@ -232,6 +232,7 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli smb scan", Summary: "Scan SMB service"},
 	{Path: "raxuiscli smb shares", Summary: "Enumerate SMB shares"},
 	{Path: "raxuiscli strings", Summary: "Extract printable strings from files"},
+	{Path: "raxuiscli tlsscan", Summary: "Audit a server's TLS/SSL posture"},
 	{Path: "raxuiscli todo", Summary: "Manage your todo list"},
 	{Path: "raxuiscli todo add", Summary: "Add a new todo item"},
 	{Path: "raxuiscli todo complete", Summary: "Mark a todo item as complete"},
@@ -300,7 +301,7 @@ func categoryFor(path string) string {
 		return "audit & reporting"
 	case "dns", "recon", "whois":
 		return "network"
-	case "certinfo", "cipher", "jwt", "keygen":
+	case "certinfo", "cipher", "jwt", "keygen", "tlsscan":
 		return "cryptography"
 	case "cloud", "container", "k8s":
 		return "infrastructure"
@@ -389,6 +390,7 @@ func safetyFor(path string) SafetyLevel {
 		"raxuiscli cloud", "raxuiscli container", "raxuiscli k8s", "raxuiscli ports",
 		"raxuiscli http post", "raxuiscli http put", "raxuiscli http delete",
 		"raxuiscli http options", "raxuiscli jwt none-attack",
+		"raxuiscli tlsscan",
 	}
 	if hasPrefix(path, activePrefixes) {
 		return SafetyActive

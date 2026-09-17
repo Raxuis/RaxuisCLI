@@ -485,6 +485,31 @@ raxuiscli certinfo compare site1.com site2.com
 - Domain discovery via SANs
 - Audit of expired or misconfigured certificates
 
+#### `tlsscan` - TLS/SSL Posture Audit
+Assesses a server's TLS configuration and grades it. Probes supported protocol
+versions (TLS 1.0-1.3), enumerates accepted cipher suites and their weaknesses
+(RC4, 3DES, CBC, missing forward secrecy), and checks certificate health
+(expiry, self-signed, weak signature or key, hostname match). Each issue is
+reported as a severity-rated finding. It performs only ordinary handshakes, so
+it is safe to run against systems you are authorized to test.
+
+```bash
+# Scan a host (defaults to port 443)
+raxuiscli tlsscan example.com
+raxuiscli tlsscan example.com:8443
+
+# Machine-readable findings for CI / pipelines
+raxuiscli tlsscan example.com --output json
+
+# Custom per-connection timeout
+raxuiscli tlsscan example.com --timeout 5
+```
+
+**Use cases:**
+- Detect deprecated protocols (TLS 1.0/1.1) and weak cipher suites
+- Flag SWEET32 (3DES), RC4, and no-forward-secrecy exposure
+- Gate a CI pipeline on TLS posture using `--output json`
+
 ---
 
 ### Active Directory
@@ -1201,7 +1226,7 @@ This table is generated from the command catalog. `stable` means the implementat
 |---|---:|---:|---:|---:|
 | audit & reporting | 6 | 0 | 0 | 6 |
 | core | 7 | 0 | 0 | 7 |
-| cryptography | 0 | 30 | 0 | 30 |
+| cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |
 | network | 0 | 7 | 0 | 7 |
 | offensive security | 0 | 57 | 14 | 71 |
