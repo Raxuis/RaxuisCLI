@@ -2,14 +2,24 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/network/dns"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 
 	"github.com/spf13/cobra"
 )
+
+// errString renders an error as a JSON-friendly string (empty when nil).
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
 
 var dnsNameserver string
 var dnsTimeout int
@@ -58,7 +68,28 @@ Examples:
 		}
 
 		results := dns.Lookup(opts)
-		dns.DisplayLookupResults(results)
+
+		type recordOut struct {
+			Domain     string   `json:"domain"`
+			RecordType string   `json:"record_type"`
+			Records    []string `json:"records"`
+			TTL        uint32   `json:"ttl"`
+			Error      string   `json:"error,omitempty"`
+		}
+		view := make([]recordOut, 0, len(results))
+		for _, r := range results {
+			view = append(view, recordOut{
+				Domain:     r.Domain,
+				RecordType: string(r.RecordType),
+				Records:    r.Records,
+				TTL:        r.TTL,
+				Error:      errString(r.Error),
+			})
+		}
+
+		_ = output.Emit(map[string]any{"domain": domain, "results": view}, func(_ io.Writer) {
+			dns.DisplayLookupResults(results)
+		})
 	},
 }
 
@@ -75,7 +106,17 @@ Examples:
 		ip := args[0]
 
 		result := dns.ReverseLookup(ip, dnsNameserver, dnsTimeout)
-		dns.DisplayReverseResult(result)
+
+		payload := map[string]any{
+			"ip":       result.IP,
+			"hostname": result.Hostname,
+		}
+		if msg := errString(result.Error); msg != "" {
+			payload["error"] = msg
+		}
+		_ = output.Emit(payload, func(_ io.Writer) {
+			dns.DisplayReverseResult(result)
+		})
 	},
 }
 

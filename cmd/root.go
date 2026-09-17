@@ -37,12 +37,14 @@ func newRootCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := OptionsFromCommand(cmd); err != nil {
+			options, err := OptionsFromCommand(cmd)
+			if err != nil {
 				return err
 			}
 			// Route command text output through the command's writer so it is
 			// redirectable and capturable instead of hard-wired to os.Stdout.
 			output.Set(cmd.OutOrStdout())
+			output.SetFormat(options.Output)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

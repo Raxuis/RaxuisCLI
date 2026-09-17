@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Raxuis/RaxuisCLI/internal/crypto/jwt"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 )
 
 var jwtCmd = &cobra.Command{
@@ -56,12 +58,34 @@ Examples:
 			return
 		}
 
-		jwt.DisplayJWT(decoded)
-
-		if checkVulns {
-			vulns := jwt.CheckVulnerabilities(decoded)
-			jwt.DisplayVulnerabilities(vulns)
+		payload := map[string]any{
+			"algorithm": decoded.Algorithm,
+			"header":    decoded.Header,
+			"payload":   decoded.Payload,
+			"signature": decoded.Signature,
 		}
+
+		var vulns []jwt.VulnerabilityCheck
+		if checkVulns {
+			vulns = jwt.CheckVulnerabilities(decoded)
+			view := make([]map[string]any, 0, len(vulns))
+			for _, v := range vulns {
+				view = append(view, map[string]any{
+					"name":        v.Name,
+					"vulnerable":  v.Vulnerable,
+					"description": v.Description,
+					"severity":    v.Severity,
+				})
+			}
+			payload["vulnerabilities"] = view
+		}
+
+		_ = output.Emit(payload, func(_ io.Writer) {
+			jwt.DisplayJWT(decoded)
+			if checkVulns {
+				jwt.DisplayVulnerabilities(vulns)
+			}
+		})
 	},
 }
 

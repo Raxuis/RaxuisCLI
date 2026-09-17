@@ -2,10 +2,12 @@ package tools
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/hash"
 
 	"github.com/spf13/cobra"
@@ -32,7 +34,7 @@ Examples:
   raxuiscli hash /path/to/file --file
   raxuiscli hash /path/to/file --file --algo sha256`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		input := strings.Join(args, " ")
 
 		// If no algorithm specified, show all hashes
@@ -43,11 +45,25 @@ Examples:
 				os.Exit(1)
 			}
 
-			fmt.Println("Hash results:")
-			fmt.Println(strings.Repeat("-", 80))
+			hashes := make(map[string]string, len(results))
 			for algo, hashStr := range results {
-				fmt.Printf("%-8s: %s\n", algo, hashStr)
+				hashes[string(algo)] = hashStr
 			}
+
+			payload := map[string]any{
+				"input":  input,
+				"file":   hashFile,
+				"hashes": hashes,
+			}
+			_ = output.Emit(payload, func(w io.Writer) {
+				fmt.Fprintln(w, "Hash results:")
+				fmt.Fprintln(w, strings.Repeat("-", 80))
+				for _, algo := range hash.GetSupportedAlgorithms() {
+					if h, ok := hashes[string(algo)]; ok {
+						fmt.Fprintf(w, "%-8s: %s\n", algo, h)
+					}
+				}
+			})
 			return
 		}
 
@@ -57,7 +73,15 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Println(result.Hash)
+		payload := map[string]any{
+			"input":     result.Input,
+			"file":      result.IsFile,
+			"algorithm": string(result.Algorithm),
+			"hash":      result.Hash,
+		}
+		_ = output.Emit(payload, func(w io.Writer) {
+			fmt.Fprintln(w, result.Hash)
+		})
 	},
 }
 
@@ -70,27 +94,33 @@ Examples:
   raxuiscli hash identify "5d41402abc4b2a76b9719d911017c592"
   raxuiscli hash identify "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		hashStr := args[0]
+	Run: func(_ *cobra.Command, args []string) {
+		result := hash.Identify(args[0])
 
-		result := hash.Identify(hashStr)
-
-		fmt.Println("Hash Analysis:")
-		fmt.Println(strings.Repeat("-", 50))
-		fmt.Printf("Hash:   %s\n", result.Hash)
-		fmt.Printf("Length: %d characters\n", result.Length)
-
-		if len(result.Algorithms) == 0 {
-			fmt.Println("Type:   Unknown or invalid hash format")
-		} else if len(result.Algorithms) == 1 {
-			fmt.Printf("Type:   %s\n", result.Algorithms[0])
-		} else {
-			algos := make([]string, len(result.Algorithms))
-			for i, a := range result.Algorithms {
-				algos[i] = string(a)
-			}
-			fmt.Printf("Type:   %s (possible matches)\n", strings.Join(algos, " or "))
+		algos := make([]string, len(result.Algorithms))
+		for i, a := range result.Algorithms {
+			algos[i] = string(a)
 		}
+
+		payload := map[string]any{
+			"hash":       result.Hash,
+			"length":     result.Length,
+			"algorithms": algos,
+		}
+		_ = output.Emit(payload, func(w io.Writer) {
+			fmt.Fprintln(w, "Hash Analysis:")
+			fmt.Fprintln(w, strings.Repeat("-", 50))
+			fmt.Fprintf(w, "Hash:   %s\n", result.Hash)
+			fmt.Fprintf(w, "Length: %d characters\n", result.Length)
+			switch len(result.Algorithms) {
+			case 0:
+				fmt.Fprintln(w, "Type:   Unknown or invalid hash format")
+			case 1:
+				fmt.Fprintf(w, "Type:   %s\n", result.Algorithms[0])
+			default:
+				fmt.Fprintf(w, "Type:   %s (possible matches)\n", strings.Join(algos, " or "))
+			}
+		})
 	},
 }
 
@@ -105,7 +135,7 @@ Examples:
   raxuiscli hash crack "5d41402abc4b2a76b9719d911017c592" --algo md5 --wordlist /usr/share/wordlists/rockyou.txt
   raxuiscli hash crack "5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8" --algo sha1 --wordlist wordlist.txt`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		hashStr := args[0]
 
 		if hashWordlist == "" {
@@ -122,35 +152,51 @@ Examples:
 				os.Exit(1)
 			}
 			algo = identified.Algorithms[0]
-			fmt.Printf("Detected hash type: %s\n", algo)
+			if !output.JSON() {
+				fmt.Printf("Detected hash type: %s\n", algo)
+			}
 		}
 
-		fmt.Printf("Cracking %s hash...\n", algo)
-		fmt.Printf("Wordlist: %s\n", hashWordlist)
-		fmt.Println(strings.Repeat("-", 50))
+		// Progress and status lines are noise for machine consumers.
+		progress := func(attempts int) { fmt.Printf("\rAttempts: %d", attempts) }
+		if output.JSON() {
+			progress = nil
+		} else {
+			fmt.Printf("Cracking %s hash...\n", algo)
+			fmt.Printf("Wordlist: %s\n", hashWordlist)
+			fmt.Println(strings.Repeat("-", 50))
+		}
 
-		result, err := hash.CrackWithProgress(hashStr, algo, hashWordlist, func(attempts int) {
-			fmt.Printf("\rAttempts: %d", attempts)
-		})
-
-		fmt.Println() // New line after progress
-
+		result, err := hash.CrackWithProgress(hashStr, algo, hashWordlist, progress)
+		if !output.JSON() {
+			fmt.Println() // New line after progress
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		if result.Found {
-			fmt.Println(strings.Repeat("-", 50))
-			fmt.Printf("FOUND!\n")
-			fmt.Printf("Hash:      %s\n", result.Hash)
-			fmt.Printf("Plaintext: %s\n", result.Plaintext)
-			fmt.Printf("Attempts:  %d\n", result.Attempts)
-		} else {
-			fmt.Println(strings.Repeat("-", 50))
-			fmt.Printf("NOT FOUND\n")
-			fmt.Printf("Total attempts: %d\n", result.Attempts)
+		payload := map[string]any{
+			"hash":      result.Hash,
+			"algorithm": string(result.Algorithm),
+			"found":     result.Found,
+			"attempts":  result.Attempts,
 		}
+		if result.Found {
+			payload["plaintext"] = result.Plaintext
+		}
+		_ = output.Emit(payload, func(w io.Writer) {
+			fmt.Fprintln(w, strings.Repeat("-", 50))
+			if result.Found {
+				fmt.Fprintln(w, "FOUND!")
+				fmt.Fprintf(w, "Hash:      %s\n", result.Hash)
+				fmt.Fprintf(w, "Plaintext: %s\n", result.Plaintext)
+				fmt.Fprintf(w, "Attempts:  %d\n", result.Attempts)
+			} else {
+				fmt.Fprintln(w, "NOT FOUND")
+				fmt.Fprintf(w, "Total attempts: %d\n", result.Attempts)
+			}
+		})
 	},
 }
 
