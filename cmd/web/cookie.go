@@ -2,12 +2,14 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/web/cookie"
 )
 
@@ -272,6 +274,11 @@ Examples:
 
 		value := args[0]
 		sessionType := cookie.DetectSessionType(value)
+
+		if output.JSON() {
+			_ = output.Emit(map[string]any{"value": value, "detected_type": sessionType}, func(io.Writer) {})
+			return
+		}
 
 		fmt.Println("\n[SESSION TYPE DETECTION]")
 		fmt.Println(strings.Repeat("=", 60))
