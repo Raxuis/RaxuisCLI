@@ -138,15 +138,21 @@ Examples:
 			return
 		}
 
-		jwt.DisplayJWT(verified)
-
-		fmt.Println("[VERIFICATION RESULT]")
-		fmt.Println(strings.Repeat("=", 60))
-		if verified.Valid {
-			fmt.Println("Signature: VALID")
-		} else {
-			fmt.Println("Signature: INVALID")
-		}
+		_ = output.Emit(map[string]any{
+			"algorithm": verified.Algorithm,
+			"header":    verified.Header,
+			"payload":   verified.Payload,
+			"valid":     verified.Valid,
+		}, func(_ io.Writer) {
+			jwt.DisplayJWT(verified)
+			fmt.Println("[VERIFICATION RESULT]")
+			fmt.Println(strings.Repeat("=", 60))
+			if verified.Valid {
+				fmt.Println("Signature: VALID")
+			} else {
+				fmt.Println("Signature: INVALID")
+			}
+		})
 	},
 }
 
@@ -181,18 +187,25 @@ Examples:
 			return
 		}
 
-		fmt.Println("\n[JWT FORGED]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Algorithm: %s\n", algorithm)
-		fmt.Printf("Token: %s\n", token)
-
-		// Also decode and show it
 		decoded, _ := jwt.DecodeJWT(token)
-		if decoded != nil {
-			fmt.Println("\n[Decoded Payload]")
-			payloadJSON, _ := json.MarshalIndent(decoded.Payload, "", "  ")
-			fmt.Println(string(payloadJSON))
+		forgePayload := map[string]any{
+			"algorithm": algorithm,
+			"token":     token,
 		}
+		if decoded != nil {
+			forgePayload["payload"] = decoded.Payload
+		}
+		_ = output.Emit(forgePayload, func(_ io.Writer) {
+			fmt.Println("\n[JWT FORGED]")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Algorithm: %s\n", algorithm)
+			fmt.Printf("Token: %s\n", token)
+			if decoded != nil {
+				fmt.Println("\n[Decoded Payload]")
+				payloadJSON, _ := json.MarshalIndent(decoded.Payload, "", "  ")
+				fmt.Println(string(payloadJSON))
+			}
+		})
 	},
 }
 
@@ -229,7 +242,9 @@ Examples:
 
 		if useCommon {
 			secrets = jwt.CommonSecrets()
-			fmt.Printf("Using %d common secrets...\n", len(secrets))
+			if !output.JSON() {
+				fmt.Printf("Using %d common secrets...\n", len(secrets))
+			}
 		}
 
 		if wordlist != "" {
@@ -244,7 +259,9 @@ Examples:
 			for scanner.Scan() {
 				secrets = append(secrets, scanner.Text())
 			}
-			fmt.Printf("Loaded %d secrets from wordlist\n", len(secrets))
+			if !output.JSON() {
+				fmt.Printf("Loaded %d secrets from wordlist\n", len(secrets))
+			}
 		}
 
 		if len(secrets) == 0 {
@@ -252,26 +269,39 @@ Examples:
 			return
 		}
 
-		fmt.Println("\n[JWT CRACKING]")
-		fmt.Println(strings.Repeat("=", 60))
+		if !output.JSON() {
+			fmt.Println("\n[JWT CRACKING]")
+			fmt.Println(strings.Repeat("=", 60))
+		}
 
 		decoded, err := jwt.DecodeJWT(token)
 		if err != nil {
 			fmt.Printf("Error decoding JWT: %v\n", err)
 			return
 		}
-		fmt.Printf("Algorithm: %s\n", decoded.Algorithm)
-		fmt.Printf("Trying %d secrets...\n\n", len(secrets))
+		if !output.JSON() {
+			fmt.Printf("Algorithm: %s\n", decoded.Algorithm)
+			fmt.Printf("Trying %d secrets...\n\n", len(secrets))
+		}
 
 		secret, found := jwt.CrackJWT(token, secrets)
 
-		if found {
-			fmt.Printf("SECRET FOUND: %s\n", secret)
-			fmt.Println("\nYou can now forge tokens with:")
-			fmt.Printf("  raxuiscli jwt forge --payload '{...}' --secret '%s'\n", secret)
-		} else {
-			fmt.Println("Secret not found in wordlist")
+		crackPayload := map[string]any{
+			"algorithm": decoded.Algorithm,
+			"found":     found,
 		}
+		if found {
+			crackPayload["secret"] = secret
+		}
+		_ = output.Emit(crackPayload, func(_ io.Writer) {
+			if found {
+				fmt.Printf("SECRET FOUND: %s\n", secret)
+				fmt.Println("\nYou can now forge tokens with:")
+				fmt.Printf("  raxuiscli jwt forge --payload '{...}' --secret '%s'\n", secret)
+			} else {
+				fmt.Println("Secret not found in wordlist")
+			}
+		})
 	},
 }
 
@@ -309,14 +339,15 @@ Examples:
 			return
 		}
 
-		fmt.Println("\n[NONE ATTACK TOKENS]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Println("Generated tokens with 'none' algorithm variations:")
-		fmt.Println("Test each token to see if the target accepts unsigned JWTs.")
-
-		for i, t := range tokens {
-			fmt.Printf("[%d] %s\n\n", i+1, t)
-		}
+		_ = output.Emit(map[string]any{"tokens": tokens}, func(_ io.Writer) {
+			fmt.Println("\n[NONE ATTACK TOKENS]")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Println("Generated tokens with 'none' algorithm variations:")
+			fmt.Println("Test each token to see if the target accepts unsigned JWTs.")
+			for i, t := range tokens {
+				fmt.Printf("[%d] %s\n\n", i+1, t)
+			}
+		})
 	},
 }
 
@@ -360,10 +391,25 @@ Examples:
 			return
 		}
 
-		jwt.DisplayJWT(decoded)
-
 		vulns := jwt.CheckVulnerabilities(decoded)
-		jwt.DisplayVulnerabilities(vulns)
+		vulnView := make([]map[string]any, 0, len(vulns))
+		for _, v := range vulns {
+			vulnView = append(vulnView, map[string]any{
+				"name":        v.Name,
+				"vulnerable":  v.Vulnerable,
+				"description": v.Description,
+				"severity":    v.Severity,
+			})
+		}
+		_ = output.Emit(map[string]any{
+			"algorithm":       decoded.Algorithm,
+			"header":          decoded.Header,
+			"payload":         decoded.Payload,
+			"vulnerabilities": vulnView,
+		}, func(_ io.Writer) {
+			jwt.DisplayJWT(decoded)
+			jwt.DisplayVulnerabilities(vulns)
+		})
 	},
 }
 
