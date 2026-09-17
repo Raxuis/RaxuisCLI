@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -9,9 +10,46 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/urlnorm"
 	"github.com/Raxuis/RaxuisCLI/internal/web/fuzz"
 )
+
+type fuzzHitView struct {
+	Input         string `json:"input"`
+	URL           string `json:"url"`
+	StatusCode    int    `json:"status_code"`
+	ContentLength int64  `json:"content_length"`
+	WordCount     int    `json:"word_count"`
+	LineCount     int    `json:"line_count"`
+	Redirect      string `json:"redirect,omitempty"`
+	DurationMS    int64  `json:"duration_ms"`
+}
+
+func fuzzResultsView(r *fuzz.FuzzResults) map[string]any {
+	hits := make([]fuzzHitView, 0, len(r.Results))
+	for _, h := range r.Results {
+		hits = append(hits, fuzzHitView{
+			Input:         h.Input,
+			URL:           h.URL,
+			StatusCode:    h.StatusCode,
+			ContentLength: h.ContentLength,
+			WordCount:     h.WordCount,
+			LineCount:     h.LineCount,
+			Redirect:      h.Redirect,
+			DurationMS:    h.Duration.Milliseconds(),
+		})
+	}
+	return map[string]any{
+		"type":        string(r.Type),
+		"base_url":    r.BaseURL,
+		"total":       r.Total,
+		"found":       r.Found,
+		"errors":      r.Errors,
+		"duration_ms": r.Duration.Milliseconds(),
+		"results":     hits,
+	}
+}
 
 var fuzzCmd = &cobra.Command{
 	Use:   "fuzz",
@@ -268,8 +306,8 @@ func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- f
 			}
 			processed++
 
-			// Update progress every 100ms
-			if time.Since(lastUpdate) > 100*time.Millisecond {
+			// Update progress every 100ms (noise for machine consumers)
+			if !output.JSON() && time.Since(lastUpdate) > 100*time.Millisecond {
 				elapsed := time.Since(start).Seconds()
 				rate := float64(processed) / elapsed
 				fuzz.DisplayProgress(processed, results.Total, results.Found, rate)
@@ -278,8 +316,10 @@ func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- f
 
 		case <-doneChan:
 			results.Duration = time.Since(start)
-			fmt.Println() // New line after progress
-			fuzz.DisplayResults(results)
+			_ = output.Emit(fuzzResultsView(results), func(_ io.Writer) {
+				fmt.Println() // New line after progress
+				fuzz.DisplayResults(results)
+			})
 			return
 		}
 	}

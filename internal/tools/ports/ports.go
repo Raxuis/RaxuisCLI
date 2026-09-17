@@ -59,6 +59,25 @@ func Scan(opts Options) {
 	scanner.displayResults(duration, len(ports))
 }
 
+// ScanResults runs the scan and returns the results without printing, for
+// machine-readable output.
+func ScanResults(opts Options) ([]ScanResult, error) {
+	scanner := &PortScanner{
+		host:     opts.Host,
+		timeout:  time.Duration(opts.Timeout) * time.Second,
+		scanType: strings.ToLower(opts.ScanType),
+		results:  make([]ScanResult, 0),
+	}
+
+	ports, err := parsePortRange(expandPresetRanges(opts.PortRange))
+	if err != nil {
+		return nil, err
+	}
+
+	scanner.scanPorts(ports)
+	return scanner.results, nil
+}
+
 func expandPresetRanges(portRange string) string {
 	presets := map[string]string{
 		"common":   "21,22,23,25,53,80,110,135,139,143,443,993,995,1433,3306,3389,5432,8080",

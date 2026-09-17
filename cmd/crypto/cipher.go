@@ -3,6 +3,7 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Raxuis/RaxuisCLI/internal/crypto/cipher"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 )
 
 var cipherCmd = &cobra.Command{
@@ -78,20 +80,28 @@ Examples:
 		}
 
 		result := cipher.XOREncrypt(data, keyBytes)
+		printable := cipher.IsPrintable(result)
 
-		fmt.Println("\n[XOR RESULT]")
-		fmt.Println(strings.Repeat("=", 50))
-
-		if outputHex {
-			fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
+		payload := map[string]any{
+			"hex":       hex.EncodeToString(result),
+			"printable": printable,
 		}
-
-		if cipher.IsPrintable(result) {
-			fmt.Printf("Text: %s\n", string(result))
-		} else if !outputHex {
-			fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
-			fmt.Println("(Result contains non-printable characters)")
+		if printable {
+			payload["text"] = string(result)
 		}
+		_ = output.Emit(payload, func(_ io.Writer) {
+			fmt.Println("\n[XOR RESULT]")
+			fmt.Println(strings.Repeat("=", 50))
+			if outputHex {
+				fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
+			}
+			if printable {
+				fmt.Printf("Text: %s\n", string(result))
+			} else if !outputHex {
+				fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
+				fmt.Println("(Result contains non-printable characters)")
+			}
+		})
 	},
 }
 
@@ -181,10 +191,16 @@ Examples:
 			operation = "Decrypted"
 		}
 
-		fmt.Printf("\n[VIGENERE %s]\n", strings.ToUpper(operation))
-		fmt.Println(strings.Repeat("=", 50))
-		fmt.Printf("Key: %s\n", key)
-		fmt.Printf("Result: %s\n", result)
+		_ = output.Emit(map[string]any{
+			"operation": strings.ToLower(operation),
+			"key":       key,
+			"result":    result,
+		}, func(_ io.Writer) {
+			fmt.Printf("\n[VIGENERE %s]\n", strings.ToUpper(operation))
+			fmt.Println(strings.Repeat("=", 50))
+			fmt.Printf("Key: %s\n", key)
+			fmt.Printf("Result: %s\n", result)
+		})
 	},
 }
 
@@ -303,10 +319,16 @@ Examples:
 			operation = "Decrypted"
 		}
 
-		fmt.Printf("\n[CAESAR %s]\n", strings.ToUpper(operation))
-		fmt.Println(strings.Repeat("=", 50))
-		fmt.Printf("Shift: %d\n", shift)
-		fmt.Printf("Result: %s\n", result)
+		_ = output.Emit(map[string]any{
+			"operation": strings.ToLower(operation),
+			"shift":     shift,
+			"result":    result,
+		}, func(_ io.Writer) {
+			fmt.Printf("\n[CAESAR %s]\n", strings.ToUpper(operation))
+			fmt.Println(strings.Repeat("=", 50))
+			fmt.Printf("Shift: %d\n", shift)
+			fmt.Printf("Result: %s\n", result)
+		})
 	},
 }
 
@@ -328,9 +350,11 @@ Examples:
 
 		result := cipher.ROT13(args[0])
 
-		fmt.Println("\n[ROT13]")
-		fmt.Println(strings.Repeat("=", 50))
-		fmt.Printf("Result: %s\n", result)
+		_ = output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
+			fmt.Println("\n[ROT13]")
+			fmt.Println(strings.Repeat("=", 50))
+			fmt.Printf("Result: %s\n", result)
+		})
 	},
 }
 
@@ -353,9 +377,11 @@ Examples:
 
 		result := cipher.AtbashDecrypt(args[0])
 
-		fmt.Println("\n[ATBASH]")
-		fmt.Println(strings.Repeat("=", 50))
-		fmt.Printf("Result: %s\n", result)
+		_ = output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
+			fmt.Println("\n[ATBASH]")
+			fmt.Println(strings.Repeat("=", 50))
+			fmt.Printf("Result: %s\n", result)
+		})
 	},
 }
 
@@ -391,21 +417,33 @@ Examples:
 			return
 		}
 
-		fmt.Println("\n[CIPHER DETECTION]")
-		fmt.Println(strings.Repeat("=", 50))
-
 		cipherType := cipher.DetectCipherType(text)
-		fmt.Printf("Detection: %s\n", cipherType)
-
-		// Show some statistics
 		freq := cipher.AnalyzeFrequency(text)
-		if len(freq) > 0 {
-			fmt.Printf("\nTop 5 characters: ")
-			for i := 0; i < min(5, len(freq)); i++ {
-				fmt.Printf("%c(%.1f%%) ", freq[i].Char, freq[i].Frequency)
-			}
-			fmt.Println()
+
+		type charFreq struct {
+			Char      string  `json:"char"`
+			Frequency float64 `json:"frequency"`
 		}
+		top := make([]charFreq, 0, 5)
+		for i := 0; i < min(5, len(freq)); i++ {
+			top = append(top, charFreq{Char: string(freq[i].Char), Frequency: freq[i].Frequency})
+		}
+
+		_ = output.Emit(map[string]any{
+			"detection": fmt.Sprintf("%v", cipherType),
+			"top_chars": top,
+		}, func(_ io.Writer) {
+			fmt.Println("\n[CIPHER DETECTION]")
+			fmt.Println(strings.Repeat("=", 50))
+			fmt.Printf("Detection: %s\n", cipherType)
+			if len(freq) > 0 {
+				fmt.Printf("\nTop 5 characters: ")
+				for i := 0; i < min(5, len(freq)); i++ {
+					fmt.Printf("%c(%.1f%%) ", freq[i].Char, freq[i].Frequency)
+				}
+				fmt.Println()
+			}
+		})
 	},
 }
 

@@ -1,12 +1,14 @@
 package network
 
 import (
+	"io"
 	"net"
 	"regexp"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/network/whois"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 
 	"github.com/spf13/cobra"
 )
@@ -44,11 +46,45 @@ Examples:
 			result = whois.LookupASN(query, whoisTimeout)
 		}
 
-		if whoisRaw {
-			whois.DisplayRaw(result)
-		} else {
-			whois.DisplayResult(result)
+		payload := map[string]any{
+			"query":      result.Query,
+			"query_type": result.QueryType,
 		}
+		if result.Registrar != "" {
+			payload["registrar"] = result.Registrar
+		}
+		if result.Created != "" {
+			payload["created"] = result.Created
+		}
+		if result.Updated != "" {
+			payload["updated"] = result.Updated
+		}
+		if result.Expires != "" {
+			payload["expires"] = result.Expires
+		}
+		if len(result.NameServer) > 0 {
+			payload["name_servers"] = result.NameServer
+		}
+		if len(result.Status) > 0 {
+			payload["status"] = result.Status
+		}
+		if len(result.Parsed) > 0 {
+			payload["parsed"] = result.Parsed
+		}
+		if whoisRaw {
+			payload["raw_data"] = result.RawData
+		}
+		if msg := errString(result.Error); msg != "" {
+			payload["error"] = msg
+		}
+
+		_ = output.Emit(payload, func(_ io.Writer) {
+			if whoisRaw {
+				whois.DisplayRaw(result)
+			} else {
+				whois.DisplayResult(result)
+			}
+		})
 	},
 }
 

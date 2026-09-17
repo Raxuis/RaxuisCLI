@@ -2,11 +2,13 @@ package tools
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/metadata"
 
 	"github.com/spf13/cobra"
@@ -36,56 +38,60 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Display results
-		fmt.Printf("File: %s\n", meta.FileName)
-		fmt.Printf("Type: %s\n", meta.FileType)
-		fmt.Printf("Size: %d bytes\n", meta.FileSize)
-		fmt.Println(strings.Repeat("-", 60))
-
-		// Display properties in sorted order
-		fmt.Println("Properties:")
-
-		// Sort keys for consistent output
-		keys := make([]string, 0, len(meta.Properties))
-		for k := range meta.Properties {
-			keys = append(keys, k)
+		payload := map[string]any{
+			"file":       meta.FileName,
+			"type":       string(meta.FileType),
+			"size":       meta.FileSize,
+			"properties": meta.Properties,
 		}
-		sort.Strings(keys)
-
-		for _, key := range keys {
-			value := meta.Properties[key]
-			// Truncate long values
-			if len(value) > 100 {
-				value = value[:100] + "..."
-			}
-			fmt.Printf("  %-20s: %s\n", key, value)
-		}
-
-		// Display EXIF data if present
 		if len(meta.ExifData) > 0 {
-			fmt.Println()
-			fmt.Println("EXIF Data:")
+			payload["exif"] = meta.ExifData
+		}
+		if len(meta.Errors) > 0 {
+			payload["warnings"] = meta.Errors
+		}
 
-			keys := make([]string, 0, len(meta.ExifData))
-			for k := range meta.ExifData {
+		_ = output.Emit(payload, func(w io.Writer) {
+			fmt.Fprintf(w, "File: %s\n", meta.FileName)
+			fmt.Fprintf(w, "Type: %s\n", meta.FileType)
+			fmt.Fprintf(w, "Size: %d bytes\n", meta.FileSize)
+			fmt.Fprintln(w, strings.Repeat("-", 60))
+			fmt.Fprintln(w, "Properties:")
+
+			keys := make([]string, 0, len(meta.Properties))
+			for k := range meta.Properties {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
-
 			for _, key := range keys {
-				value := meta.ExifData[key]
-				fmt.Printf("  %-20s: %s\n", key, value)
+				value := meta.Properties[key]
+				if len(value) > 100 {
+					value = value[:100] + "..."
+				}
+				fmt.Fprintf(w, "  %-20s: %s\n", key, value)
 			}
-		}
 
-		// Display errors if any
-		if len(meta.Errors) > 0 {
-			fmt.Println()
-			fmt.Println("Warnings:")
-			for _, err := range meta.Errors {
-				fmt.Printf("  - %s\n", err)
+			if len(meta.ExifData) > 0 {
+				fmt.Fprintln(w)
+				fmt.Fprintln(w, "EXIF Data:")
+				keys := make([]string, 0, len(meta.ExifData))
+				for k := range meta.ExifData {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, key := range keys {
+					fmt.Fprintf(w, "  %-20s: %s\n", key, meta.ExifData[key])
+				}
 			}
-		}
+
+			if len(meta.Errors) > 0 {
+				fmt.Fprintln(w)
+				fmt.Fprintln(w, "Warnings:")
+				for _, err := range meta.Errors {
+					fmt.Fprintf(w, "  - %s\n", err)
+				}
+			}
+		})
 	},
 }
 

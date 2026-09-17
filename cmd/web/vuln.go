@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -9,9 +10,33 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/urlnorm"
 	"github.com/Raxuis/RaxuisCLI/internal/web/vuln"
 )
+
+// vulnLive prints a live finding line, suppressed in JSON mode so it never
+// corrupts the machine-readable stream.
+func vulnLive(format string, a ...any) {
+	if !output.JSON() {
+		fmt.Printf(format, a...)
+	}
+}
+
+// emitVuln writes results as JSON ({target, results}) or, in text mode, prints
+// emptyMsg when there are no findings else the human table.
+func emitVuln(target string, results []vuln.VulnResult, emptyMsg string) {
+	if results == nil {
+		results = []vuln.VulnResult{}
+	}
+	_ = output.Emit(map[string]any{"target": target, "results": results}, func(_ io.Writer) {
+		if len(results) == 0 {
+			fmt.Println(emptyMsg)
+			return
+		}
+		vuln.DisplayResults(results)
+	})
+}
 
 var vulnCmd = &cobra.Command{
 	Use:   "vuln",
@@ -64,12 +89,14 @@ Examples:
 			Cookie:       cookie,
 		}
 
-		fmt.Printf("[VULNERABILITY SCAN]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Level: %d (1=basic, 2=normal, 3=aggressive)\n", level)
-		fmt.Printf("Threads: %d\n\n", threads)
-		fmt.Println("Scanning...")
+		if !output.JSON() {
+			fmt.Printf("[VULNERABILITY SCAN]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Level: %d (1=basic, 2=normal, 3=aggressive)\n", level)
+			fmt.Printf("Threads: %d\n\n", threads)
+			fmt.Println("Scanning...")
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		doneChan := make(chan bool)
@@ -83,10 +110,10 @@ Examples:
 			select {
 			case result := <-resultChan:
 				results = append(results, result)
-				fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Type, result.Parameter)
+				vulnLive("  [%s] %s - %s\n", result.Severity, result.Type, result.Parameter)
 			case <-doneChan:
-				fmt.Printf("\nScan completed in %v\n", time.Since(start))
-				vuln.DisplayResults(results)
+				vulnLive("\nScan completed in %v\n", time.Since(start))
+				emitVuln(url, results, "No vulnerabilities detected")
 				return
 			}
 		}
@@ -127,10 +154,12 @@ Examples:
 			Cookie:       cookie,
 		}
 
-		fmt.Printf("[XSS TESTING]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Level: %d\n\n", level)
+		if !output.JSON() {
+			fmt.Printf("[XSS TESTING]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Level: %d\n\n", level)
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -142,14 +171,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [FOUND] Parameter: %s\n", result.Parameter)
+			vulnLive("  [FOUND] Parameter: %s\n", result.Parameter)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No XSS vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No XSS vulnerabilities detected")
 	},
 }
 
@@ -189,10 +214,12 @@ Examples:
 			Cookie:       cookie,
 		}
 
-		fmt.Printf("[SQL INJECTION TESTING]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Level: %d\n\n", level)
+		if !output.JSON() {
+			fmt.Printf("[SQL INJECTION TESTING]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Level: %d\n\n", level)
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -204,14 +231,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [FOUND] %s - %s\n", result.Parameter, result.Evidence)
+			vulnLive("  [FOUND] %s - %s\n", result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No SQL injection vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No SQL injection vulnerabilities detected")
 	},
 }
 
@@ -249,10 +272,12 @@ Examples:
 			Cookie:       cookie,
 		}
 
-		fmt.Printf("[LFI TESTING]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Level: %d\n\n", level)
+		if !output.JSON() {
+			fmt.Printf("[LFI TESTING]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Level: %d\n\n", level)
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -264,14 +289,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [FOUND] %s - %s\n", result.Parameter, result.Payload)
+			vulnLive("  [FOUND] %s - %s\n", result.Parameter, result.Payload)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No LFI vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No LFI vulnerabilities detected")
 	},
 }
 
@@ -305,12 +326,14 @@ Examples:
 			UserAgent: userAgent,
 		}
 
-		fmt.Printf("[SECURITY HEADERS CHECK]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n\n", url)
+		if !output.JSON() {
+			fmt.Printf("[SECURITY HEADERS CHECK]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n\n", url)
+		}
 
 		results := vuln.ScanSecurityHeaders(opts)
-		vuln.DisplayResults(results)
+		emitVuln(url, results, "No security header issues detected")
 	},
 }
 
@@ -354,14 +377,19 @@ Examples:
 
 		payloads := vuln.GetPayloads(vulnType, level)
 
-		fmt.Printf("[%s PAYLOADS - Level %d]\n", strings.ToUpper(args[0]), level)
-		fmt.Println(strings.Repeat("=", 60))
-
-		for i, p := range payloads {
-			fmt.Printf("%3d. %s\n", i+1, p)
-		}
-
-		fmt.Printf("\nTotal: %d payloads\n", len(payloads))
+		_ = output.Emit(map[string]any{
+			"type":     strings.ToLower(args[0]),
+			"level":    level,
+			"count":    len(payloads),
+			"payloads": payloads,
+		}, func(_ io.Writer) {
+			fmt.Printf("[%s PAYLOADS - Level %d]\n", strings.ToUpper(args[0]), level)
+			fmt.Println(strings.Repeat("=", 60))
+			for i, p := range payloads {
+				fmt.Printf("%3d. %s\n", i+1, p)
+			}
+			fmt.Printf("\nTotal: %d payloads\n", len(payloads))
+		})
 	},
 }
 
@@ -407,13 +435,15 @@ Examples:
 			Full:       full,
 		}
 
-		fmt.Printf("[CORS MISCONFIGURATION TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		if origin != "" {
-			fmt.Printf("Custom Origin: %s\n", origin)
+		if !output.JSON() {
+			fmt.Printf("[CORS MISCONFIGURATION TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			if origin != "" {
+				fmt.Printf("Custom Origin: %s\n", origin)
+			}
+			fmt.Println()
 		}
-		fmt.Println()
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -425,14 +455,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [%s] %s: %s\n", result.Severity, result.Parameter, result.Evidence)
+			vulnLive("  [%s] %s: %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No CORS misconfigurations detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No CORS misconfigurations detected")
 	},
 }
 
@@ -485,14 +511,16 @@ Examples:
 			IsJSON: isJSON,
 		}
 
-		fmt.Printf("[NoSQL INJECTION TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Level: %d\n", level)
-		if data != "" {
-			fmt.Printf("Data: %s\n", data)
+		if !output.JSON() {
+			fmt.Printf("[NoSQL INJECTION TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Level: %d\n", level)
+			if data != "" {
+				fmt.Printf("Data: %s\n", data)
+			}
+			fmt.Println()
 		}
-		fmt.Println()
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -504,14 +532,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
+			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No NoSQL injection vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No NoSQL injection vulnerabilities detected")
 	},
 }
 
@@ -557,16 +581,18 @@ Examples:
 			PayloadType: payloadType,
 		}
 
-		fmt.Printf("[XXE VULNERABILITY TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		if oobCallback != "" {
-			fmt.Printf("OOB Callback: %s\n", oobCallback)
+		if !output.JSON() {
+			fmt.Printf("[XXE VULNERABILITY TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			if oobCallback != "" {
+				fmt.Printf("OOB Callback: %s\n", oobCallback)
+			}
+			if payloadType != "" {
+				fmt.Printf("Payload Type: %s\n", payloadType)
+			}
+			fmt.Println()
 		}
-		if payloadType != "" {
-			fmt.Printf("Payload Type: %s\n", payloadType)
-		}
-		fmt.Println()
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -578,15 +604,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
+			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No XXE vulnerabilities detected")
-			fmt.Println("\nNote: Use --oob with a callback server for blind XXE detection")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No XXE vulnerabilities detected\n\nNote: Use --oob with a callback server for blind XXE detection")
 	},
 }
 
@@ -633,11 +654,13 @@ Examples:
 			DoS:        dos,
 		}
 
-		fmt.Printf("[GRAPHQL SECURITY TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("DoS Testing: %v\n", dos)
-		fmt.Println()
+		if !output.JSON() {
+			fmt.Printf("[GRAPHQL SECURITY TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("DoS Testing: %v\n", dos)
+			fmt.Println()
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -649,14 +672,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
+			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No GraphQL security issues detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No GraphQL security issues detected")
 	},
 }
 
@@ -703,12 +722,14 @@ Examples:
 			Cache:  cache,
 		}
 
-		fmt.Printf("[HOST HEADER INJECTION TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Password Reset Poisoning: %v\n", poison)
-		fmt.Printf("Cache Poisoning: %v\n", cache)
-		fmt.Println()
+		if !output.JSON() {
+			fmt.Printf("[HOST HEADER INJECTION TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Password Reset Poisoning: %v\n", poison)
+			fmt.Printf("Cache Poisoning: %v\n", cache)
+			fmt.Println()
+		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
 		var results []vuln.VulnResult
@@ -720,14 +741,10 @@ Examples:
 
 		for result := range resultChan {
 			results = append(results, result)
-			fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
+			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No Host header injection vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(results)
-		}
+		emitVuln(url, results, "No Host header injection vulnerabilities detected")
 	},
 }
 
@@ -777,16 +794,18 @@ Examples:
 			Requests: requests,
 		}
 
-		fmt.Printf("[RACE CONDITION TEST]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Target: %s\n", url)
-		fmt.Printf("Method: %s\n", method)
-		fmt.Printf("Concurrent Requests: %d\n", requests)
-		if data != "" {
-			fmt.Printf("Data: %s\n", data)
+		if !output.JSON() {
+			fmt.Printf("[RACE CONDITION TEST]\n")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("Target: %s\n", url)
+			fmt.Printf("Method: %s\n", method)
+			fmt.Printf("Concurrent Requests: %d\n", requests)
+			if data != "" {
+				fmt.Printf("Data: %s\n", data)
+			}
+			fmt.Println()
+			fmt.Println("Firing concurrent requests...")
 		}
-		fmt.Println()
-		fmt.Println("Firing concurrent requests...")
 
 		start := time.Now()
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -800,11 +819,11 @@ Examples:
 		for result := range resultChan {
 			results = append(results, result)
 			if result.Severity != vuln.SeverityInfo {
-				fmt.Printf("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
+				vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 			}
 		}
 
-		fmt.Printf("\nCompleted in %v\n", time.Since(start))
+		vulnLive("\nCompleted in %v\n", time.Since(start))
 
 		// Filter out info-level results for display
 		var significantResults []vuln.VulnResult
@@ -814,11 +833,7 @@ Examples:
 			}
 		}
 
-		if len(significantResults) == 0 {
-			fmt.Println("No race condition vulnerabilities detected")
-		} else {
-			vuln.DisplayResults(significantResults)
-		}
+		emitVuln(url, significantResults, "No race condition vulnerabilities detected")
 	},
 }
 

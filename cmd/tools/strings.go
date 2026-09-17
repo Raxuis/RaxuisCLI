@@ -2,9 +2,11 @@ package tools
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/strings"
 
 	"github.com/spf13/cobra"
@@ -45,7 +47,26 @@ Examples:
 			ShowEncoding: stringsShowEncoding,
 		}
 
-		if err := strings.StreamExtract(path, opts, os.Stdout); err != nil {
+		if output.JSON() {
+			results, err := strings.Extract(path, opts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			type strOut struct {
+				Offset   int64  `json:"offset"`
+				String   string `json:"string"`
+				Encoding string `json:"encoding"`
+			}
+			view := make([]strOut, 0, len(results))
+			for _, r := range results {
+				view = append(view, strOut{Offset: r.Offset, String: r.String, Encoding: string(r.Encoding)})
+			}
+			_ = output.Emit(map[string]any{"file": path, "strings": view}, func(io.Writer) {})
+			return
+		}
+
+		if err := strings.StreamExtract(path, opts, output.Std); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}

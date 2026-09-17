@@ -1,7 +1,12 @@
 package tools
 
 import (
+	"fmt"
+	"io"
+	"os"
+
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/ports"
 
 	"github.com/spf13/cobra"
@@ -37,6 +42,30 @@ Examples:
 			PortRange: portsPortRange,
 			Timeout:   portsTimeout,
 			ScanType:  portsScanType,
+		}
+
+		if output.JSON() {
+			results, err := ports.ScanResults(options)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			type portOut struct {
+				Port    int    `json:"port"`
+				Status  string `json:"status"`
+				Service string `json:"service"`
+			}
+			view := make([]portOut, 0, len(results))
+			for _, r := range results {
+				view = append(view, portOut{Port: r.Port, Status: r.Status, Service: r.Service})
+			}
+			_ = output.Emit(map[string]any{
+				"host":       options.Host,
+				"scan_type":  options.ScanType,
+				"port_range": options.PortRange,
+				"results":    view,
+			}, func(io.Writer) {})
+			return
 		}
 
 		ports.Scan(options)

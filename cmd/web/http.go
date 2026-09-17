@@ -2,15 +2,57 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/urlnorm"
 	httplib "github.com/Raxuis/RaxuisCLI/internal/web/http"
 )
+
+// httpRespView is the machine-readable shape of an HTTP response.
+type httpRespView struct {
+	StatusCode    int                 `json:"status_code"`
+	Status        string              `json:"status"`
+	Headers       map[string][]string `json:"headers"`
+	ContentLength int64               `json:"content_length"`
+	DurationMS    int64               `json:"duration_ms"`
+	RedirectChain []string            `json:"redirect_chain,omitempty"`
+	TLS           *httpTLSView        `json:"tls,omitempty"`
+	Body          string              `json:"body,omitempty"`
+	Truncated     bool                `json:"truncated,omitempty"`
+}
+
+type httpTLSView struct {
+	Version     string `json:"version"`
+	CipherSuite string `json:"cipher_suite"`
+	ServerName  string `json:"server_name"`
+}
+
+func responseView(resp *httplib.Response) httpRespView {
+	view := httpRespView{
+		StatusCode:    resp.StatusCode,
+		Status:        resp.Status,
+		Headers:       map[string][]string(resp.Headers),
+		ContentLength: resp.ContentLength,
+		DurationMS:    resp.Duration.Milliseconds(),
+		RedirectChain: resp.RedirectChain,
+		Body:          resp.Body,
+		Truncated:     resp.Truncated,
+	}
+	if resp.TLS != nil {
+		view.TLS = &httpTLSView{
+			Version:     resp.TLS.Version,
+			CipherSuite: resp.TLS.CipherSuite,
+			ServerName:  resp.TLS.ServerName,
+		}
+	}
+	return view
+}
 
 var httpCmd = &cobra.Command{
 	Use:   "http",
@@ -131,16 +173,41 @@ Examples:
 			return
 		}
 
-		if verbose {
-			httplib.DisplayResponse(resp, false, 0)
-		}
-
 		analysis := httplib.AnalyzeSecurityHeaders(resp.Headers)
-		httplib.DisplayHeaderAnalysis(analysis)
-
-		// Detect technologies
 		techs := httplib.DetectTechnology(resp.Headers, resp.Body)
-		httplib.DisplayTechnologies(techs)
+
+		type headerView struct {
+			Name        string `json:"name"`
+			Value       string `json:"value,omitempty"`
+			Present     bool   `json:"present"`
+			Secure      bool   `json:"secure"`
+			Description string `json:"description,omitempty"`
+			Severity    string `json:"severity,omitempty"`
+		}
+		hviews := make([]headerView, 0, len(analysis.Headers))
+		for _, h := range analysis.Headers {
+			hviews = append(hviews, headerView{
+				Name: h.Name, Value: h.Value, Present: h.Present,
+				Secure: h.Secure, Description: h.Description, Severity: h.Severity,
+			})
+		}
+		payload := map[string]any{
+			"url":              url,
+			"score":            analysis.Score,
+			"max_score":        analysis.MaxScore,
+			"grade":            analysis.Grade,
+			"security_headers": hviews,
+			"warnings":         analysis.Warnings,
+			"missing":          analysis.Missing,
+			"technologies":     techs,
+		}
+		_ = output.Emit(payload, func(_ io.Writer) {
+			if verbose {
+				httplib.DisplayResponse(resp, false, 0)
+			}
+			httplib.DisplayHeaderAnalysis(analysis)
+			httplib.DisplayTechnologies(techs)
+		})
 	},
 }
 
@@ -178,22 +245,28 @@ Examples:
 			return
 		}
 
-		fmt.Println("\n[REDIRECT TRACE]")
-		fmt.Println(strings.Repeat("=", 60))
-
-		fmt.Printf("\nOriginal URL: %s\n", url)
-
-		if len(resp.RedirectChain) > 0 {
-			fmt.Println("\nRedirect Chain:")
-			for i, redirectURL := range resp.RedirectChain {
-				fmt.Printf("  %d. %s\n", i+1, redirectURL)
-			}
-		} else {
-			fmt.Println("\nNo redirects")
+		payload := map[string]any{
+			"original_url":   url,
+			"redirect_chain": resp.RedirectChain,
+			"final_status":   resp.Status,
+			"status_code":    resp.StatusCode,
+			"duration_ms":    resp.Duration.Milliseconds(),
 		}
-
-		fmt.Printf("\nFinal Status: %s\n", resp.Status)
-		fmt.Printf("Duration: %v\n", resp.Duration)
+		_ = output.Emit(payload, func(_ io.Writer) {
+			fmt.Println("\n[REDIRECT TRACE]")
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Printf("\nOriginal URL: %s\n", url)
+			if len(resp.RedirectChain) > 0 {
+				fmt.Println("\nRedirect Chain:")
+				for i, redirectURL := range resp.RedirectChain {
+					fmt.Printf("  %d. %s\n", i+1, redirectURL)
+				}
+			} else {
+				fmt.Println("\nNo redirects")
+			}
+			fmt.Printf("\nFinal Status: %s\n", resp.Status)
+			fmt.Printf("Duration: %v\n", resp.Duration)
+		})
 	},
 }
 
@@ -304,13 +377,14 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
 		resp.Body = httplib.FormatJSON(resp.Body)
 	}
 
-	httplib.DisplayResponse(resp, showBody, maxBody)
-
-	// Show curl equivalent
 	showCurl, _ := cmd.Flags().GetBool("curl")
-	if showCurl {
-		fmt.Printf("\n[Curl Equivalent]\n%s\n", httplib.GenerateCurl(opts))
-	}
+
+	_ = output.Emit(responseView(resp), func(_ io.Writer) {
+		httplib.DisplayResponse(resp, showBody, maxBody)
+		if showCurl {
+			fmt.Printf("\n[Curl Equivalent]\n%s\n", httplib.GenerateCurl(opts))
+		}
+	})
 }
 
 func init() {

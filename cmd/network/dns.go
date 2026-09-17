@@ -143,7 +143,19 @@ Examples:
 		}
 
 		result := dns.AttemptAXFR(domain, dnsAXFRServer, dnsTimeout)
-		dns.DisplayAXFRResult(result)
+
+		payload := map[string]any{
+			"domain":  result.Domain,
+			"server":  result.Server,
+			"success": result.Success,
+			"records": result.Records,
+		}
+		if msg := errString(result.Error); msg != "" {
+			payload["error"] = msg
+		}
+		_ = output.Emit(payload, func(_ io.Writer) {
+			dns.DisplayAXFRResult(result)
+		})
 	},
 }
 
@@ -176,9 +188,27 @@ Examples:
 			os.Exit(1)
 		}
 
-		fmt.Printf("Starting subdomain bruteforce for %s...\n", domain)
+		if !output.JSON() {
+			fmt.Printf("Starting subdomain bruteforce for %s...\n", domain)
+		}
 		result := dns.BruteSubdomains(domain, dnsBruteWordlist, dnsNameserver, dnsTimeout, dnsBruteThreads)
-		dns.DisplayBruteResult(result)
+
+		type subOut struct {
+			Subdomain string   `json:"subdomain"`
+			IPs       []string `json:"ips"`
+		}
+		subs := make([]subOut, 0, len(result.Subdomains))
+		for _, s := range result.Subdomains {
+			subs = append(subs, subOut{Subdomain: s.Subdomain, IPs: s.IPs})
+		}
+		_ = output.Emit(map[string]any{
+			"domain":     result.Domain,
+			"total":      result.Total,
+			"found":      result.Found,
+			"subdomains": subs,
+		}, func(_ io.Writer) {
+			dns.DisplayBruteResult(result)
+		})
 	},
 }
 

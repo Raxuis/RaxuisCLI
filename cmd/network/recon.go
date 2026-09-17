@@ -2,15 +2,45 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/network/recon"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 
 	"github.com/spf13/cobra"
 )
+
+type serviceOut struct {
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Protocol   string `json:"protocol,omitempty"`
+	Banner     string `json:"banner,omitempty"`
+	Service    string `json:"service,omitempty"`
+	Version    string `json:"version,omitempty"`
+	TLS        bool   `json:"tls"`
+	TLSVersion string `json:"tls_version,omitempty"`
+	ResponseMS int64  `json:"response_ms"`
+	Error      string `json:"error,omitempty"`
+}
+
+func serviceView(r recon.ServiceResult) serviceOut {
+	return serviceOut{
+		Host:       r.Host,
+		Port:       r.Port,
+		Protocol:   r.Protocol,
+		Banner:     r.Banner,
+		Service:    r.Service,
+		Version:    r.Version,
+		TLS:        r.TLS,
+		TLSVersion: r.TLSVersion,
+		ResponseMS: r.ResponseTime.Milliseconds(),
+		Error:      errString(r.Error),
+	}
+}
 
 var reconPorts string
 var reconTimeout int
@@ -62,10 +92,14 @@ Examples:
 		if len(ports) == 1 {
 			// Single port - detailed view
 			result := recon.BannerGrab(host, ports[0], reconTimeout, reconTLS)
-			recon.DisplayResult(result)
+			_ = output.Emit(serviceView(result), func(_ io.Writer) {
+				recon.DisplayResult(result)
+			})
 		} else {
 			// Multiple ports - summary view
-			fmt.Printf("Scanning %s with %d ports...\n", host, len(ports))
+			if !output.JSON() {
+				fmt.Printf("Scanning %s with %d ports...\n", host, len(ports))
+			}
 			opts := recon.ReconOptions{
 				Host:    host,
 				Ports:   ports,
@@ -73,7 +107,13 @@ Examples:
 				TLS:     reconTLS,
 			}
 			results := recon.ReconMultiple(opts)
-			recon.DisplayResults(results)
+			views := make([]serviceOut, 0, len(results))
+			for _, r := range results {
+				views = append(views, serviceView(r))
+			}
+			_ = output.Emit(map[string]any{"host": host, "results": views}, func(_ io.Writer) {
+				recon.DisplayResults(results)
+			})
 		}
 	},
 }
