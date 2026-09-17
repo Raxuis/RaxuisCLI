@@ -34,3 +34,6 @@ dist/
 
 # Local visual brainstorming artifacts
 .superpowers/
+
+# Generated at release time by GoReleaser before-hooks
+/completions/

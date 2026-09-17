@@ -1,9 +1,17 @@
 # GoReleaser configuration — https://goreleaser.com
 version: 2
 
+# Pinned so artifact names don't depend on the git remote name (the local
+# remote still uses the old "RaxuiCLI" spelling, which would leak into archives).
+project_name: raxuiscli
+
 before:
   hooks:
     - go mod tidy
+    - mkdir -p completions
+    - sh -c 'go run . completion bash > completions/raxuiscli.bash'
+    - sh -c 'go run . completion zsh  > completions/raxuiscli.zsh'
+    - sh -c 'go run . completion fish > completions/raxuiscli.fish'
 
 builds:
   - id: raxuiscli
@@ -43,6 +51,98 @@ archives:
       - README.md
       - LICENSE
       - ROADMAP.md
+      - completions/*
+
+nfpms:
+  - id: packages
+    package_name: raxuiscli
+    vendor: Raxuis
+    homepage: https://github.com/Raxuis/RaxuisCLI
+    maintainer: Raxuis <raxuis@proton.me>
+    description: Cybersecurity CLI toolkit for pentest, CTF and security analysis.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    contents:
+      - src: ./completions/raxuiscli.bash
+        dst: /usr/share/bash-completion/completions/raxuiscli
+      - src: ./completions/raxuiscli.zsh
+        dst: /usr/share/zsh/vendor-completions/_raxuiscli
+      - src: ./completions/raxuiscli.fish
+        dst: /usr/share/fish/vendor_completions.d/raxuiscli.fish
+
+dockers:
+  - id: amd64
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    use: buildx
+    image_templates:
+      - "ghcr.io/raxuis/raxuiscli:{{ .Version }}-amd64"
+      - "ghcr.io/raxuis/raxuiscli:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=Cybersecurity CLI toolkit for pentest, CTF and security analysis"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/Raxuis/RaxuisCLI"
+      - "--label=org.opencontainers.image.licenses=MIT"
+  - id: arm64
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    use: buildx
+    image_templates:
+      - "ghcr.io/raxuis/raxuiscli:{{ .Version }}-arm64"
+      - "ghcr.io/raxuis/raxuiscli:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=Cybersecurity CLI toolkit for pentest, CTF and security analysis"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/Raxuis/RaxuisCLI"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
+docker_manifests:
+  - name_template: "ghcr.io/raxuis/raxuiscli:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/raxuis/raxuiscli:{{ .Version }}-amd64"
+      - "ghcr.io/raxuis/raxuiscli:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/raxuis/raxuiscli:latest"
+    image_templates:
+      - "ghcr.io/raxuis/raxuiscli:latest-amd64"
+      - "ghcr.io/raxuis/raxuiscli:latest-arm64"
+
+homebrew_casks:
+  - name: raxuiscli
+    repository:
+      owner: Raxuis
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaserbot@users.noreply.github.com
+    homepage: "https://github.com/Raxuis/RaxuisCLI"
+    description: "Cybersecurity CLI toolkit for pentest, CTF and security analysis"
+    binaries:
+      - raxuiscli
+    completions:
+      bash: completions/raxuiscli.bash
+      zsh: completions/raxuiscli.zsh
+      fish: completions/raxuiscli.fish
+    # Unsigned binary: strip the macOS quarantine flag so it opens without the
+    # "damaged and cannot be opened" prompt.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/raxuiscli"]
+          end
 
 checksum:
   name_template: checksums.txt

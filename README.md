@@ -35,19 +35,52 @@ The author(s) assume no liability and are not responsible for any misuse or dama
 
 ## Installation
 
+### Homebrew (macOS / Linux)
+
 ```bash
-# Clone the repository
+brew install Raxuis/tap/raxuiscli
+```
+
+### Install script (Linux / macOS)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Raxuis/RaxuisCLI/main/scripts/install.sh | sh
+```
+
+Pins a version with `RAXUIS_VERSION=v1.2.3` and the install dir with `RAXUIS_BIN_DIR=~/.local/bin`. The script verifies the release checksum before installing.
+
+### Docker
+
+```bash
+docker run --rm ghcr.io/raxuis/raxuiscli dns lookup example.com
+```
+
+Images are published to GHCR for `linux/amd64` and `linux/arm64`.
+
+### Linux packages
+
+Grab the `.deb`, `.rpm`, or `.apk` for your architecture from the [releases page](https://github.com/Raxuis/RaxuisCLI/releases), then:
+
+```bash
+sudo dpkg -i raxuiscli_*.deb      # Debian / Ubuntu / Kali
+sudo rpm -i  raxuiscli_*.rpm      # Fedora / RHEL
+sudo apk add --allow-untrusted raxuiscli_*.apk   # Alpine
+```
+
+### Prebuilt binaries
+
+Download the archive for your OS/arch from the [releases page](https://github.com/Raxuis/RaxuisCLI/releases). Each release ships checksums and an SBOM.
+
+### From source
+
+```bash
 git clone https://github.com/Raxuis/RaxuisCLI.git
 cd RaxuisCLI
-
-# Build
 go build -o bin/raxuiscli .
+sudo mv bin/raxuiscli /usr/local/bin/   # optional: add to PATH
 
-# (Optional) Add to PATH
-sudo mv bin/raxuiscli /usr/local/bin/
-
-# Or install via go install
-go install .
+# Or install directly
+go install github.com/Raxuis/RaxuisCLI@latest
 ```
 
 ## Usage

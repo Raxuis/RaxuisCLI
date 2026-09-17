@@ -6,6 +6,14 @@ RaxuisCLI is a comprehensive cybersecurity CLI toolkit written in Go, designed f
 
 ## Development Guidelines
 
+### Code Style
+
+Keep comments minimal. Only comment on non-obvious behavior (why, not what);
+do not add doc comments to every exported function just because it's
+exported — `revive`'s `exported` rule is disabled in `.golangci.yml`
+specifically so this isn't required. Prefer clear naming and short functions
+over narration in comments.
+
 ### Adding New Commands
 
 When adding a new command, you MUST:
