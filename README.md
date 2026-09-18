@@ -386,6 +386,33 @@ raxuiscli recon example.com:22 --timeout 5
 - Technology detection
 - Server fingerprinting
 
+#### `scan` - Attack-Surface Mapper
+Concurrent host and TCP service discovery across a network. Finds live hosts,
+scans their services with banner/version detection, and tags interesting ones
+with the raxuiscli command to run next — turning discovery into an attack
+workflow. Accepts a single IP, a hostname list, or an IPv4 CIDR. **Only run it
+against networks you are authorized to test (pentest, CTF, or your own lab).**
+
+```bash
+raxuiscli scan 10.10.10.0/24                       # curated top ports
+raxuiscli scan 10.10.10.5 --ports 1-1024           # custom range/list
+raxuiscli scan 10.10.10.0/24 --jitter 200ms -c 50  # low & slow
+raxuiscli scan 192.168.1.10 --full --no-discovery  # all 65535 ports
+raxuiscli --output=json scan 10.0.0.0/24 > surface.json  # diffable JSON
+```
+
+Example output:
+```
+10.10.10.5   dc01.corp.local
+  88/tcp    kerberos       → raxuiscli kerberos asrep -d <domain>
+  389/tcp   ldap           → raxuiscli ldap enum -H 10.10.10.5
+  445/tcp   smb            → raxuiscli smb null -H 10.10.10.5
+  5985/tcp  winrm          [WinRM] evil-winrm / lateral movement target
+```
+
+**Flags:** `--ports/-p`, `--full`, `--concurrency/-c`, `--timeout/-t`,
+`--jitter`, `--no-discovery`, `--no-banner`.
+
 ---
 
 ### Cryptography

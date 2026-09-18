@@ -273,6 +273,22 @@ raxuiscli recon example.com:22                    # Banner grab SSH
 raxuiscli recon example.com --ports 21,22,80,443  # Multi-ports
 ```
 
+#### `scan` - Attack-Surface Mapper
+Concurrent host and TCP service discovery across a range of targets. Discovers
+live hosts, scans their services (banner/version detection), and tags
+interesting ones with the next raxuiscli command to run (LDAP/SMB/Kerberos
+enum, web/TLS checks, unauth-service warnings). Only use against authorized
+targets. Passive TCP connect scans; supports single IP, hostname list, or IPv4
+CIDR. JSON output is diffable.
+
+```bash
+raxuiscli scan 10.10.10.0/24                       # curated top ports
+raxuiscli scan 10.10.10.5 --ports 1-1024           # custom range
+raxuiscli scan 10.10.10.0/24 --jitter 200ms -c 50  # low & slow
+raxuiscli scan 192.168.1.10 --full --no-discovery  # all 65535 ports
+raxuiscli --output=json scan 10.0.0.0/24 > surface.json
+```
+
 ---
 
 ### Cryptography
