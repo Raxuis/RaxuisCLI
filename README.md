@@ -697,6 +697,36 @@ raxuiscli smb null -H target
 - Anonymous session testing
 - SMB vulnerability identification
 
+#### `spray` - AD Password Spraying (LDAP)
+Low-and-slow password spraying against Active Directory over LDAP simple bind.
+Sprays **one password across all users per round** (never many passwords at one
+user in a burst) to respect account-lockout policy, and consumes the `ad`-tagged
+LDAP targets discovered by `scan`. **Authorized use only** — know the lockout
+policy first and space rounds with `--round-delay`.
+
+```bash
+# Feed it the ad-tagged LDAP targets found by scan (file or stdin pipe)
+raxuiscli --output=json scan 10.10.10.0/24 > surface.json
+raxuiscli spray --from-scan surface.json -u users.txt --password 'Winter2025!' -d corp.local
+raxuiscli --output=json scan 10.0.0.0/24 | raxuiscli spray --from-scan - -u users.txt -p passwords.txt -d corp.local
+
+# Or point at a single domain controller
+raxuiscli spray -H dc01.corp.local -u users.txt --password 'Spring2025!' -d corp.local
+
+# Low & slow with lockout guard
+raxuiscli spray --from-scan surface.json -u users.txt -p passwords.txt -d corp.local \
+  --delay 500ms --jitter 300ms --round-delay 31m --lockout-threshold 5
+```
+
+**Flags:** `--from-scan`, `-H/--host`, `-u/--users`, `-p/--passwords` /
+`--password`, `-d/--domain`, `-c/--concurrency`, `-t/--timeout`, `--delay`,
+`--jitter`, `--round-delay`, `--lockout-threshold`, `--force`,
+`--continue-on-success`.
+
+**Safety:** valid credentials are confirmed via the LDAP bind resultCode (0 =
+success, 49 = invalid) — the bind parser fails closed on an unparseable
+response, so it does not report false positives.
+
 ---
 
 #### `poison` - Network Poisoning
@@ -1325,9 +1355,9 @@ This table is generated from the command catalog. `stable` means the implementat
 | core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |
-| network | 0 | 7 | 0 | 7 |
-| offensive security | 0 | 57 | 14 | 71 |
-| utilities | 0 | 28 | 0 | 28 |
+| network | 0 | 8 | 0 | 8 |
+| offensive security | 0 | 58 | 14 | 72 |
+| utilities | 0 | 29 | 0 | 29 |
 | web security | 0 | 33 | 2 | 35 |
 <!-- END GENERATED COMMAND CATALOG -->
 

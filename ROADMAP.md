@@ -98,7 +98,8 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli fuzz vhost` | Virtual host discovery | web security | `experimental` | `active` | no |
 | `raxuiscli hash` | Hash text or files | utilities | `experimental` | `safe` | no |
 | `raxuiscli hash crack` | Crack hash using wordlist | utilities | `experimental` | `safe` | no |
-| `raxuiscli hash identify` | Identify hash type | utilities | `experimental` | `safe` | no |
+| `raxuiscli hash identify` | Identify hash type (with hashcat/john hints) | utilities | `experimental` | `safe` | no |
+| `raxuiscli hashid` | Identify hash type (alias of 'hash identify') | utilities | `experimental` | `safe` | no |
 | `raxuiscli help` | Help about any command | core | `stable` | `safe` | no |
 | `raxuiscli hexdump` | Display file contents in hex and ASCII | utilities | `experimental` | `safe` | no |
 | `raxuiscli http` | HTTP request tools and security header analysis | web security | `experimental` | `passive` | no |
@@ -190,10 +191,12 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 | `raxuiscli pwgen` | Generate secure passwords | utilities | `experimental` | `safe` | no |
 | `raxuiscli pwgen generate` | Generate password(s) | utilities | `experimental` | `safe` | no |
 | `raxuiscli recon` | Banner grabbing and service detection | network | `experimental` | `passive` | no |
+| `raxuiscli scan` | Concurrent host & service discovery (attack-surface mapper) | network | `experimental` | `active` | no |
 | `raxuiscli smb` | SMB enumeration and analysis | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli smb null` | Test null session | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli smb scan` | Scan SMB service | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli smb shares` | Enumerate SMB shares | offensive security | `experimental` | `dangerous` | no |
+| `raxuiscli spray` | Low-and-slow AD password spraying (LDAP) | offensive security | `experimental` | `dangerous` | no |
 | `raxuiscli strings` | Extract printable strings from files | utilities | `experimental` | `safe` | no |
 | `raxuiscli tlsscan` | Audit a server's TLS/SSL posture | cryptography | `experimental` | `active` | no |
 | `raxuiscli todo` | Manage your todo list | utilities | `experimental` | `safe` | no |

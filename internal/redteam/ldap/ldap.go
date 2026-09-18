@@ -184,30 +184,95 @@ func (c *SimpleLDAPConn) Bind(username, password, domain string) error {
 		return fmt.Errorf("bind read failed: %v", err)
 	}
 
-	// Parse bind response (simplified)
-	if n > 10 {
-		// Check result code (position varies but typically around byte 9-12)
-		// 0 = success, 49 = invalid credentials
-		for i := 8; i < min(n, 15); i++ {
-			if response[i] == 0x0a { // Result code tag
-				if i+2 < n {
-					resultCode := response[i+2]
-					if resultCode == 0 {
-						c.bound = true
-						return nil
-					} else if resultCode == 49 {
-						return fmt.Errorf("invalid credentials")
-					} else {
-						return fmt.Errorf("bind failed with code: %d", resultCode)
-					}
-				}
-			}
-		}
+	// Parse the bindResponse resultCode: 0 = success, 49 = invalid credentials.
+	// Fail closed on an unparseable response rather than assuming success, so
+	// callers (e.g. password spraying) never see a false positive.
+	code, ok := parseBindResultCode(response[:n])
+	if !ok {
+		return fmt.Errorf("bind failed: unparseable response")
+	}
+	switch code {
+	case 0:
+		c.bound = true
+		return nil
+	case 49:
+		return fmt.Errorf("invalid credentials")
+	default:
+		return fmt.Errorf("bind failed with code: %d", code)
+	}
+}
+
+// parseBindResultCode walks the BER-encoded LDAPMessage
+// (SEQUENCE { messageID INTEGER, bindResponse [APPLICATION 1] SEQUENCE {
+// resultCode ENUMERATED, ... } }) and returns the resultCode.
+func parseBindResultCode(resp []byte) (int, bool) {
+	p := 0
+	if len(resp) < 2 || resp[p] != 0x30 { // LDAPMessage SEQUENCE
+		return 0, false
+	}
+	p++
+	_, p, ok := readBERLen(resp, p)
+	if !ok {
+		return 0, false
 	}
 
-	// If we can't parse, assume success if no error
-	c.bound = true
-	return nil
+	// messageID INTEGER — skip its value.
+	if p >= len(resp) || resp[p] != 0x02 {
+		return 0, false
+	}
+	p++
+	mlen, p, ok := readBERLen(resp, p)
+	if !ok || p+mlen > len(resp) {
+		return 0, false
+	}
+	p += mlen
+
+	// bindResponse [APPLICATION 1] SEQUENCE.
+	if p >= len(resp) || resp[p] != 0x61 {
+		return 0, false
+	}
+	p++
+	_, p, ok = readBERLen(resp, p)
+	if !ok {
+		return 0, false
+	}
+
+	// resultCode ENUMERATED.
+	if p >= len(resp) || resp[p] != 0x0a {
+		return 0, false
+	}
+	p++
+	rlen, p, ok := readBERLen(resp, p)
+	if !ok || rlen < 1 || p+rlen > len(resp) {
+		return 0, false
+	}
+	code := 0
+	for i := 0; i < rlen; i++ {
+		code = code<<8 | int(resp[p+i])
+	}
+	return code, true
+}
+
+// readBERLen reads a BER length octet (short or long form) at position p and
+// returns the length plus the position just past the length octets.
+func readBERLen(b []byte, p int) (length, next int, ok bool) {
+	if p >= len(b) {
+		return 0, p, false
+	}
+	l := b[p]
+	p++
+	if l < 0x80 {
+		return int(l), p, true
+	}
+	n := int(l & 0x7f)
+	if n == 0 || n > 4 || p+n > len(b) {
+		return 0, p, false
+	}
+	length = 0
+	for i := 0; i < n; i++ {
+		length = length<<8 | int(b[p+i])
+	}
+	return length, p + n, true
 }
 
 // buildBindRequest builds an LDAP simple bind request

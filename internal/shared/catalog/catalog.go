@@ -137,7 +137,8 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli fuzz vhost", Summary: "Virtual host discovery"},
 	{Path: "raxuiscli hash", Summary: "Hash text or files"},
 	{Path: "raxuiscli hash crack", Summary: "Crack hash using wordlist"},
-	{Path: "raxuiscli hash identify", Summary: "Identify hash type"},
+	{Path: "raxuiscli hash identify", Summary: "Identify hash type (with hashcat/john hints)"},
+	{Path: "raxuiscli hashid", Summary: "Identify hash type (alias of 'hash identify')"},
 	{Path: "raxuiscli help", Summary: "Help about any command"},
 	{Path: "raxuiscli hexdump", Summary: "Display file contents in hex and ASCII"},
 	{Path: "raxuiscli http", Summary: "HTTP request tools and security header analysis"},
@@ -229,10 +230,12 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli pwgen", Summary: "Generate secure passwords"},
 	{Path: "raxuiscli pwgen generate", Summary: "Generate password(s)"},
 	{Path: "raxuiscli recon", Summary: "Banner grabbing and service detection"},
+	{Path: "raxuiscli scan", Summary: "Concurrent host & service discovery (attack-surface mapper)"},
 	{Path: "raxuiscli smb", Summary: "SMB enumeration and analysis"},
 	{Path: "raxuiscli smb null", Summary: "Test null session"},
 	{Path: "raxuiscli smb scan", Summary: "Scan SMB service"},
 	{Path: "raxuiscli smb shares", Summary: "Enumerate SMB shares"},
+	{Path: "raxuiscli spray", Summary: "Low-and-slow AD password spraying (LDAP)"},
 	{Path: "raxuiscli strings", Summary: "Extract printable strings from files"},
 	{Path: "raxuiscli tlsscan", Summary: "Audit a server's TLS/SSL posture"},
 	{Path: "raxuiscli todo", Summary: "Manage your todo list"},
@@ -301,7 +304,7 @@ func categoryFor(path string) string {
 		return "core"
 	case "audit", "compare", "demo", "interactive":
 		return "audit & reporting"
-	case "dns", "recon", "whois":
+	case "dns", "recon", "scan", "whois":
 		return "network"
 	case "certinfo", "cipher", "jwt", "keygen", "tlsscan":
 		return "cryptography"
@@ -309,7 +312,7 @@ func categoryFor(path string) string {
 		return "infrastructure"
 	case "cookie", "fuzz", "http", "vuln":
 		return "web security"
-	case "creds", "exfil", "kerberos", "ldap", "ntlm", "obfuscate", "persist", "pivot", "poison", "privesc", "smb", "tunnel":
+	case "creds", "exfil", "kerberos", "ldap", "ntlm", "obfuscate", "persist", "pivot", "poison", "privesc", "smb", "spray", "tunnel":
 		return "offensive security"
 	default:
 		return "utilities"
@@ -379,7 +382,7 @@ func safetyFor(path string) SafetyLevel {
 		"raxuiscli creds", "raxuiscli exfil",
 		"raxuiscli kerberos", "raxuiscli ldap", "raxuiscli ntlm",
 		"raxuiscli obfuscate", "raxuiscli persist", "raxuiscli pivot",
-		"raxuiscli poison", "raxuiscli privesc", "raxuiscli smb", "raxuiscli tunnel",
+		"raxuiscli poison", "raxuiscli privesc", "raxuiscli smb", "raxuiscli spray", "raxuiscli tunnel",
 	}
 	if hasPrefix(path, dangerousPrefixes) || path == "raxuiscli files shred" {
 		return SafetyDangerous
@@ -393,6 +396,7 @@ func safetyFor(path string) SafetyLevel {
 		"raxuiscli http post", "raxuiscli http put", "raxuiscli http delete",
 		"raxuiscli http options", "raxuiscli jwt none-attack",
 		"raxuiscli tlsscan", "raxuiscli audit tls", "raxuiscli audit dns",
+		"raxuiscli scan",
 	}
 	if hasPrefix(path, activePrefixes) {
 		return SafetyActive
