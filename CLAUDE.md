@@ -233,6 +233,15 @@ raxuiscli dns axfr example.com --server ns1.example.com  # Zone transfer
 raxuiscli dns brute example.com --wordlist subs.txt      # Subdomain brute
 ```
 
+For a versioned DNS/email posture report (SPF, DMARC, zone transfer), diffable
+with `compare` and gate-able with `--fail-on`:
+
+```bash
+raxuiscli audit dns example.com                          # DNS/email posture report
+raxuiscli --output=json --output-file before.json audit dns example.com
+raxuiscli --fail-on=high audit dns example.com           # Non-zero on HIGH+
+```
+
 #### `whois` - WHOIS Lookup
 Domain and IP WHOIS information.
 

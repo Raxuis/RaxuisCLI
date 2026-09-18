@@ -199,6 +199,25 @@ to test.
 The quick, non-report view remains available as the standalone
 [`tlsscan`](#tlsscan---tlsssl-posture-audit) command.
 
+### DNS / email posture audit
+
+`audit dns` assesses a domain's DNS and email-authentication posture and emits
+the same versioned report envelope, so it too is diffable with `compare` and
+gate-able with `--fail-on`. It checks the SPF and DMARC records and whether the
+domain's nameservers allow zone transfers (AXFR), and attaches the observed NS,
+MX, and A records as observations. Run it only against domains you are
+authorized to test.
+
+```bash
+raxuiscli audit dns example.com
+raxuiscli --output=json --output-file before.json audit dns example.com
+raxuiscli --fail-on=high audit dns example.com     # non-zero on HIGH+
+raxuiscli audit dns example.com --skip-axfr        # skip zone-transfer checks
+```
+
+Typical findings: missing SPF/DMARC (MEDIUM), an over-permissive `+all` SPF or a
+`p=none` DMARC policy, and an open zone transfer (CRITICAL).
+
 ### Scope, redirects, and request controls
 
 The audit accepts one absolute `http` or `https` URL. HTTP targets record that
@@ -1263,7 +1282,7 @@ This table is generated from the command catalog. `stable` means the implementat
 
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
-| audit & reporting | 7 | 0 | 0 | 7 |
+| audit & reporting | 8 | 0 | 0 | 8 |
 | core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |
