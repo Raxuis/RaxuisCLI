@@ -48,17 +48,20 @@ jobs:
     runs-on: ubuntu-latest
     # Publish to npm only for stable tags (skip prereleases like v1.2.3-rc1).
     if: ${{ !contains(github.ref_name, '-') }}
+    permissions:
+      contents: read
+      id-token: write # required for npm Trusted Publishing (OIDC)
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+      - name: Upgrade npm (Trusted Publishing needs >= 11.5.1)
+        run: npm install -g npm@latest
       - name: Set package version to the release tag
         working-directory: npm
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
       - name: Publish to npm
         working-directory: npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
