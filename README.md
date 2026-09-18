@@ -160,6 +160,34 @@ not fail for resolved, improved, or evidence-only changes. Comparison output
 uses the same `--output-file` and `--force` contract as audits, and HTML output
 requires an output file.
 
+### TLS/SSL posture audit
+
+`audit tls` assesses a server's TLS posture and emits the same versioned report
+envelope as `audit web`, so its snapshots are diffable with `compare` and can
+gate CI with `--fail-on`. It reuses the `tlsscan` engine (protocol versions,
+cipher suites, certificate health) and records each weakness as a severity-rated
+finding. It performs only ordinary handshakes against a host you are authorized
+to test.
+
+```bash
+# Human-readable report (defaults to port 443)
+./bin/raxuiscli audit tls example.com
+./bin/raxuiscli audit tls example.com:8443
+
+# Schema-v1 JSON snapshot for CI / comparison
+./bin/raxuiscli --output=json --output-file before.json audit tls example.com
+
+# Fail the pipeline when a HIGH (or worse) finding is present
+./bin/raxuiscli --fail-on=high audit tls example.com
+
+# Diff two snapshots taken before/after a TLS configuration change
+./bin/raxuiscli --output=json --output-file after.json audit tls example.com
+./bin/raxuiscli --fail-on-new=medium compare before.json after.json
+```
+
+The quick, non-report view remains available as the standalone
+[`tlsscan`](#tlsscan---tlsssl-posture-audit) command.
+
 ### Scope, redirects, and request controls
 
 The audit accepts one absolute `http` or `https` URL. HTTP targets record that
@@ -1224,7 +1252,7 @@ This table is generated from the command catalog. `stable` means the implementat
 
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
-| audit & reporting | 6 | 0 | 0 | 6 |
+| audit & reporting | 7 | 0 | 0 | 7 |
 | core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |

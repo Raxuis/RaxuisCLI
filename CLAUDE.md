@@ -322,6 +322,15 @@ raxuiscli tlsscan example.com --output json       # Machine-readable findings
 raxuiscli tlsscan example.com --timeout 5         # Per-connection timeout
 ```
 
+For a versioned, comparable report (same envelope as `audit web`, diffable with
+`compare` and gate-able with `--fail-on`), use the audit variant:
+
+```bash
+raxuiscli audit tls example.com                                  # Report on stdout
+raxuiscli --output=json --output-file before.json audit tls example.com
+raxuiscli --fail-on=high audit tls example.com                   # Non-zero on HIGH+
+```
+
 ---
 
 ### Active Directory / LDAP

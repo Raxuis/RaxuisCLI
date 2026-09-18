@@ -13,6 +13,7 @@ Ce tableau est généré depuis les métadonnées validées du binaire. Une comm
 |---|---|---|---|---|:---:|
 | `raxuiscli` | A powerful CLI toolkit | core | `stable` | `safe` | no |
 | `raxuiscli audit` | Passive security audits with versioned reports | audit & reporting | `stable` | `safe` | no |
+| `raxuiscli audit tls` | Audit TLS/SSL posture and produce a versioned report | audit & reporting | `stable` | `active` | no |
 | `raxuiscli audit web` | Passively inspect HTTP security headers and TLS certificates | audit & reporting | `stable` | `passive` | yes |
 | `raxuiscli certinfo` | Analyze X.509 certificates | cryptography | `experimental` | `safe` | no |
 | `raxuiscli certinfo chain` | Display full certificate chain | cryptography | `experimental` | `safe` | no |
