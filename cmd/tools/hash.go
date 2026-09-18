@@ -85,43 +85,85 @@ Examples:
 	},
 }
 
-var hashIdentifyCmd = &cobra.Command{
-	Use:   "identify [hash]",
-	Short: "Identify hash type",
-	Long: `Attempt to identify the type of a hash based on its length and format.
+const hashIdentifyLong = `Identify the likely type of a hash and, for each candidate, the
+hashcat mode (-m) and John the Ripper format to crack it.
+
+Detects structured formats (bcrypt, sha512crypt, phpass, LDAP, Django,
+Kerberoast, MSSQL, MySQL, ...) by signature, and plain hex/base64 digests
+by length and character set, returning a ranked list of candidates.
 
 Examples:
   raxuiscli hash identify "5d41402abc4b2a76b9719d911017c592"
-  raxuiscli hash identify "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"`,
-	Args: cobra.ExactArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
-		result := hash.Identify(args[0])
+  raxuiscli hash identify '$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZ...'
+  raxuiscli hashid '$6$rounds=656000$saltsalt$hash...'`
 
-		algos := make([]string, len(result.Algorithms))
-		for i, a := range result.Algorithms {
-			algos[i] = string(a)
+var hashIdentifyCmd = &cobra.Command{
+	Use:   "identify [hash]",
+	Short: "Identify hash type (with hashcat/john hints)",
+	Long:  hashIdentifyLong,
+	Args:  cobra.ExactArgs(1),
+	Run:   runHashIdentify,
+}
+
+var hashidCmd = &cobra.Command{
+	Use:   "hashid [hash]",
+	Short: "Identify hash type (alias of 'hash identify')",
+	Long:  hashIdentifyLong,
+	Args:  cobra.ExactArgs(1),
+	Run:   runHashIdentify,
+}
+
+func runHashIdentify(_ *cobra.Command, args []string) {
+	result := hash.Identify(args[0])
+
+	algos := make([]string, len(result.Algorithms))
+	for i, a := range result.Algorithms {
+		algos[i] = string(a)
+	}
+
+	candidates := make([]map[string]any, len(result.Candidates))
+	for i, c := range result.Candidates {
+		candidates[i] = map[string]any{
+			"name":         c.Name,
+			"hashcat_mode": c.HashcatMode,
+			"john_format":  c.JohnFormat,
+			"confidence":   c.Confidence,
+		}
+	}
+
+	payload := map[string]any{
+		"hash":       result.Hash,
+		"length":     result.Length,
+		"format":     result.Format,
+		"algorithms": algos, // crackable subset, kept for compatibility
+		"candidates": candidates,
+	}
+	_ = output.Emit(payload, func(w io.Writer) {
+		fmt.Fprintln(w, "Hash Analysis:")
+		fmt.Fprintln(w, strings.Repeat("-", 72))
+		fmt.Fprintf(w, "Hash:   %s\n", result.Hash)
+		fmt.Fprintf(w, "Length: %d characters (%s)\n", result.Length, result.Format)
+
+		if len(result.Candidates) == 0 {
+			fmt.Fprintln(w, "Type:   Unknown or unrecognized hash format")
+			return
 		}
 
-		payload := map[string]any{
-			"hash":       result.Hash,
-			"length":     result.Length,
-			"algorithms": algos,
-		}
-		_ = output.Emit(payload, func(w io.Writer) {
-			fmt.Fprintln(w, "Hash Analysis:")
-			fmt.Fprintln(w, strings.Repeat("-", 50))
-			fmt.Fprintf(w, "Hash:   %s\n", result.Hash)
-			fmt.Fprintf(w, "Length: %d characters\n", result.Length)
-			switch len(result.Algorithms) {
-			case 0:
-				fmt.Fprintln(w, "Type:   Unknown or invalid hash format")
-			case 1:
-				fmt.Fprintf(w, "Type:   %s\n", result.Algorithms[0])
-			default:
-				fmt.Fprintf(w, "Type:   %s (possible matches)\n", strings.Join(algos, " or "))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Candidates (most likely first):")
+		for _, c := range result.Candidates {
+			hashcat := "-"
+			if c.HashcatMode != "" {
+				hashcat = "-m " + c.HashcatMode
 			}
-		})
-	},
+			john := "-"
+			if c.JohnFormat != "" {
+				john = c.JohnFormat
+			}
+			fmt.Fprintf(w, "  %-42s hashcat %-10s john: %-14s [%s]\n",
+				c.Name, hashcat, john, c.Confidence)
+		}
+	})
 }
 
 var hashWordlist string
@@ -202,6 +244,7 @@ Examples:
 
 func init() {
 	cmd.RootCmd.AddCommand(hashCmd)
+	cmd.RootCmd.AddCommand(hashidCmd) // top-level alias of "hash identify"
 	hashCmd.AddCommand(hashIdentifyCmd)
 	hashCmd.AddCommand(hashCrackCmd)
 

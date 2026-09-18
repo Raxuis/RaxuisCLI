@@ -3,6 +3,7 @@ package hash
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -235,5 +236,91 @@ func TestHashFileUnsupportedAlgorithm(t *testing.T) {
 func TestHashFileMissing(t *testing.T) {
 	if _, err := HashFile("/nonexistent/file", AlgoMD5); err == nil {
 		t.Error("HashFile on a missing file should return an error")
+	}
+}
+
+func TestIdentifyCandidatesByLength(t *testing.T) {
+	tests := []struct {
+		name       string
+		hash       string
+		wantFormat string
+		wantFirst  string // Name of the top candidate
+		wantMode   string // hashcat mode of the top candidate
+	}{
+		{"md5", "5d41402abc4b2a76b9719d911017c592", "hex", "MD5", "0"},
+		{"sha1", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", "hex", "SHA-1", "100"},
+		{"sha256", "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "hex", "SHA-256", "1400"},
+		{"sha512-len", strings.Repeat("a", 128), "hex", "SHA-512", "1700"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Identify(tt.hash)
+			if res.Format != tt.wantFormat {
+				t.Errorf("Format = %q, want %q", res.Format, tt.wantFormat)
+			}
+			if len(res.Candidates) == 0 {
+				t.Fatalf("expected candidates, got none")
+			}
+			if res.Candidates[0].Name != tt.wantFirst {
+				t.Errorf("top candidate = %q, want %q", res.Candidates[0].Name, tt.wantFirst)
+			}
+			if res.Candidates[0].HashcatMode != tt.wantMode {
+				t.Errorf("top hashcat mode = %q, want %q", res.Candidates[0].HashcatMode, tt.wantMode)
+			}
+		})
+	}
+}
+
+func TestIdentifyMD5AndNTLMAmbiguity(t *testing.T) {
+	res := Identify("5d41402abc4b2a76b9719d911017c592")
+	names := make(map[string]bool)
+	for _, c := range res.Candidates {
+		names[c.Name] = true
+	}
+	if !names["MD5"] || !names["NTLM"] {
+		t.Errorf("32-hex hash should list both MD5 and NTLM, got %v", names)
+	}
+}
+
+func TestIdentifySignatures(t *testing.T) {
+	tests := []struct {
+		name     string
+		hash     string
+		wantName string
+		wantMode string
+	}{
+		{"bcrypt", "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZfhBhJ5G", "bcrypt (Blowfish)", "3200"},
+		{"sha512crypt", "$6$rounds=656000$salt$hash", "sha512crypt (Unix)", "1800"},
+		{"md5crypt", "$1$salt$qJH7.N4xYta3aEG/dfqo/0", "md5crypt (Unix, FreeBSD)", "500"},
+		{"phpass", "$P$984478476IagS59wHZvyQMArzfx58u.", "phpass (WordPress, phpBB3, Joomla)", "400"},
+		{"krb5tgs", "$krb5tgs$23$*u$D$s*$deadbeef", "Kerberoast TGS-REP (Kerberos 5)", "13100"},
+		{"django-pbkdf2", "pbkdf2_sha256$260000$salt$hash", "Django PBKDF2-HMAC-SHA256", "10000"},
+		{"mysql41", "*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19", "MySQL 4.1+/5.x (SHA-1(SHA-1(pass)))", "300"},
+		{"ldap-ssha", "{SSHA}deadbeefdeadbeefdeadbeef", "LDAP SSHA (salted SHA-1, base64)", "111"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Identify(tt.hash)
+			if res.Format != "structured" {
+				t.Errorf("Format = %q, want structured", res.Format)
+			}
+			if len(res.Candidates) == 0 {
+				t.Fatalf("expected a candidate for %s", tt.name)
+			}
+			c := res.Candidates[0]
+			if c.Name != tt.wantName || c.HashcatMode != tt.wantMode || c.Confidence != "certain" {
+				t.Errorf("got {%q, %q, %q}, want {%q, %q, certain}", c.Name, c.HashcatMode, c.Confidence, tt.wantName, tt.wantMode)
+			}
+		})
+	}
+}
+
+func TestIdentifyUnknownHasNoCandidates(t *testing.T) {
+	res := Identify("this is definitely not a hash!")
+	if len(res.Candidates) != 0 {
+		t.Errorf("unknown input should yield no candidates, got %v", res.Candidates)
+	}
+	if res.Algorithms != nil {
+		t.Errorf("unknown input should yield nil crackable algorithms, got %v", res.Algorithms)
 	}
 }

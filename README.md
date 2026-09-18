@@ -1160,6 +1160,18 @@ raxuiscli hash sha256 "text"
 raxuiscli hash sha512 -f file.bin
 ```
 
+#### `hashid` / `hash identify` - Hash Identification
+Identify the likely type of a hash and, for each candidate, the hashcat mode
+(`-m`) and John the Ripper format needed to crack it. Recognizes structured
+formats (bcrypt, `*crypt`, phpass, LDAP, Django, Kerberoast, MSSQL, MySQL, ...)
+by signature, and plain hex/base64 digests by length, returning a ranked list.
+```bash
+raxuiscli hashid "5d41402abc4b2a76b9719d911017c592"      # MD5 / NTLM / MD4 ...
+raxuiscli hashid '$2y$10$N9qo8uLOickgx2ZMRZo...'         # bcrypt (hashcat -m 3200)
+raxuiscli hash identify '$krb5tgs$23$*user$DOM$svc*...'  # Kerberoast (-m 13100)
+raxuiscli --output=json hashid "<hash>"                  # machine-readable
+```
+
 #### `pwgen` - Password Generator
 ```bash
 raxuiscli pwgen

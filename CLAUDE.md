@@ -188,6 +188,19 @@ raxuiscli hash sha256 "text"                      # SHA256 hash
 raxuiscli hash -f <file>                          # Hash file
 ```
 
+#### `hashid` / `hash identify` - Hash Identification
+Identify a hash's likely type with hashcat `-m` mode and John format hints for
+each candidate. Recognizes structured formats (bcrypt, sha512crypt, phpass,
+LDAP, Django, Kerberoast, MSSQL, MySQL, ...) by signature and hex/base64
+digests by length. `hashid` is a top-level alias of `hash identify`.
+
+```bash
+raxuiscli hashid "5d41402abc4b2a76b9719d911017c592"   # MD5/NTLM/MD4 candidates
+raxuiscli hashid '$2y$10$N9qo8uLOickgx2ZMRZo...'      # bcrypt (hashcat -m 3200)
+raxuiscli hash identify '$6$rounds=656000$salt$...'   # sha512crypt (-m 1800)
+raxuiscli --output=json hashid "<hash>"               # machine-readable candidates
+```
+
 #### `hexdump` - Hexadecimal Display
 Display file contents in hexadecimal format.
 
