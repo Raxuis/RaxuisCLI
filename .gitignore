@@ -14,7 +14,7 @@ mycli
 
 # Dependency directories (vendor/ is rarely used with modules now)
 vendor/
-bin/
+/bin/
 
 # IDE/editor settings
 .idea/
