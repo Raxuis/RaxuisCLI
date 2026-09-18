@@ -1,0 +1,48 @@
+{
+  "name": "raxuiscli",
+  "version": "0.2.1",
+  "description": "Cybersecurity CLI toolkit for pentest, CTF and security analysis",
+  "bin": {
+    "raxuiscli": "bin/raxuiscli.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "keywords": [
+    "security",
+    "cybersecurity",
+    "pentest",
+    "ctf",
+    "cli",
+    "tls",
+    "recon",
+    "jwt"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raxuis/RaxuisCLI.git"
+  },
+  "homepage": "https://github.com/Raxuis/RaxuisCLI#readme",
+  "bugs": {
+    "url": "https://github.com/Raxuis/RaxuisCLI/issues"
+  },
+  "author": "Raxuis",
+  "license": "MIT"
+}

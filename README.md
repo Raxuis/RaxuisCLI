@@ -41,6 +41,17 @@ The author(s) assume no liability and are not responsible for any misuse or dama
 brew install Raxuis/tap/raxuiscli
 ```
 
+### npm / npx (Node)
+
+```bash
+npx raxuiscli tlsscan example.com      # run without installing
+npm install -g raxuiscli               # or install globally
+```
+
+On install, a small script downloads the matching prebuilt binary from the
+releases and verifies its checksum. Requires `tar` on `PATH` (default on Linux,
+macOS, and Windows 10+).
+
 ### Install script (Linux / macOS)
 
 ```bash
