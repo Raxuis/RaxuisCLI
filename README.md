@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/Raxuis/RaxuisCLI/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxuis/RaxuisCLI/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Raxuis/RaxuisCLI?sort=semver)](https://github.com/Raxuis/RaxuisCLI/releases/latest)
+[![npm](https://img.shields.io/npm/v/raxuiscli?logo=npm)](https://www.npmjs.com/package/raxuiscli)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Raxuis/RaxuisCLI)](https://goreportcard.com/report/github.com/Raxuis/RaxuisCLI)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Raxuis/RaxuisCLI.svg)](https://pkg.go.dev/github.com/Raxuis/RaxuisCLI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
