@@ -713,15 +713,19 @@ raxuiscli --output=json scan 10.0.0.0/24 | raxuiscli spray --from-scan - -u user
 # Or point at a single domain controller
 raxuiscli spray -H dc01.corp.local -u users.txt --password 'Spring2025!' -d corp.local
 
-# Low & slow with lockout guard
+# Low & slow with lockout guard; --delay paces the launch rate
 raxuiscli spray --from-scan surface.json -u users.txt -p passwords.txt -d corp.local \
   --delay 500ms --jitter 300ms --round-delay 31m --lockout-threshold 5
+
+# Grab one foothold and stop, saving valid creds for reuse
+raxuiscli spray --from-scan surface.json -u users.txt -p passwords.txt -d corp.local \
+  --stop-on-success --out valid-creds.txt
 ```
 
 **Flags:** `--from-scan`, `-H/--host`, `-u/--users`, `-p/--passwords` /
-`--password`, `-d/--domain`, `-c/--concurrency`, `-t/--timeout`, `--delay`,
-`--jitter`, `--round-delay`, `--lockout-threshold`, `--force`,
-`--continue-on-success`.
+`--password`, `-d/--domain`, `-c/--concurrency`, `-t/--timeout`, `--delay`
+(launch rate limit), `--jitter`, `--round-delay`, `--lockout-threshold`,
+`--force`, `--continue-on-success`, `--stop-on-success`, `-o/--out`.
 
 **Safety:** valid credentials are confirmed via the LDAP bind resultCode (0 =
 success, 49 = invalid) — the bind parser fails closed on an unparseable

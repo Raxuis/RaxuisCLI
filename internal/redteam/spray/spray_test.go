@@ -178,3 +178,40 @@ func TestParseScanTargetsEmpty(t *testing.T) {
 		t.Error("expected error when no ad-tagged LDAP targets are present")
 	}
 }
+
+func TestStopOnSuccessHaltsSpray(t *testing.T) {
+	host, port, done := fakeLDAP(t, "P@ss") // every user matches when password is P@ss
+	defer done()
+
+	res := Run(Options{
+		Targets:       []Target{{Host: host, Port: port}},
+		Users:         []string{"alice", "bob", "carol"},
+		Passwords:     []string{"P@ss"},
+		Domain:        "corp.local",
+		Timeout:       3,
+		Concurrency:   1,
+		StopOnSuccess: true,
+	})
+	if len(res.Valid) != 1 {
+		t.Errorf("StopOnSuccess should yield exactly 1 hit, got %d", len(res.Valid))
+	}
+}
+
+func TestOnRoundStartFires(t *testing.T) {
+	host, port, done := fakeLDAP(t, "none") // no password matches, so all rounds run
+	defer done()
+
+	var seen []int
+	Run(Options{
+		Targets:      []Target{{Host: host, Port: port}},
+		Users:        []string{"alice"},
+		Passwords:    []string{"a", "b", "c"},
+		Domain:       "corp.local",
+		Timeout:      3,
+		Concurrency:  1,
+		OnRoundStart: func(round, total int, _ string) { seen = append(seen, round) },
+	})
+	if len(seen) != 3 || seen[0] != 1 || seen[2] != 3 {
+		t.Errorf("OnRoundStart should fire for rounds 1,2,3; got %v", seen)
+	}
+}
