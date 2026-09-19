@@ -421,11 +421,16 @@ round to respect lockout policy. Consumes the `ad`-tagged LDAP targets found by
 `scan`. Authorized use only; know the lockout policy first and space rounds
 with `--round-delay`.
 
+Two protocols via `--protocol`: `ldap` (default, simple bind, ports
+389/636/3268/3269) and `kerberos` (AS-REQ pre-auth, RC4-HMAC, port 88 — reports
+expired/locked/unknown accounts and warns when the KDC refuses RC4).
+
 ```bash
 raxuiscli --output=json scan 10.10.10.0/24 > surface.json
 raxuiscli spray --from-scan surface.json -u users.txt --password 'Winter2025!' -d corp.local
 raxuiscli --output=json scan 10.0.0.0/24 | raxuiscli spray --from-scan - -u users.txt -p passwords.txt -d corp.local
 raxuiscli spray -H dc01.corp.local -u users.txt --password 'Spring2025!' -d corp.local
+raxuiscli spray --protocol kerberos --from-scan surface.json -u users.txt --password 'Winter2025!' -d corp.local
 ```
 
 #### `poison` - Network Poisoning

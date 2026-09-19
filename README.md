@@ -313,6 +313,74 @@ Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
 
 ## Available Commands
 
+> **New to security tooling? Start here.** RaxuisCLI is a "Swiss-army knife" for
+> security work: each command does one focused job. You do **not** need to know
+> them all — pick the one that matches your task. Every command supports
+> `raxuiscli <command> --help` for details and examples, most support
+> `--output=json` for scripting, and each carries a maturity label in its help
+> (`stable` = complete, `experimental` = may change, `informational` = prints
+> guidance/examples rather than performing the action end to end). Only run
+> active/offensive commands against systems you own or are authorized to test.
+
+### What each family of commands is for (in plain English)
+
+| Family | In one sentence | Example commands |
+|---|---|---|
+| **Network reconnaissance** | Find out what hosts and services exist on a network and what software they run. | `dns`, `whois`, `recon`, `scan` |
+| **Cryptography** | Encode/decode, analyze, break, or generate cryptographic material (ciphers, JWTs, keys, certificates). | `cipher`, `jwt`, `keygen`, `certinfo`, `tlsscan` |
+| **Active Directory / Windows** | Enumerate and attack Windows domains (users, groups, tickets, passwords). | `ldap`, `kerberos`, `ntlm`, `smb`, `spray` |
+| **Privilege escalation & persistence** | On a machine you already have access to, find ways to get higher privileges or stay in. | `privesc`, `persist`, `creds` |
+| **Network attacks & movement** | Poison local traffic, tunnel through networks, and pivot to reach new hosts. | `poison`, `tunnel`, `pivot`, `exfil` |
+| **Web security** | Send custom HTTP requests and test websites/APIs for common vulnerabilities. | `http`, `fuzz`, `vuln`, `cookie` |
+| **Cloud & containers** | Check cloud accounts, Docker, and Kubernetes for misconfigurations and escape paths. | `cloud`, `container`, `k8s` |
+| **Encoding & analysis** | Everyday data helpers: hashing, encoding, entropy, file inspection. | `hash`, `hashid`, `encode`, `entropy`, `strings`, `hexdump`, `metadata` |
+| **Utilities** | Convenience tools that touch nothing on the network. | `pwgen`, `ports`, `todo`, `files` |
+| **Audit & reporting** | Passive, repeatable security reports you can diff over time and gate CI with. | `audit`, `compare`, `tlsscan` |
+
+<details>
+<summary><strong>Glossary — the jargon used above and in the command descriptions, in plain words</strong> (click to expand)</summary>
+
+**General**
+- **Pentest (penetration test):** an authorized, simulated attack to find weaknesses before real attackers do.
+- **Red team:** offensive security — playing the attacker to test defenses.
+- **CTF (Capture The Flag):** a security puzzle/competition where you exploit challenges to find hidden "flags".
+- **Passive vs. active:** *passive* only reads/observes (low risk); *active* sends probes or attacks (only on authorized targets).
+
+**Windows / Active Directory**
+- **Active Directory (AD):** Microsoft's system for managing Windows users, computers, and permissions in a company.
+- **Domain Controller (DC):** the server that runs AD and checks logins.
+- **LDAP:** the protocol used to query and log in to AD (think "the directory's query language").
+- **Kerberos / KDC:** the ticket-based login system in AD; the **KDC** is the service that issues those tickets.
+- **NTLM:** an older Windows login/hashing scheme; its password hashes are often cracked or replayed.
+- **SMB:** Windows file/printer sharing (the `\\server\share` protocol).
+- **Password spraying:** trying **one** common password against **many** users (the opposite of brute-forcing one user), to avoid locking accounts.
+- **Kerberoasting / AS-REP roasting:** requesting Kerberos data for accounts, then cracking it offline to recover passwords.
+
+**Getting in deeper**
+- **Privilege escalation:** going from a low-privilege user to admin/root.
+- **SUID / sudo / capabilities:** Linux mechanisms that, if misconfigured, let a normal user run code as root.
+- **Persistence:** ways to keep access after a reboot or logout.
+- **Poisoning (LLMNR/NBT-NS/mDNS):** answering Windows name-lookup broadcasts to trick machines into sending you their credentials.
+- **Pivoting / tunneling / SOCKS proxy:** using one compromised host as a stepping stone to reach networks you couldn't otherwise touch.
+- **Exfiltration:** sneaking data out of a network (e.g. hidden in DNS or ICMP traffic).
+
+**Web**
+- **HTTP headers:** metadata sent with every web request/response; some headers (or their absence) reveal security weaknesses.
+- **XSS (Cross-Site Scripting):** injecting malicious JavaScript into a page other users view.
+- **SQLi (SQL injection):** injecting database commands through an input field.
+- **LFI/RFI (Local/Remote File Inclusion):** tricking a site into reading or running files it shouldn't.
+- **CORS / Host header / SSRF / XXE:** various ways web apps can be tricked into trusting the wrong origin, host, URL, or XML input.
+- **JWT / cookie / session:** tokens that keep you logged in; they can sometimes be decoded, forged, or tampered with.
+
+**Crypto & data**
+- **Hash:** a one-way fingerprint of data (e.g. MD5, SHA-256). **Hash cracking** = guessing the original input; **`hashid`** = identifying which hash type you have.
+- **TLS/SSL & certificates:** the encryption behind `https://`; `tlsscan`/`certinfo` grade how well a server is configured.
+- **Cipher:** an algorithm that scrambles text; the `cipher` command handles classic ones (Caesar, XOR, Vigenère…).
+- **Entropy:** a measure of randomness — high entropy often means data is encrypted or compressed.
+- **Banner grabbing:** connecting to a service to read the "hello" text that reveals its software and version.
+
+</details>
+
 ### Network Reconnaissance
 
 #### `dns` - DNS Operations
@@ -720,11 +788,20 @@ raxuiscli spray --from-scan surface.json -u users.txt -p passwords.txt -d corp.l
 # Grab one foothold and stop, saving valid creds for reuse
 raxuiscli spray --from-scan surface.json -u users.txt -p passwords.txt -d corp.local \
   --stop-on-success --out valid-creds.txt
+
+# Kerberos mode: spray via AS-REQ pre-authentication against the KDC (port 88)
+raxuiscli spray --protocol kerberos --from-scan surface.json -u users.txt --password 'Winter2025!' -d corp.local
 ```
 
-**Flags:** `--from-scan`, `-H/--host`, `-u/--users`, `-p/--passwords` /
-`--password`, `-d/--domain`, `-c/--concurrency`, `-t/--timeout`, `--delay`
-(launch rate limit), `--jitter`, `--round-delay`, `--lockout-threshold`,
+Two protocols are supported with `--protocol`:
+- `ldap` (default) — LDAP simple bind against a domain controller (ports 389/636/3268/3269).
+- `kerberos` — AS-REQ pre-authentication (RC4-HMAC) against the KDC (port 88). It
+  distinguishes valid, invalid, non-existent, locked, and password-expired
+  accounts, and warns if the KDC refuses RC4 (AES-only hardening).
+
+**Flags:** `--protocol` (ldap|kerberos), `--from-scan`, `-H/--host`, `-u/--users`,
+`-p/--passwords` / `--password`, `-d/--domain`, `-c/--concurrency`, `-t/--timeout`,
+`--delay` (launch rate limit), `--jitter`, `--round-delay`, `--lockout-threshold`,
 `--force`, `--continue-on-success`, `--stop-on-success`, `-o/--out`.
 
 **Safety:** valid credentials are confirmed via the LDAP bind resultCode (0 =

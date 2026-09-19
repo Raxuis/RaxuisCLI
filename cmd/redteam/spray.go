@@ -41,6 +41,7 @@ type hitOut struct {
 	Host     string `json:"host"`
 	User     string `json:"user"`
 	Password string `json:"password"`
+	Note     string `json:"note,omitempty"`
 }
 
 var sprayCmd = &cobra.Command{
@@ -68,8 +69,9 @@ password rounds across the lockout window.`,
 }
 
 func runSpray(_ *cobra.Command, _ []string) {
-	if strings.ToLower(sprayProtocol) != "ldap" {
-		fmt.Fprintf(os.Stderr, "Error: only --protocol ldap is implemented\n")
+	proto := strings.ToLower(sprayProtocol)
+	if proto != "ldap" && proto != "kerberos" {
+		fmt.Fprintf(os.Stderr, "Error: --protocol must be 'ldap' or 'kerberos'\n")
 		os.Exit(1)
 	}
 	if sprayDomain == "" {
@@ -77,7 +79,7 @@ func runSpray(_ *cobra.Command, _ []string) {
 		os.Exit(1)
 	}
 
-	targets, err := resolveSprayTargets()
+	targets, err := resolveSprayTargets(proto)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -121,8 +123,8 @@ func runSpray(_ *cobra.Command, _ []string) {
 
 	jsonMode := output.JSON()
 	if !jsonMode {
-		fmt.Printf("Spraying %d user(s) x %d password(s) against %d LDAP target(s) [%s]...\n",
-			len(users), len(passwords), len(targets), sprayDomain)
+		fmt.Printf("Spraying %d user(s) x %d password(s) against %d %s target(s) [%s]...\n",
+			len(users), len(passwords), len(targets), strings.ToUpper(proto), sprayDomain)
 		fmt.Println(strings.Repeat("-", 60))
 	}
 
@@ -139,9 +141,16 @@ func runSpray(_ *cobra.Command, _ []string) {
 		ContinueOnSuccess: sprayContinueHits,
 		StopOnSuccess:     sprayStopOnHit,
 	}
+	if proto == "kerberos" {
+		opts.Probe = spray.KerberosProbe
+	}
 	if !jsonMode {
 		opts.OnHit = func(h spray.Hit) {
-			fmt.Printf("[+] %s\\%s : %s  (%s)\n", sprayDomain, h.User, h.Password, h.Host)
+			note := ""
+			if h.Note != "" {
+				note = "  [" + h.Note + "]"
+			}
+			fmt.Printf("[+] %s\\%s : %s  (%s)%s\n", sprayDomain, h.User, h.Password, h.Host, note)
 		}
 		if len(passwords) > 1 {
 			opts.OnRoundStart = func(round, total int, password string) {
@@ -162,26 +171,31 @@ func runSpray(_ *cobra.Command, _ []string) {
 
 	hits := make([]hitOut, 0, len(result.Valid))
 	for _, h := range result.Valid {
-		hits = append(hits, hitOut{Host: h.Host, User: h.User, Password: h.Password})
+		hits = append(hits, hitOut{Host: h.Host, User: h.User, Password: h.Password, Note: h.Note})
 	}
 	payload := map[string]any{
 		"domain":      sprayDomain,
+		"protocol":    proto,
 		"targets":     len(targets),
 		"users":       len(users),
 		"passwords":   len(passwords),
 		"attempts":    result.Attempts,
 		"errors":      result.Errors,
 		"valid":       hits,
+		"notes":       result.Notes,
 		"duration_ms": result.Duration.Milliseconds(),
 	}
 	_ = output.Emit(payload, func(w io.Writer) {
 		fmt.Fprintln(w, strings.Repeat("-", 60))
+		for _, n := range result.Notes {
+			fmt.Fprintf(w, "[!] %s\n", n)
+		}
 		fmt.Fprintf(w, "%d valid credential(s), %d attempts, %d errors (%.1fs)\n",
 			len(result.Valid), result.Attempts, result.Errors, result.Duration.Seconds())
 	})
 }
 
-func resolveSprayTargets() ([]spray.Target, error) {
+func resolveSprayTargets(proto string) ([]spray.Target, error) {
 	if sprayFromScan != "" {
 		var data []byte
 		var err error
@@ -193,15 +207,21 @@ func resolveSprayTargets() ([]spray.Target, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading scan output: %w", err)
 		}
+		if proto == "kerberos" {
+			return spray.ParseScanKerberosTargets(data)
+		}
 		return spray.ParseScanTargets(data)
 	}
 
 	if sprayHost != "" {
 		port := sprayPort
 		if port == 0 {
-			if sprayTLS {
+			switch {
+			case proto == "kerberos":
+				port = 88
+			case sprayTLS:
 				port = 636
-			} else {
+			default:
 				port = 389
 			}
 		}
@@ -300,7 +320,7 @@ func init() {
 	sprayCmd.Flags().StringVarP(&sprayPasswords, "passwords", "p", "", "Password list file (spray each, one round per password)")
 	sprayCmd.Flags().StringVar(&sprayPassword, "password", "", "Single password to spray across all users")
 	sprayCmd.Flags().StringVarP(&sprayDomain, "domain", "d", "", "Active Directory domain, e.g. corp.local (required)")
-	sprayCmd.Flags().StringVar(&sprayProtocol, "protocol", "ldap", "Spray protocol (only 'ldap' is implemented)")
+	sprayCmd.Flags().StringVar(&sprayProtocol, "protocol", "ldap", "Spray protocol: 'ldap' (simple bind) or 'kerberos' (AS-REQ pre-auth, RC4)")
 	sprayCmd.Flags().IntVarP(&sprayConcurrency, "concurrency", "c", 10, "Maximum concurrent binds within a password round")
 	sprayCmd.Flags().IntVarP(&sprayTimeout, "timeout", "t", 5, "Per-connection timeout in seconds")
 	sprayCmd.Flags().StringVar(&sprayDelay, "delay", "", "Fixed delay before each attempt (e.g. 500ms)")
