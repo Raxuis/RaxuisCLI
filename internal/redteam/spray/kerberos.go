@@ -7,13 +7,14 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf16"
 
-	"golang.org/x/crypto/md4"
+	"golang.org/x/crypto/md4" //nolint:staticcheck // NT hash (Kerberos/NTLM, RFC 4757) requires MD4 for protocol compatibility, not for security.
 )
 
 // Kerberos AS-REQ pre-authentication password spraying (etype 23, RC4-HMAC).
@@ -73,7 +74,7 @@ func sendKerberosTCP(host string, port int, req []byte, timeout int) ([]byte, er
 	}
 
 	var lenBuf [4]byte
-	if _, err := readFull(conn, lenBuf[:]); err != nil {
+	if _, err := io.ReadFull(conn, lenBuf[:]); err != nil {
 		return nil, err
 	}
 	n := binary.BigEndian.Uint32(lenBuf[:])
@@ -81,24 +82,10 @@ func sendKerberosTCP(host string, port int, req []byte, timeout int) ([]byte, er
 		return nil, fmt.Errorf("bad kerberos response length %d", n)
 	}
 	body := make([]byte, n)
-	if _, err := readFull(conn, body); err != nil {
+	if _, err := io.ReadFull(conn, body); err != nil {
 		return nil, err
 	}
 	return body, nil
-}
-
-func readFull(conn net.Conn, buf []byte) (int, error) {
-	total := 0
-	for total < len(buf) {
-		nn, err := conn.Read(buf[total:])
-		if nn > 0 {
-			total += nn
-		}
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
 }
 
 // parseKerberosResponse maps an AS-REP / KRB-ERROR reply to an Outcome.
