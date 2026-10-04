@@ -125,6 +125,20 @@ import (
 
 ## Commands Reference
 
+### Consolidated Audit
+
+`audit all <http-or-https-url>` combines web, DNS, and TLS in one schema-v1 report.
+The global timeout defaults to 60 seconds; DNS/TLS operations each have a
+10-second limit. IP targets skip DNS, HTTP targets skip TLS, and AXFR requires
+`--axfr`. Partial results are preserved and return exit 1; complete reports
+apply `--fail-on` (exit 2). All web request options and `--nameserver` are supported.
+
+```bash
+raxuiscli --output=json --output-file report.json audit all https://example.com
+raxuiscli --output=html --output-file report.html audit all https://example.com
+```
+
+
 ### Utility Commands
 
 #### `files` - File Operations

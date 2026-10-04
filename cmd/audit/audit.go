@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/audit/combined"
 	dnsaudit "github.com/Raxuis/RaxuisCLI/internal/audit/dns"
 	tlsaudit "github.com/Raxuis/RaxuisCLI/internal/audit/tls"
 	webaudit "github.com/Raxuis/RaxuisCLI/internal/audit/web"
@@ -28,6 +29,7 @@ func newAuditCommand(runner auditRunner) *cobra.Command {
 		},
 	}
 	command.AddCommand(newWebCommand(runner))
+	command.AddCommand(newAllCommand(combined.Audit))
 	command.AddCommand(newTLSCommand(tlsaudit.Audit))
 	command.AddCommand(newDNSCommand(dnsaudit.Audit))
 	return command

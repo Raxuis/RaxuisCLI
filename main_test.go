@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -70,12 +72,37 @@ func TestPublicCLI(t *testing.T) {
 			{"audit", "dns", "https://example.test"},
 			{"audit", "tls", "example.test:65536"},
 			{"audit", "web", "ftp://example.test"},
+			{"audit", "all", "ftp://example.test"},
 		}
 		for _, args := range cases {
 			stdout, stderr, code := run(args...)
 			if code != 1 || len(stderr) == 0 || len(stdout) != 0 {
 				t.Errorf("%v: exit=%d stdout=%q stderr=%q", args, code, stdout, stderr)
 			}
+		}
+	})
+	t.Run("combined local HTTP report", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+		defer server.Close()
+		stdout, stderr, code := run("--output=json", "audit", "all", server.URL)
+		if code != 0 {
+			t.Fatalf("exit=%d stderr=%s", code, stderr)
+		}
+		value, err := report.Read(bytes.NewReader(stdout))
+		if err != nil || value.Audit.Kind != "all" || value.Audit.Status != "complete" {
+			t.Fatalf("report=%s err=%v", stdout, err)
+		}
+		skipped := 0
+		for _, item := range value.Observations {
+			if item.Key == "combined.dns.status" || item.Key == "combined.tls.status" {
+				if item.Value != "skipped" {
+					t.Fatal(item)
+				}
+				skipped++
+			}
+		}
+		if skipped != 2 {
+			t.Fatalf("expected two skipped stages: %+v", value.Observations)
 		}
 	})
 	t.Run("demo report and policy exit", func(t *testing.T) {

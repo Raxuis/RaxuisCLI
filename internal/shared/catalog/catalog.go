@@ -52,6 +52,7 @@ type commandSpec struct {
 var commandSpecs = []commandSpec{
 	{Path: "raxuiscli", Summary: "A powerful CLI toolkit"},
 	{Path: "raxuiscli audit", Summary: "Passive security audits with versioned reports"},
+	{Path: "raxuiscli audit all", Summary: "Combine web, DNS, and TLS posture audits in one versioned report"},
 	{Path: "raxuiscli audit dns", Summary: "Audit a domain's DNS/email posture and produce a versioned report"},
 	{Path: "raxuiscli audit tls", Summary: "Audit TLS/SSL posture and produce a versioned report"},
 	{Path: "raxuiscli audit web", Summary: "Passively inspect HTTP security headers and TLS certificates"},
@@ -284,7 +285,7 @@ func buildEntries(specs []commandSpec) []Entry {
 
 func maturityFor(path string) Maturity {
 	switch path {
-	case "raxuiscli", "raxuiscli audit", "raxuiscli audit dns", "raxuiscli audit tls", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web", "raxuiscli interactive",
+	case "raxuiscli", "raxuiscli audit", "raxuiscli audit all", "raxuiscli audit dns", "raxuiscli audit tls", "raxuiscli audit web", "raxuiscli compare", "raxuiscli demo", "raxuiscli demo web", "raxuiscli interactive",
 		"raxuiscli completion", "raxuiscli completion bash", "raxuiscli completion fish", "raxuiscli completion powershell", "raxuiscli completion zsh", "raxuiscli help":
 		return MaturityStable
 	case "raxuiscli http curl", "raxuiscli k8s commands", "raxuiscli kerberos asrep", "raxuiscli kerberos golden", "raxuiscli kerberos roast", "raxuiscli kerberos silver", "raxuiscli ntlm pth", "raxuiscli persist list", "raxuiscli poison arp", "raxuiscli poison dhcp", "raxuiscli poison llmnr", "raxuiscli poison mdns", "raxuiscli poison nbtns", "raxuiscli poison protocols", "raxuiscli poison responder", "raxuiscli tunnel dns", "raxuiscli vuln payloads":
@@ -395,7 +396,7 @@ func safetyFor(path string) SafetyLevel {
 		"raxuiscli cloud", "raxuiscli container", "raxuiscli k8s", "raxuiscli ports",
 		"raxuiscli http post", "raxuiscli http put", "raxuiscli http delete",
 		"raxuiscli http options", "raxuiscli jwt none-attack",
-		"raxuiscli tlsscan", "raxuiscli audit tls", "raxuiscli audit dns",
+		"raxuiscli tlsscan", "raxuiscli audit all", "raxuiscli audit tls", "raxuiscli audit dns",
 		"raxuiscli scan",
 	}
 	if hasPrefix(path, activePrefixes) {

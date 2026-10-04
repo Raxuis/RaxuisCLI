@@ -165,6 +165,10 @@ func Audit(ctx context.Context, rawTarget string, options Options) (report.Repor
 	}, findings, observations, reportErrors), nil
 }
 
+func ParseTarget(rawTarget string) (*url.URL, error) {
+	return parseTarget(rawTarget)
+}
+
 func parseTarget(rawTarget string) (*url.URL, error) {
 	target, err := url.ParseRequestURI(rawTarget)
 	if err != nil || target.Scheme == "" || target.Host == "" || target.Hostname() == "" {

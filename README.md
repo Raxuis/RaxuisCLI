@@ -200,6 +200,36 @@ to test.
 The quick, non-report view remains available as the standalone
 [`tlsscan`](#tlsscan---tlsssl-posture-audit) command.
 
+### Combined web / DNS / TLS audit
+
+`audit all` combines the existing audits in one schema-v1 report, compatible
+with JSON, HTML, `compare`, and `--fail-on`.
+
+```bash
+raxuiscli audit all https://example.com
+raxuiscli --output=json --output-file before.json audit all https://example.com
+raxuiscli --output=html --output-file report.html audit all https://example.com
+raxuiscli --fail-on=high audit all https://example.com --timeout=60s
+raxuiscli audit all https://example.com --nameserver=1.1.1.1 --axfr
+raxuiscli compare before.json after.json
+```
+
+The web audit uses the supplied URL; DNS uses its hostname; TLS uses its HTTPS
+port (443 by default). IP targets skip DNS, and HTTP URLs skip the TLS scan.
+Each stage is recorded under `combined.web.status`, `combined.dns.status`, or
+`combined.tls.status`, with a reason when skipped. AXFR is disabled by default;
+use `--axfr` only for domains you are authorized to test.
+
+The overall timeout defaults to 60 seconds. DNS queries and TLS connections
+also have a 10-second limit each. Stages run sequentially and respect Ctrl+C.
+An unavailable stage produces a partial report while preserving findings from
+other stages. Exit codes are 0 for a complete report below the policy threshold,
+1 for invalid input, output failure, or partial collection, and 2 for findings
+meeting `--fail-on` in a complete report. Web request controls such as `--header`,
+`--cookie`, `--user-agent`, `--insecure`, `--follow-redirects`, and
+`--max-body-bytes` are available. DNS and TLS audit the original URL's host even
+when HTTP redirects are followed.
+
 ### DNS / email posture audit
 
 `audit dns` assesses a domain's DNS and email-authentication posture and emits
@@ -1433,7 +1463,7 @@ This table is generated from the command catalog. `stable` means the implementat
 
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
-| audit & reporting | 8 | 0 | 0 | 8 |
+| audit & reporting | 9 | 0 | 0 | 9 |
 | core | 7 | 0 | 0 | 7 |
 | cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |

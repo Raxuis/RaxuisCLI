@@ -27,14 +27,18 @@ func newWebCommand(runner auditRunner) *cobra.Command {
 		},
 	}
 
-	command.Flags().Duration("timeout", 10*time.Second, "Overall audit timeout")
+	addWebAuditFlags(command, 10*time.Second)
+	return command
+}
+
+func addWebAuditFlags(command *cobra.Command, timeout time.Duration) {
+	command.Flags().Duration("timeout", timeout, "Overall audit timeout")
 	command.Flags().Int64("max-body-bytes", 1<<20, "Maximum response body bytes to read")
 	command.Flags().Bool("insecure", false, "Skip TLS verification for the HTTP request")
 	command.Flags().Bool("follow-redirects", false, "Allow redirects to another target")
 	command.Flags().StringArray("header", nil, "Request header in Name: Value form (repeatable)")
 	command.Flags().String("cookie", "", "Cookie header to include with the request")
 	command.Flags().String("user-agent", "", "User-Agent header to include with the request")
-	return command
 }
 
 // exactlyOneAuditTarget preserves Cobra's familiar arity message while making
