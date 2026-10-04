@@ -2,6 +2,7 @@ package dns
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"net"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // dnsLabels encodes a dotted domain name as DNS wire-format labels.
@@ -340,7 +343,7 @@ func TestAttemptAXFRRefused(t *testing.T) {
 	}
 }
 
-func TestAttemptAXFRSuccess(t *testing.T) {
+func TestAttemptAXFREmptyNOERRORIsNotSuccess(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to start listener: %v", err)
@@ -369,8 +372,8 @@ func TestAttemptAXFRSuccess(t *testing.T) {
 	}()
 
 	result := AttemptAXFR("example.com", ln.Addr().String(), 3)
-	if !result.Success {
-		t.Errorf("AttemptAXFR should report success for a NOERROR response, got error: %v", result.Error)
+	if result.Success || result.Error == nil {
+		t.Fatal("empty NOERROR response must not count as a zone transfer")
 	}
 }
 
@@ -443,3 +446,58 @@ func TestDisplayFunctions(t *testing.T) {
 type errDNSTest struct{}
 
 func (errDNSTest) Error() string { return "dns test error" }
+
+func TestAXFRCompleteTransferAndPartialReads(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	name := dnsmessage.MustNewName("example.com.")
+	soa := dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: name, Type: dnsmessage.TypeSOA, Class: dnsmessage.ClassINET}, Body: &dnsmessage.SOAResource{NS: dnsmessage.MustNewName("ns.example.com."), MBox: dnsmessage.MustNewName("hostmaster.example.com."), Serial: 42}}
+	record := dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: name, Type: dnsmessage.TypeA, Class: dnsmessage.ClassINET}, Body: &dnsmessage.AResource{A: [4]byte{127, 0, 0, 1}}}
+	first, err := (&dnsmessage.Message{Header: dnsmessage.Header{ID: 1, Response: true}, Answers: []dnsmessage.Resource{soa, record}}).Pack()
+	if err != nil {
+		t.Fatal(err)
+	}
+	last, err := (&dnsmessage.Message{Header: dnsmessage.Header{ID: 1, Response: true}, Answers: []dnsmessage.Resource{soa}}).Pack()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		var size [2]byte
+		if _, err := io.ReadFull(conn, size[:]); err != nil {
+			return
+		}
+		query := make([]byte, int(size[0])<<8|int(size[1]))
+		if _, err := io.ReadFull(conn, query); err != nil {
+			return
+		}
+		for _, message := range [][]byte{first, last} {
+			wire := append([]byte{byte(len(message) >> 8), byte(len(message))}, message...)
+			for _, b := range wire {
+				if _, err := conn.Write([]byte{b}); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	got := AttemptAXFR("example.com", listener.Addr().String(), 3)
+	if !got.Success || got.Error != nil || len(got.Records) != 2 {
+		t.Fatalf("transfer = %+v", got)
+	}
+}
+
+func TestLookupContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got := LookupContext(ctx, LookupOptions{Domain: "example.test", RecordType: TypeTXT, Timeout: 10, Nameserver: "127.0.0.1:1"})
+	if len(got) != 1 || got[0].Error == nil {
+		t.Fatalf("lookup = %+v", got)
+	}
+}

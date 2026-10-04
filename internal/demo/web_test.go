@@ -133,7 +133,6 @@ func TestWebProducesDeterministicDocumentedFindings(t *testing.T) {
 		"http.header.x-content-type-options.missing",
 		"http.header.x-frame-options.missing",
 		"http.header.x-powered-by.disclosure",
-		"http.header.x-xss-protection.missing",
 		"tls.certificate.chain-validation",
 		"tls.certificate.expired",
 		"tls.certificate.self-signed",

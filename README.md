@@ -15,7 +15,7 @@ RaxuisCLI is a command-line tool designed for security professionals, pentesters
   <img src="docs/demo.gif" alt="RaxuisCLI demo: version banner, a classical Caesar cipher, and a passive offline web security audit with severity-rated findings" width="820">
 </p>
 
-> **Maturity — read this first.** Commands carry a maturity label shown in their
+> **Maturity (read this first).** Commands carry a maturity label shown in their
 > `--help` and in the [command catalog](#command-catalog) at the bottom of this
 > file. Only `stable` commands (the passive **audit**, **compare**, **demo**, the
 > guided **interactive** interface, and core commands) are considered complete.
@@ -303,12 +303,12 @@ Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
 ![RaxuisCLI Interactive TUI - Home Screen](docs/assets/interactive.png)
 
 **Features:**
-- **Keyboard-first navigation** — Pure terminal UI, no mouse required
-- **Live audit forms** — Enter URL, cookies, select output format
-- **Review before running** — See the exact command with masked secrets
-- **Colorized results** — Passive audit findings with maturity/safety badges
-- **Report comparison** — Diff two audit snapshots to track regressions
-- **Command browser** — Search and explore the full command catalog
+- **Keyboard-first navigation:** Pure terminal UI, no mouse required
+- **Live audit forms:** Enter URL, cookies, select output format
+- **Review before running:** See the exact command with masked secrets
+- **Colorized results:** Passive audit findings with maturity/safety badges
+- **Report comparison:** Diff two audit snapshots to track regressions
+- **Command browser:** Search and explore the full command catalog
 
 ---
 
@@ -316,7 +316,7 @@ Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
 
 > **New to security tooling? Start here.** RaxuisCLI is a "Swiss-army knife" for
 > security work: each command does one focused job. You do **not** need to know
-> them all — pick the one that matches your task. Every command supports
+> them all. Pick the one that matches your task. Every command supports
 > `raxuiscli <command> --help` for details and examples, most support
 > `--output=json` for scripting, and each carries a maturity label in its help
 > (`stable` = complete, `experimental` = may change, `informational` = prints
@@ -339,11 +339,11 @@ Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
 | **Audit & reporting** | Passive, repeatable security reports you can diff over time and gate CI with. | `audit`, `compare`, `tlsscan` |
 
 <details>
-<summary><strong>Glossary — the jargon used above and in the command descriptions, in plain words</strong> (click to expand)</summary>
+<summary><strong>Glossary: the jargon used above and in the command descriptions, in plain words</strong> (click to expand)</summary>
 
 **General**
 - **Pentest (penetration test):** an authorized, simulated attack to find weaknesses before real attackers do.
-- **Red team:** offensive security — playing the attacker to test defenses.
+- **Red team:** offensive security, playing the attacker to test defenses.
 - **CTF (Capture The Flag):** a security puzzle/competition where you exploit challenges to find hidden "flags".
 - **Passive vs. active:** *passive* only reads/observes (low risk); *active* sends probes or attacks (only on authorized targets).
 
@@ -377,7 +377,7 @@ Colors follow the same rules as the rest of the CLI: `--no-color`, `NO_COLOR`,
 - **Hash:** a one-way fingerprint of data (e.g. MD5, SHA-256). **Hash cracking** = guessing the original input; **`hashid`** = identifying which hash type you have.
 - **TLS/SSL & certificates:** the encryption behind `https://`; `tlsscan`/`certinfo` grade how well a server is configured.
 - **Cipher:** an algorithm that scrambles text; the `cipher` command handles classic ones (Caesar, XOR, Vigenère…).
-- **Entropy:** a measure of randomness — high entropy often means data is encrypted or compressed.
+- **Entropy:** a measure of randomness; high entropy often means data is encrypted or compressed.
 - **Banner grabbing:** connecting to a service to read the "hello" text that reveals its software and version.
 
 </details>
@@ -458,7 +458,7 @@ raxuiscli recon example.com:22 --timeout 5
 #### `scan` - Attack-Surface Mapper
 Concurrent host and TCP service discovery across a network. Finds live hosts,
 scans their services with banner/version detection, and tags interesting ones
-with the raxuiscli command to run next — turning discovery into an attack
+with the raxuiscli command to run next, turning discovery into an attack
 workflow. Accepts a single IP, a hostname list, or an IPv4 CIDR. **Only run it
 against networks you are authorized to test (pentest, CTF, or your own lab).**
 
@@ -770,7 +770,7 @@ raxuiscli smb null -H target
 Low-and-slow password spraying against Active Directory over LDAP simple bind.
 Sprays **one password across all users per round** (never many passwords at one
 user in a burst) to respect account-lockout policy, and consumes the `ad`-tagged
-LDAP targets discovered by `scan`. **Authorized use only** — know the lockout
+LDAP targets discovered by `scan`. **Authorized use only:** know the lockout
 policy first and space rounds with `--round-delay`.
 
 ```bash
@@ -795,8 +795,8 @@ raxuiscli spray --protocol kerberos --from-scan surface.json -u users.txt --pass
 ```
 
 Two protocols are supported with `--protocol`:
-- `ldap` (default) — LDAP simple bind against a domain controller (ports 389/636/3268/3269).
-- `kerberos` — AS-REQ pre-authentication (RC4-HMAC) against the KDC (port 88). It
+- `ldap` (default): LDAP simple bind against a domain controller (ports 389/636/3268/3269).
+- `kerberos`: AS-REQ pre-authentication (RC4-HMAC) against the KDC (port 88). It
   distinguishes valid, invalid, non-existent, locked, and password-expired
   accounts, and warns if the KDC refuses RC4 (AES-only hardening).
 
@@ -806,7 +806,7 @@ Two protocols are supported with `--protocol`:
 `--force`, `--continue-on-success`, `--stop-on-success`, `-o/--out`.
 
 **Safety:** valid credentials are confirmed via the LDAP bind resultCode (0 =
-success, 49 = invalid) — the bind parser fails closed on an unparseable
+success, 49 = invalid); the bind parser fails closed on an unparseable
 response, so it does not report false positives.
 
 ---

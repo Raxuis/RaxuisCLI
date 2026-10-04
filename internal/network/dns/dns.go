@@ -3,13 +3,17 @@ package dns
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // RecordType represents DNS record types
@@ -51,6 +55,8 @@ type ReverseResult struct {
 	Error    error
 }
 
+var ErrAXFRDenied = errors.New("zone transfer denied")
+
 // AXFRResult holds the result of a zone transfer attempt
 type AXFRResult struct {
 	Domain  string
@@ -76,10 +82,14 @@ type SubdomainResult struct {
 
 // Lookup performs DNS lookup for the specified record type
 func Lookup(opts LookupOptions) []LookupResult {
+	return LookupContext(context.Background(), opts)
+}
+
+func LookupContext(parent context.Context, opts LookupOptions) []LookupResult {
 	var results []LookupResult
 
 	resolver := getResolver(opts.Nameserver, opts.Timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(opts.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(parent, time.Duration(opts.Timeout)*time.Second)
 	defer cancel()
 
 	if opts.RecordType == TypeANY {
@@ -206,77 +216,99 @@ func ReverseLookup(ip string, nameserver string, timeout int) ReverseResult {
 
 // AttemptAXFR attempts a zone transfer from the specified DNS server
 func AttemptAXFR(domain, server string, timeout int) AXFRResult {
-	result := AXFRResult{
-		Domain:  domain,
-		Server:  server,
-		Success: false,
-	}
+	return AttemptAXFRContext(context.Background(), domain, server, timeout)
+}
 
-	// Ensure server has port
-	if !strings.Contains(server, ":") {
-		server = server + ":53"
+func AttemptAXFRContext(ctx context.Context, domain, server string, timeout int) AXFRResult {
+	result := AXFRResult{Domain: domain, Server: server}
+	if timeout <= 0 {
+		timeout = 10
 	}
-
-	// Connect to DNS server
-	conn, err := net.DialTimeout("tcp", server, time.Duration(timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+	if _, _, err := net.SplitHostPort(server); err != nil {
+		server = net.JoinHostPort(strings.Trim(server, "[]"), "53")
+	}
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", server)
 	if err != nil {
-		result.Error = fmt.Errorf("connection failed: %v", err)
+		result.Error = err
 		return result
 	}
 	defer conn.Close()
-
-	// Set deadline
-	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
-
-	// Build AXFR query
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
 	query := buildAXFRQuery(domain)
-
-	// Send length prefix (TCP DNS)
-	length := uint16(len(query))
-	lengthBytes := []byte{byte(length >> 8), byte(length & 0xff)}
-	_, err = conn.Write(append(lengthBytes, query...))
-	if err != nil {
-		result.Error = fmt.Errorf("send failed: %v", err)
+	wire := append([]byte{byte(len(query) >> 8), byte(len(query))}, query...)
+	if _, err := io.Copy(conn, strings.NewReader(string(wire))); err != nil {
+		result.Error = fmt.Errorf("send AXFR: %w", err)
 		return result
 	}
-
-	// Read response
-	respLenBytes := make([]byte, 2)
-	_, err = conn.Read(respLenBytes)
-	if err != nil {
-		result.Error = fmt.Errorf("read failed: %v", err)
-		return result
-	}
-
-	respLen := int(respLenBytes[0])<<8 | int(respLenBytes[1])
-	if respLen < 12 {
-		result.Error = fmt.Errorf("invalid response length")
-		return result
-	}
-
-	response := make([]byte, respLen)
-	_, err = conn.Read(response)
-	if err != nil {
-		result.Error = fmt.Errorf("read response failed: %v", err)
-		return result
-	}
-
-	// Check RCODE (response code)
-	if len(response) >= 4 {
-		rcode := response[3] & 0x0f
-		switch rcode {
-		case 0:
-			result.Success = true
-			result.Records = append(result.Records, "Zone transfer may be possible (NOERROR)")
-		case 5:
-			result.Error = fmt.Errorf("zone transfer refused (REFUSED)")
-		case 9:
-			result.Error = fmt.Errorf("not authorized (NOTAUTH)")
-		default:
-			result.Error = fmt.Errorf("transfer failed with RCODE: %d", rcode)
+	var firstSOA *dnsmessage.SOAResource
+	var firstName dnsmessage.Name
+	totalBytes := 0
+	for totalBytes < 16<<20 && len(result.Records) < 100000 {
+		var size [2]byte
+		if _, err := io.ReadFull(conn, size[:]); err != nil {
+			result.Error = fmt.Errorf("incomplete zone transfer: %w", err)
+			return result
+		}
+		n := int(size[0])<<8 | int(size[1])
+		if n < 12 {
+			result.Error = fmt.Errorf("invalid DNS response length")
+			return result
+		}
+		data := make([]byte, n)
+		if _, err := io.ReadFull(conn, data); err != nil {
+			result.Error = err
+			return result
+		}
+		totalBytes += n
+		var message dnsmessage.Message
+		if err := message.Unpack(data); err != nil {
+			result.Error = err
+			return result
+		}
+		if !message.Response || message.ID != 1 || message.Truncated {
+			result.Error = fmt.Errorf("invalid AXFR response header")
+			return result
+		}
+		if message.RCode != dnsmessage.RCodeSuccess {
+			if message.RCode == dnsmessage.RCodeRefused || message.RCode == dnsmessage.RCode(9) {
+				result.Error = fmt.Errorf("%w: %s", ErrAXFRDenied, message.RCode)
+			} else {
+				result.Error = fmt.Errorf("zone transfer rejected: %s", message.RCode)
+			}
+			return result
+		}
+		if len(message.Answers) == 0 {
+			result.Error = fmt.Errorf("zone transfer returned no records")
+			return result
+		}
+		for i, answer := range message.Answers {
+			soa, isSOA := answer.Body.(*dnsmessage.SOAResource)
+			if firstSOA == nil {
+				if !isSOA || !strings.EqualFold(answer.Header.Name.String(), strings.TrimSuffix(domain, ".")+".") {
+					result.Error = fmt.Errorf("zone transfer must begin with the zone SOA")
+					return result
+				}
+				copySOA := *soa
+				firstSOA = &copySOA
+				firstName = answer.Header.Name
+			} else if isSOA && answer.Header.Name == firstName {
+				if *soa != *firstSOA || i != len(message.Answers)-1 {
+					result.Error = fmt.Errorf("invalid closing SOA")
+					return result
+				}
+				result.Success = true
+				return result
+			}
+			result.Records = append(result.Records, fmt.Sprintf("%s %d %s %v", answer.Header.Name, answer.Header.TTL, answer.Header.Type, answer.Body))
 		}
 	}
-
+	result.Error = fmt.Errorf("zone transfer exceeds collection limit")
 	return result
 }
 

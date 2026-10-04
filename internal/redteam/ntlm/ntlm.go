@@ -2,6 +2,7 @@ package ntlm
 
 import (
 	"bufio"
+	"crypto/des"
 	"crypto/hmac"
 	"crypto/md5"
 	"encoding/hex"
@@ -46,24 +47,36 @@ func ComputeNTHash(password string) string {
 	return strings.ToUpper(hex.EncodeToString(hash.Sum(nil)))
 }
 
-// ComputeLMHash computes the LM hash of a password
+// ComputeLMHash supports the ASCII subset of the legacy OEM password encoding.
+// Unsupported passwords return the conventional disabled-LM marker.
 func ComputeLMHash(password string) string {
-	// LM hash is deprecated and insecure
-	// For passwords > 14 chars or with certain chars, returns empty hash
-	if len(password) > 14 {
-		return "AAD3B435B51404EEAAD3B435B51404EE"
-	}
-
-	// Uppercase and pad to 14 chars
+	const disabled = "AAD3B435B51404EEAAD3B435B51404EE"
 	password = strings.ToUpper(password)
-	for len(password) < 14 {
-		password += "\x00"
+	if len(password) > 14 {
+		return disabled
 	}
-
-	// Split into two 7-byte halves
-	// Each half is used as a DES key to encrypt "KGS!@#$%"
-	// This is a simplified version - real LM hash requires DES
-	return "AAD3B435B51404EEAAD3B435B51404EE" // Placeholder
+	for _, character := range password {
+		if character > 127 {
+			return disabled
+		}
+	}
+	var padded [14]byte
+	copy(padded[:], password)
+	var hash [16]byte
+	for half := 0; half < 2; half++ {
+		var packed uint64
+		for _, b := range padded[half*7 : half*7+7] {
+			packed = packed<<8 | uint64(b)
+		}
+		var key [8]byte
+		for i := range key {
+			key[i] = byte(packed>>uint(49-i*7)) << 1
+		}
+		// DES ignores the low parity bit of each key byte.
+		cipher, _ := des.NewCipher(key[:])
+		cipher.Encrypt(hash[half*8:half*8+8], []byte("KGS!@#$%"))
+	}
+	return strings.ToUpper(hex.EncodeToString(hash[:]))
 }
 
 // ComputeNTLMv2 computes NTLMv2 response

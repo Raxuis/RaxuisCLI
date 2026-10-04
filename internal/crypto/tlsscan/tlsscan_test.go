@@ -1,6 +1,11 @@
 package tlsscan
 
 import (
+	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -140,5 +145,47 @@ func TestHelpers(t *testing.T) {
 	}
 	if hasForwardSecrecy("TLS_RSA_WITH_AES_128_GCM_SHA256") {
 		t.Error("RSA key exchange has no forward secrecy")
+	}
+}
+
+func TestScanContextInterruptsBlockedHandshake(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err == nil {
+			accepted <- conn
+		}
+	}()
+	host, rawPort, _ := net.SplitHostPort(listener.Addr().String())
+	port, _ := strconv.Atoi(rawPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	result := ScanContext(ctx, host, port, 10*time.Second)
+	if result.Error == "" || time.Since(started) > 2*time.Second {
+		t.Fatalf("cancellation ignored: %+v", result)
+	}
+	select {
+	case conn := <-accepted:
+		conn.Close()
+	default:
+	}
+}
+
+func TestCertificateCollectionChecksTrust(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer server.Close()
+	host, port, _ := net.SplitHostPort(server.Listener.Addr().String())
+	got := fetchCertificate(context.Background(), server.Listener.Addr().String(), host, time.Second)
+	if port == "" || got == nil || got.VerificationError == "" {
+		t.Fatalf("untrusted certificate not detected: %+v", got)
+	}
+	if ids := findingIDs(certFindings(got)); ids["cert-untrusted"] != SeverityHigh {
+		t.Fatalf("findings = %v", ids)
 	}
 }

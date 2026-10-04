@@ -94,8 +94,7 @@ func GenerateECDSAKeyPair(curve string) (*KeyPair, error) {
 		c = elliptic.P521()
 		bits = 521
 	default:
-		c = elliptic.P256()
-		bits = 256
+		return nil, fmt.Errorf("unsupported ECDSA curve %q: use P256, P384, or P521", curve)
 	}
 
 	privateKey, err := ecdsa.GenerateKey(c, rand.Reader)
@@ -380,7 +379,7 @@ func GenerateSelfSignedCert(cn string, days int, keyBits int) (*CertificateInfo,
 // GenerateAESKey generates a random AES key
 func GenerateAESKey(bits int) (string, []byte, error) {
 	if bits != 128 && bits != 192 && bits != 256 {
-		bits = 256
+		return "", nil, fmt.Errorf("AES key size must be 128, 192, or 256 bits")
 	}
 
 	key := make([]byte, bits/8)
@@ -393,6 +392,9 @@ func GenerateAESKey(bits int) (string, []byte, error) {
 
 // GenerateRandomBytes generates random bytes
 func GenerateRandomBytes(length int) (string, []byte, error) {
+	if length < 0 {
+		return "", nil, fmt.Errorf("random byte length must not be negative")
+	}
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", nil, fmt.Errorf("failed to generate random bytes: %v", err)

@@ -82,19 +82,6 @@
       "remediation": "Implement a Content-Security-Policy header to restrict resource loading."
     },
     {
-      "id": "bdbe483baeca366706098668645a811932eb2e801bee417c414d75f2bcaaa8df",
-      "rule_id": "http.header.x-xss-protection.missing",
-      "title": "X-XSS-Protection header is missing",
-      "type": "Security Headers",
-      "severity": "LOW",
-      "status": "open",
-      "resource": "http://fixture.local/demo?api_key=\u003credacted\u003e\u0026mode=\u003credacted\u003e",
-      "parameter": "X-XSS-Protection",
-      "evidence": "Header not present",
-      "description": "Missing X-XSS-Protection header. Browser XSS filter may not be enabled.",
-      "remediation": "Add 'X-XSS-Protection: 1; mode=block' header (note: deprecated in favor of CSP)."
-    },
-    {
       "id": "da1f0237a721384bba1f1088c6bbdc40be836576c26c925ebdfc1078a675eb62",
       "rule_id": "http.header.hsts.missing",
       "title": "HSTS header is missing",

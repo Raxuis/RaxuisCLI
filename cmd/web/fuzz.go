@@ -74,10 +74,9 @@ Examples:
   raxuiscli fuzz dir https://example.com -w dirs.txt -e php,html,txt
   raxuiscli fuzz dir https://example.com --common
   raxuiscli fuzz dir https://example.com -w dirs.txt --threads 20`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a URL")
 		}
 
 		url := args[0]
@@ -106,13 +105,11 @@ Examples:
 		} else if wordlist != "" {
 			words, err = fuzz.LoadWordlist(wordlist)
 			if err != nil {
-				fmt.Printf("Error loading wordlist: %v\n", err)
-				return
+				return fmt.Errorf("loading wordlist: %w", err)
 			}
 			fmt.Printf("Loaded %d words from wordlist\n", len(words))
 		} else {
-			fmt.Println("Please provide --wordlist or --common flag")
-			return
+			return fmt.Errorf("please provide --wordlist or --common flag")
 		}
 
 		opts := fuzz.FuzzOptions{
@@ -133,6 +130,7 @@ Examples:
 		}
 
 		runFuzzer(opts, fuzz.FuzzDirectory)
+		return nil
 	},
 }
 
@@ -147,10 +145,9 @@ Examples:
   raxuiscli fuzz param https://example.com/api --wordlist params.txt
   raxuiscli fuzz param https://example.com/search --common
   raxuiscli fuzz param "https://example.com/page?id=1" --wordlist params.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a URL")
 		}
 
 		url := args[0]
@@ -180,13 +177,11 @@ Examples:
 		} else if wordlist != "" {
 			words, err = fuzz.LoadWordlist(wordlist)
 			if err != nil {
-				fmt.Printf("Error loading wordlist: %v\n", err)
-				return
+				return fmt.Errorf("loading wordlist: %w", err)
 			}
 			fmt.Printf("Loaded %d words from wordlist\n", len(words))
 		} else {
-			fmt.Println("Please provide --wordlist or --common flag")
-			return
+			return fmt.Errorf("please provide --wordlist or --common flag")
 		}
 
 		opts := fuzz.FuzzOptions{
@@ -208,6 +203,7 @@ Examples:
 		}
 
 		runFuzzer(opts, fuzz.FuzzParameter)
+		return nil
 	},
 }
 
@@ -219,10 +215,9 @@ var fuzzVhostCmd = &cobra.Command{
 Examples:
   raxuiscli fuzz vhost https://10.10.10.10 --wordlist vhosts.txt
   raxuiscli fuzz vhost https://target.com --wordlist subdomains.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a URL")
 		}
 
 		url := args[0]
@@ -239,14 +234,12 @@ Examples:
 		rateLimit, _ := cmd.Flags().GetInt("rate")
 
 		if wordlist == "" {
-			fmt.Println("Please provide a wordlist with --wordlist")
-			return
+			return fmt.Errorf("please provide a wordlist with --wordlist")
 		}
 
 		words, err := fuzz.LoadWordlist(wordlist)
 		if err != nil {
-			fmt.Printf("Error loading wordlist: %v\n", err)
-			return
+			return fmt.Errorf("loading wordlist: %w", err)
 		}
 
 		// Append domain suffix if provided
@@ -274,6 +267,7 @@ Examples:
 		}
 
 		runFuzzer(opts, fuzz.FuzzVirtualHost)
+		return nil
 	},
 }
 

@@ -43,10 +43,9 @@ Examples:
   raxuiscli cookie decode "eyJhZG1pbiI6dHJ1ZX0="
   raxuiscli cookie decode "name=value"
   raxuiscli cookie decode "%7B%22user%22%3A%22admin%22%7D"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a cookie value to decode")
-			return
+			return fmt.Errorf("please provide a cookie value to decode")
 		}
 
 		value := args[0]
@@ -62,6 +61,7 @@ Examples:
 
 		decoded := cookie.DecodeCookieValue(value)
 		cookie.DisplayDecodedCookie(decoded)
+		return nil
 	},
 }
 
@@ -81,15 +81,15 @@ Examples:
   raxuiscli cookie analyze "session=abc123; HttpOnly; Secure"
   raxuiscli cookie analyze "PHPSESSID=xxx; path=/"
   raxuiscli cookie analyze "user=admin; domain=.example.com"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a cookie string to analyze")
-			return
+			return fmt.Errorf("please provide a cookie string to analyze")
 		}
 
 		cookieStr := args[0]
 		parsed := cookie.ParseCookieString(cookieStr)
 		cookie.DisplayCookieInfo(parsed)
+		return nil
 	},
 }
 
@@ -104,10 +104,9 @@ Provide --secret to verify the signature.
 Examples:
   raxuiscli cookie flask ".eJxNjDEOwCAIAP-C..."
   raxuiscli cookie flask ".eJxNjDEOwCAIAP-C..." --secret "development key"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a Flask session cookie")
-			return
+			return fmt.Errorf("please provide a Flask session cookie")
 		}
 
 		sessionVal := args[0]
@@ -115,11 +114,11 @@ Examples:
 
 		session, err := cookie.DecodeFlaskSession(sessionVal, secret)
 		if err != nil {
-			fmt.Printf("Error decoding Flask session: %v\n", err)
-			return
+			return fmt.Errorf("decoding Flask session: %w", err)
 		}
 
 		cookie.DisplayFlaskSession(session)
+		return nil
 	},
 }
 
@@ -133,10 +132,9 @@ Express sessions typically start with "s:" followed by JSON data and a signature
 Examples:
   raxuiscli cookie express "s:%7B%22user%22%3A%22admin%22%7D.signature"
   raxuiscli cookie express "s:..." --secret "keyboard cat"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide an Express session cookie")
-			return
+			return fmt.Errorf("please provide an Express session cookie")
 		}
 
 		sessionVal := args[0]
@@ -144,8 +142,7 @@ Examples:
 
 		data, err := cookie.DecodeExpressSession(sessionVal, secret)
 		if err != nil {
-			fmt.Printf("Error decoding Express session: %v\n", err)
-			return
+			return fmt.Errorf("decoding Express session: %w", err)
 		}
 
 		fmt.Println("\n[EXPRESS SESSION]")
@@ -155,6 +152,7 @@ Examples:
 		for key, value := range data {
 			fmt.Printf("  %s: %v\n", key, value)
 		}
+		return nil
 	},
 }
 
@@ -168,10 +166,9 @@ Provide cookies as separate arguments or as a single string separated by semicol
 Examples:
   raxuiscli cookie bulk "session=abc" "user=admin" "token=xyz"
   raxuiscli cookie bulk "session=abc; user=admin; token=xyz"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide cookie strings to analyze")
-			return
+			return fmt.Errorf("please provide cookie strings to analyze")
 		}
 
 		var cookies []string
@@ -190,7 +187,7 @@ Examples:
 
 		if len(cookies) == 0 {
 			fmt.Println("No valid cookies found")
-			return
+			return nil
 		}
 
 		fmt.Printf("[BULK COOKIE ANALYSIS]\n")
@@ -246,6 +243,7 @@ Examples:
 			fmt.Printf("  Medium: %d\n", medium)
 			fmt.Printf("  Low: %d\n", low)
 		}
+		return nil
 	},
 }
 
@@ -266,10 +264,9 @@ Supported types:
 Examples:
   raxuiscli cookie detect ".eJx..."
   raxuiscli cookie detect "s:json.signature"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a cookie value")
-			return
+			return fmt.Errorf("please provide a cookie value")
 		}
 
 		value := args[0]
@@ -277,7 +274,7 @@ Examples:
 
 		if output.JSON() {
 			_ = output.Emit(map[string]any{"value": value, "detected_type": sessionType}, func(io.Writer) {})
-			return
+			return nil
 		}
 
 		fmt.Println("\n[SESSION TYPE DETECTION]")
@@ -309,6 +306,7 @@ Examples:
 			fmt.Println("\nRuby on Rails session detected.")
 			fmt.Println("Uses MessageVerifier for signing.")
 		}
+		return nil
 	},
 }
 
@@ -331,10 +329,9 @@ Detects:
 Examples:
   raxuiscli cookie sensitive "user=admin&role=superuser"
   raxuiscli cookie sensitive "eyJhZG1pbiI6dHJ1ZX0="`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a cookie value")
-			return
+			return fmt.Errorf("please provide a cookie value")
 		}
 
 		value := args[0]
@@ -359,6 +356,7 @@ Examples:
 				fmt.Printf("  Risk: %s\n", s.Risk)
 			}
 		}
+		return nil
 	},
 }
 

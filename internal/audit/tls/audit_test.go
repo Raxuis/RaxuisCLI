@@ -93,10 +93,24 @@ func TestRemediationFor(t *testing.T) {
 }
 
 func TestSplitTarget(t *testing.T) {
-	if h, p := splitTarget("example.com:8443", 443); h != "example.com" || p != 8443 {
+	if h, p, err := parseTarget("example.com:8443", 443); err != nil || h != "example.com" || p != 8443 {
 		t.Errorf("splitTarget host:port = %s:%d", h, p)
 	}
-	if h, p := splitTarget("example.com", 443); h != "example.com" || p != 443 {
+	if h, p, err := parseTarget("example.com", 443); err != nil || h != "example.com" || p != 443 {
 		t.Errorf("splitTarget default = %s:%d", h, p)
+	}
+}
+
+func TestParseTargetIPv6AndInvalidPorts(t *testing.T) {
+	for _, target := range []string{"::1", "[::1]", "[::1]:8443"} {
+		host, port, err := parseTarget(target, 443)
+		if err != nil || host != "::1" || (port != 443 && port != 8443) {
+			t.Fatalf("%s: %s %d %v", target, host, port, err)
+		}
+	}
+	for _, target := range []string{"", "example.com:0", "example.com:65536", "example.com:abc", "https://example.com", "example.com:", "[bad]"} {
+		if _, _, err := parseTarget(target, 443); err == nil {
+			t.Fatalf("accepted %q", target)
+		}
 	}
 }

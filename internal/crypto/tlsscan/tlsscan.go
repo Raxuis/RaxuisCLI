@@ -5,9 +5,13 @@
 package tlsscan
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"sort"
@@ -60,6 +64,7 @@ type CertSummary struct {
 	KeyBits            int       `json:"key_bits"`
 	SelfSigned         bool      `json:"self_signed"`
 	HostnameValid      bool      `json:"hostname_valid"`
+	VerificationError  string    `json:"verification_error,omitempty"`
 }
 
 // Result is the complete assessment for one host:port.
@@ -86,6 +91,10 @@ var probedVersions = []struct {
 // Scan assesses host on the given port. A zero or negative timeout defaults to
 // 10 seconds per connection.
 func Scan(host string, port int, timeout time.Duration) *Result {
+	return ScanContext(context.Background(), host, port, timeout)
+}
+
+func ScanContext(ctx context.Context, host string, port int, timeout time.Duration) *Result {
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
@@ -93,7 +102,11 @@ func Scan(host string, port int, timeout time.Duration) *Result {
 	result := &Result{Host: host, Port: port}
 
 	for _, pv := range probedVersions {
-		supported := probeProtocol(addr, host, pv.version, timeout)
+		if err := ctx.Err(); err != nil {
+			result.Error = err.Error()
+			return result
+		}
+		supported := probeProtocol(ctx, addr, host, pv.version, timeout)
 		result.Protocols = append(result.Protocols, ProtocolResult{Name: pv.name, Supported: supported})
 	}
 
@@ -102,20 +115,27 @@ func Scan(host string, port int, timeout time.Duration) *Result {
 		return result
 	}
 
-	result.Ciphers = enumerateCiphers(addr, host, timeout)
-	result.Certificate = fetchCertificate(addr, host, timeout)
+	result.Ciphers = enumerateCiphers(ctx, addr, host, timeout)
+	result.Certificate = fetchCertificate(ctx, addr, host, timeout)
+	if err := ctx.Err(); err != nil {
+		result.Error = err.Error()
+		return result
+	}
+	if result.Certificate == nil {
+		result.Error = "certificate collection failed"
+	}
 	result.Findings = deriveFindings(result)
 	return result
 }
 
-func probeProtocol(addr, serverName string, version uint16, timeout time.Duration) bool {
+func probeProtocol(ctx context.Context, addr, serverName string, version uint16, timeout time.Duration) bool {
 	conf := &tls.Config{
 		InsecureSkipVerify: true, // #nosec G402 -- we assess the cert ourselves; connecting is the point
 		MinVersion:         version,
 		MaxVersion:         version,
 		ServerName:         serverName,
 	}
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, conf)
+	conn, err := (&tls.Dialer{NetDialer: &net.Dialer{Timeout: timeout}, Config: conf}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return false
 	}
@@ -126,7 +146,7 @@ func probeProtocol(addr, serverName string, version uint16, timeout time.Duratio
 // enumerateCiphers probes, one suite at a time, which cipher suites the server
 // accepts for TLS 1.0-1.2. TLS 1.3 suites are not configurable in the standard
 // library, so they are reported from the negotiated connection instead.
-func enumerateCiphers(addr, serverName string, timeout time.Duration) []CipherResult {
+func enumerateCiphers(ctx context.Context, addr, serverName string, timeout time.Duration) []CipherResult {
 	var out []CipherResult
 	seen := map[string]bool{}
 
@@ -142,10 +162,13 @@ func enumerateCiphers(addr, serverName string, timeout time.Duration) []CipherRe
 	all := append(tls.CipherSuites(), tls.InsecureCipherSuites()...)
 	for _, lv := range legacy {
 		for _, suite := range all {
+			if ctx.Err() != nil {
+				return out
+			}
 			if !supportsVersion(suite.SupportedVersions, lv.version) {
 				continue
 			}
-			if !probeCipher(addr, serverName, lv.version, suite.ID, timeout) {
+			if !probeCipher(ctx, addr, serverName, lv.version, suite.ID, timeout) {
 				continue
 			}
 			key := lv.name + "|" + suite.Name
@@ -163,7 +186,7 @@ func enumerateCiphers(addr, serverName string, timeout time.Duration) []CipherRe
 	}
 
 	// TLS 1.3: report the suite the server negotiates (not individually selectable).
-	if state, ok := negotiate(addr, serverName, tls.VersionTLS13, timeout); ok {
+	if state, ok := negotiate(ctx, addr, serverName, tls.VersionTLS13, timeout); ok {
 		name := tls.CipherSuiteName(state.CipherSuite)
 		key := "TLS 1.3|" + name
 		if !seen[key] {
@@ -179,7 +202,7 @@ func enumerateCiphers(addr, serverName string, timeout time.Duration) []CipherRe
 	return out
 }
 
-func probeCipher(addr, serverName string, version, suite uint16, timeout time.Duration) bool {
+func probeCipher(ctx context.Context, addr, serverName string, version, suite uint16, timeout time.Duration) bool {
 	conf := &tls.Config{
 		InsecureSkipVerify: true, // #nosec G402
 		MinVersion:         version,
@@ -187,7 +210,7 @@ func probeCipher(addr, serverName string, version, suite uint16, timeout time.Du
 		CipherSuites:       []uint16{suite},
 		ServerName:         serverName,
 	}
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, conf)
+	conn, err := (&tls.Dialer{NetDialer: &net.Dialer{Timeout: timeout}, Config: conf}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return false
 	}
@@ -195,33 +218,34 @@ func probeCipher(addr, serverName string, version, suite uint16, timeout time.Du
 	return true
 }
 
-func negotiate(addr, serverName string, version uint16, timeout time.Duration) (tls.ConnectionState, bool) {
+func negotiate(ctx context.Context, addr, serverName string, version uint16, timeout time.Duration) (tls.ConnectionState, bool) {
 	conf := &tls.Config{
 		InsecureSkipVerify: true, // #nosec G402
 		MinVersion:         version,
 		MaxVersion:         version,
 		ServerName:         serverName,
 	}
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, conf)
+	conn, err := (&tls.Dialer{NetDialer: &net.Dialer{Timeout: timeout}, Config: conf}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return tls.ConnectionState{}, false
 	}
 	defer conn.Close()
-	return conn.ConnectionState(), true
+	return conn.(*tls.Conn).ConnectionState(), true
 }
 
-func fetchCertificate(addr, serverName string, timeout time.Duration) *CertSummary {
+func fetchCertificate(ctx context.Context, addr, serverName string, timeout time.Duration) *CertSummary {
 	conf := &tls.Config{
 		InsecureSkipVerify: true, // #nosec G402 -- posture assessment, not trust enforcement
+		MinVersion:         tls.VersionTLS10,
 		ServerName:         serverName,
 	}
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, conf)
+	conn, err := (&tls.Dialer{NetDialer: &net.Dialer{Timeout: timeout}, Config: conf}).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil
 	}
 	defer conn.Close()
 
-	certs := conn.ConnectionState().PeerCertificates
+	certs := conn.(*tls.Conn).ConnectionState().PeerCertificates
 	if len(certs) == 0 {
 		return nil
 	}
@@ -237,14 +261,23 @@ func fetchCertificate(addr, serverName string, timeout time.Duration) *CertSumma
 		SignatureAlgorithm: leaf.SignatureAlgorithm.String(),
 		KeyType:            keyType,
 		KeyBits:            keyBits,
-		SelfSigned:         leaf.Subject.String() == leaf.Issuer.String(),
+		SelfSigned:         bytes.Equal(leaf.RawSubject, leaf.RawIssuer) && leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) == nil,
 		HostnameValid:      leaf.VerifyHostname(serverName) == nil,
+	}
+	intermediates := x509.NewCertPool()
+	for _, certificate := range certs[1:] {
+		intermediates.AddCert(certificate)
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{DNSName: serverName, Intermediates: intermediates}); err != nil {
+		summary.VerificationError = err.Error()
 	}
 	return summary
 }
 
 func keyInfo(pub any) (string, int) {
 	switch k := pub.(type) {
+	case ed25519.PublicKey:
+		return "Ed25519", 256
 	case *rsa.PublicKey:
 		return "RSA", k.N.BitLen()
 	case *ecdsa.PublicKey:
@@ -336,6 +369,10 @@ func certFindings(c *CertSummary) []Finding {
 		return nil
 	}
 	var findings []Finding
+	if c.VerificationError != "" {
+		findings = append(findings, Finding{ID: "cert-untrusted", Title: "Certificate chain validation failed", Severity: SeverityHigh, Detail: c.VerificationError})
+	}
+
 	now := time.Now()
 
 	switch {

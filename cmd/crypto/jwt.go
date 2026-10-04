@@ -32,7 +32,7 @@ var jwtDecodeCmd = &cobra.Command{
 Examples:
   raxuiscli jwt decode "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   raxuiscli jwt decode -f token.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 		checkVulns, _ := cmd.Flags().GetBool("check")
 
@@ -41,21 +41,18 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("reading file: %w", err)
 			}
 			token = strings.TrimSpace(string(data))
 		} else if len(args) > 0 {
 			token = args[0]
 		} else {
-			fmt.Println("Please provide a JWT token or use -f for file input")
-			return
+			return fmt.Errorf("please provide a JWT token or use -f for file input")
 		}
 
 		decoded, err := jwt.DecodeJWT(token)
 		if err != nil {
-			fmt.Printf("Error decoding JWT: %v\n", err)
-			return
+			return fmt.Errorf("decoding JWT: %w", err)
 		}
 
 		payload := map[string]any{
@@ -80,7 +77,7 @@ Examples:
 			payload["vulnerabilities"] = view
 		}
 
-		_ = output.Emit(payload, func(_ io.Writer) {
+		return output.Emit(payload, func(_ io.Writer) {
 			jwt.DisplayJWT(decoded)
 			if checkVulns {
 				jwt.DisplayVulnerabilities(vulns)
@@ -97,7 +94,7 @@ var jwtVerifyCmd = &cobra.Command{
 Examples:
   raxuiscli jwt verify "eyJ..." --secret "mysecret"
   raxuiscli jwt verify "eyJ..." --secret-file secret.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		secret, _ := cmd.Flags().GetString("secret")
 		secretFile, _ := cmd.Flags().GetString("secret-file")
 		file, _ := cmd.Flags().GetString("file")
@@ -107,38 +104,33 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("reading file: %w", err)
 			}
 			token = strings.TrimSpace(string(data))
 		} else if len(args) > 0 {
 			token = args[0]
 		} else {
-			fmt.Println("Please provide a JWT token")
-			return
+			return fmt.Errorf("please provide a JWT token")
 		}
 
 		if secretFile != "" {
 			data, err := os.ReadFile(secretFile)
 			if err != nil {
-				fmt.Printf("Error reading secret file: %v\n", err)
-				return
+				return fmt.Errorf("reading secret file: %w", err)
 			}
 			secret = strings.TrimSpace(string(data))
 		}
 
 		if secret == "" {
-			fmt.Println("Please provide a secret with --secret or --secret-file")
-			return
+			return fmt.Errorf("please provide a secret with --secret or --secret-file")
 		}
 
 		verified, err := jwt.VerifyJWT(token, secret)
 		if err != nil {
-			fmt.Printf("Error verifying JWT: %v\n", err)
-			return
+			return fmt.Errorf("verifying JWT: %w", err)
 		}
 
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"algorithm": verified.Algorithm,
 			"header":    verified.Header,
 			"payload":   verified.Payload,
@@ -165,26 +157,23 @@ Examples:
   raxuiscli jwt forge --payload '{"sub":"admin","admin":true}' --secret "key"
   raxuiscli jwt forge --payload '{"user":"test"}' --algorithm HS512 --secret "key"
   raxuiscli jwt forge --payload '{}' --algorithm none`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		payloadStr, _ := cmd.Flags().GetString("payload")
 		secret, _ := cmd.Flags().GetString("secret")
 		algorithm, _ := cmd.Flags().GetString("algorithm")
 
 		if payloadStr == "" {
-			fmt.Println("Please provide a payload with --payload")
-			return
+			return fmt.Errorf("please provide a payload with --payload")
 		}
 
 		var payload map[string]interface{}
 		if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
-			fmt.Printf("Error parsing payload JSON: %v\n", err)
-			return
+			return fmt.Errorf("parsing payload JSON: %w", err)
 		}
 
 		token, err := jwt.ForgeJWT(payload, secret, algorithm)
 		if err != nil {
-			fmt.Printf("Error forging JWT: %v\n", err)
-			return
+			return fmt.Errorf("forging JWT: %w", err)
 		}
 
 		decoded, _ := jwt.DecodeJWT(token)
@@ -195,7 +184,7 @@ Examples:
 		if decoded != nil {
 			forgePayload["payload"] = decoded.Payload
 		}
-		_ = output.Emit(forgePayload, func(_ io.Writer) {
+		return output.Emit(forgePayload, func(_ io.Writer) {
 			fmt.Println("\n[JWT FORGED]")
 			fmt.Println(strings.Repeat("=", 60))
 			fmt.Printf("Algorithm: %s\n", algorithm)
@@ -217,7 +206,7 @@ var jwtCrackCmd = &cobra.Command{
 Examples:
   raxuiscli jwt crack "eyJ..." --wordlist secrets.txt
   raxuiscli jwt crack "eyJ..." --common`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		wordlist, _ := cmd.Flags().GetString("wordlist")
 		useCommon, _ := cmd.Flags().GetBool("common")
 		file, _ := cmd.Flags().GetString("file")
@@ -227,15 +216,13 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("reading file: %w", err)
 			}
 			token = strings.TrimSpace(string(data))
 		} else if len(args) > 0 {
 			token = args[0]
 		} else {
-			fmt.Println("Please provide a JWT token")
-			return
+			return fmt.Errorf("please provide a JWT token")
 		}
 
 		var secrets []string
@@ -250,8 +237,7 @@ Examples:
 		if wordlist != "" {
 			f, err := os.Open(wordlist)
 			if err != nil {
-				fmt.Printf("Error opening wordlist: %v\n", err)
-				return
+				return fmt.Errorf("opening wordlist: %w", err)
 			}
 			defer f.Close()
 
@@ -259,14 +245,16 @@ Examples:
 			for scanner.Scan() {
 				secrets = append(secrets, scanner.Text())
 			}
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("reading wordlist: %w", err)
+			}
 			if !output.JSON() {
 				fmt.Printf("Loaded %d secrets from wordlist\n", len(secrets))
 			}
 		}
 
 		if len(secrets) == 0 {
-			fmt.Println("Please provide --wordlist or --common flag")
-			return
+			return fmt.Errorf("please provide --wordlist or --common flag")
 		}
 
 		if !output.JSON() {
@@ -276,8 +264,7 @@ Examples:
 
 		decoded, err := jwt.DecodeJWT(token)
 		if err != nil {
-			fmt.Printf("Error decoding JWT: %v\n", err)
-			return
+			return fmt.Errorf("decoding JWT: %w", err)
 		}
 		if !output.JSON() {
 			fmt.Printf("Algorithm: %s\n", decoded.Algorithm)
@@ -293,7 +280,7 @@ Examples:
 		if found {
 			crackPayload["secret"] = secret
 		}
-		_ = output.Emit(crackPayload, func(_ io.Writer) {
+		return output.Emit(crackPayload, func(_ io.Writer) {
 			if found {
 				fmt.Printf("SECRET FOUND: %s\n", secret)
 				fmt.Println("\nYou can now forge tokens with:")
@@ -314,7 +301,7 @@ This attack works on vulnerable implementations that accept algorithm:none.
 
 Examples:
   raxuiscli jwt none-attack "eyJ..."`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 
 		var token string
@@ -322,24 +309,21 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("reading file: %w", err)
 			}
 			token = strings.TrimSpace(string(data))
 		} else if len(args) > 0 {
 			token = args[0]
 		} else {
-			fmt.Println("Please provide a JWT token")
-			return
+			return fmt.Errorf("please provide a JWT token")
 		}
 
 		tokens, err := jwt.NoneAttack(token)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
+			return err
 		}
 
-		_ = output.Emit(map[string]any{"tokens": tokens}, func(_ io.Writer) {
+		return output.Emit(map[string]any{"tokens": tokens}, func(_ io.Writer) {
 			fmt.Println("\n[NONE ATTACK TOKENS]")
 			fmt.Println(strings.Repeat("=", 60))
 			fmt.Println("Generated tokens with 'none' algorithm variations:")
@@ -366,7 +350,7 @@ Checks for:
 
 Examples:
   raxuiscli jwt check "eyJ..."`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 
 		var token string
@@ -374,21 +358,18 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("reading file: %w", err)
 			}
 			token = strings.TrimSpace(string(data))
 		} else if len(args) > 0 {
 			token = args[0]
 		} else {
-			fmt.Println("Please provide a JWT token")
-			return
+			return fmt.Errorf("please provide a JWT token")
 		}
 
 		decoded, err := jwt.DecodeJWT(token)
 		if err != nil {
-			fmt.Printf("Error decoding JWT: %v\n", err)
-			return
+			return fmt.Errorf("decoding JWT: %w", err)
 		}
 
 		vulns := jwt.CheckVulnerabilities(decoded)
@@ -401,7 +382,7 @@ Examples:
 				"severity":    v.Severity,
 			})
 		}
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"algorithm":       decoded.Algorithm,
 			"header":          decoded.Header,
 			"payload":         decoded.Payload,

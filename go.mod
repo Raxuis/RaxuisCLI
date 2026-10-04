@@ -1,6 +1,6 @@
 module github.com/Raxuis/RaxuisCLI
 
-go 1.26
+go 1.26.8
 
 require (
 	charm.land/bubbles/v2 v2.2.1
@@ -8,8 +8,8 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/spf13/cobra v1.10.1
 	github.com/ulikunitz/xz v0.5.15
-	golang.org/x/crypto v0.52.0
-	golang.org/x/net v0.55.0
+	golang.org/x/crypto v0.53.0
+	golang.org/x/net v0.56.0
 	golang.org/x/sys v0.47.0
 )
 

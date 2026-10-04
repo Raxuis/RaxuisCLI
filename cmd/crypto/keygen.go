@@ -31,15 +31,14 @@ Examples:
   raxuiscli keygen rsa
   raxuiscli keygen rsa --bits 4096
   raxuiscli keygen rsa --bits 2048 --out key.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		bits, _ := cmd.Flags().GetInt("bits")
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
 
 		kp, err := keygen.GenerateRSAKeyPair(bits)
 		if err != nil {
-			fmt.Printf("Error generating RSA key: %v\n", err)
-			return
+			return fmt.Errorf("generating RSA key: %w", err)
 		}
 
 		keygen.DisplayKeyPair(kp)
@@ -49,12 +48,12 @@ Examples:
 				pubFile = outFile + ".pub"
 			}
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
-				fmt.Printf("Error saving keys: %v\n", err)
-				return
+				return fmt.Errorf("saving keys: %w", err)
 			}
 			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
 			fmt.Printf("Public key saved to:  %s\n", pubFile)
 		}
+		return nil
 	},
 }
 
@@ -69,15 +68,14 @@ Examples:
   raxuiscli keygen ecdsa
   raxuiscli keygen ecdsa --curve P384
   raxuiscli keygen ecdsa --curve P521 --out key.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		curve, _ := cmd.Flags().GetString("curve")
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
 
 		kp, err := keygen.GenerateECDSAKeyPair(curve)
 		if err != nil {
-			fmt.Printf("Error generating ECDSA key: %v\n", err)
-			return
+			return fmt.Errorf("generating ECDSA key: %w", err)
 		}
 
 		keygen.DisplayKeyPair(kp)
@@ -87,12 +85,12 @@ Examples:
 				pubFile = outFile + ".pub"
 			}
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
-				fmt.Printf("Error saving keys: %v\n", err)
-				return
+				return fmt.Errorf("saving keys: %w", err)
 			}
 			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
 			fmt.Printf("Public key saved to:  %s\n", pubFile)
 		}
+		return nil
 	},
 }
 
@@ -106,14 +104,13 @@ Ed25519 is a modern, secure, and fast algorithm.
 Examples:
   raxuiscli keygen ed25519
   raxuiscli keygen ed25519 --out key.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
 
 		kp, err := keygen.GenerateEd25519KeyPair()
 		if err != nil {
-			fmt.Printf("Error generating Ed25519 key: %v\n", err)
-			return
+			return fmt.Errorf("generating Ed25519 key: %w", err)
 		}
 
 		keygen.DisplayKeyPair(kp)
@@ -123,12 +120,12 @@ Examples:
 				pubFile = outFile + ".pub"
 			}
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
-				fmt.Printf("Error saving keys: %v\n", err)
-				return
+				return fmt.Errorf("saving keys: %w", err)
 			}
 			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
 			fmt.Printf("Public key saved to:  %s\n", pubFile)
 		}
+		return nil
 	},
 }
 
@@ -144,15 +141,14 @@ Examples:
   raxuiscli keygen ssh --type ed25519
   raxuiscli keygen ssh --type rsa --bits 4096
   raxuiscli keygen ssh --type ed25519 --out id_ed25519`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		keyType, _ := cmd.Flags().GetString("type")
 		bits, _ := cmd.Flags().GetInt("bits")
 		outFile, _ := cmd.Flags().GetString("out")
 
 		kp, err := keygen.GenerateSSHKeyPair(keyType, bits)
 		if err != nil {
-			fmt.Printf("Error generating SSH key: %v\n", err)
-			return
+			return fmt.Errorf("generating SSH key: %w", err)
 		}
 
 		keygen.DisplayKeyPair(kp)
@@ -160,12 +156,12 @@ Examples:
 		if outFile != "" {
 			pubFile := outFile + ".pub"
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
-				fmt.Printf("Error saving keys: %v\n", err)
-				return
+				return fmt.Errorf("saving keys: %w", err)
 			}
 			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
 			fmt.Printf("Public key saved to:  %s\n", pubFile)
 		}
+		return nil
 	},
 }
 
@@ -178,7 +174,7 @@ Examples:
   raxuiscli keygen cert --cn example.com
   raxuiscli keygen cert --cn test.local --days 365
   raxuiscli keygen cert --cn mysite.com --days 730 --out cert.pem --key key.pem`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cn, _ := cmd.Flags().GetString("cn")
 		days, _ := cmd.Flags().GetInt("days")
 		bits, _ := cmd.Flags().GetInt("bits")
@@ -186,14 +182,12 @@ Examples:
 		keyFile, _ := cmd.Flags().GetString("key")
 
 		if cn == "" {
-			fmt.Println("Please provide a Common Name with --cn")
-			return
+			return fmt.Errorf("please provide a Common Name with --cn")
 		}
 
 		cert, err := keygen.GenerateSelfSignedCert(cn, days, bits)
 		if err != nil {
-			fmt.Printf("Error generating certificate: %v\n", err)
-			return
+			return fmt.Errorf("generating certificate: %w", err)
 		}
 
 		keygen.DisplayCertificate(cert)
@@ -203,12 +197,12 @@ Examples:
 				keyFile = strings.TrimSuffix(certFile, ".pem") + ".key"
 			}
 			if err := keygen.SaveCertificate(cert, certFile, keyFile); err != nil {
-				fmt.Printf("Error saving certificate: %v\n", err)
-				return
+				return fmt.Errorf("saving certificate: %w", err)
 			}
 			fmt.Printf("\nCertificate saved to: %s\n", certFile)
 			fmt.Printf("Private key saved to: %s\n", keyFile)
 		}
+		return nil
 	},
 }
 
@@ -223,16 +217,16 @@ Examples:
   raxuiscli keygen aes
   raxuiscli keygen aes --bits 256
   raxuiscli keygen aes --bits 128`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		bits, _ := cmd.Flags().GetInt("bits")
 
 		hexKey, _, err := keygen.GenerateAESKey(bits)
 		if err != nil {
-			fmt.Printf("Error generating AES key: %v\n", err)
-			return
+			return fmt.Errorf("generating AES key: %w", err)
 		}
 
 		keygen.DisplayAESKey(hexKey, bits)
+		return nil
 	},
 }
 
@@ -245,19 +239,19 @@ Examples:
   raxuiscli keygen random
   raxuiscli keygen random --length 32
   raxuiscli keygen random --length 16`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		length, _ := cmd.Flags().GetInt("length")
 
 		hexBytes, _, err := keygen.GenerateRandomBytes(length)
 		if err != nil {
-			fmt.Printf("Error generating random bytes: %v\n", err)
-			return
+			return fmt.Errorf("generating random bytes: %w", err)
 		}
 
 		fmt.Println("\n[RANDOM BYTES GENERATED]")
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Printf("Length: %d bytes\n", length)
 		fmt.Printf("Hex:    %s\n", hexBytes)
+		return nil
 	},
 }
 

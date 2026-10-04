@@ -5,7 +5,7 @@ the conventions, and the checklist for adding a command.
 
 ## Prerequisites
 
-- Go **1.25+** (see `go.mod`).
+- Go **1.26.8+** (see `go.mod`).
 - `make` (optional, but the targets below are the easiest path).
 
 ## Build, test, lint

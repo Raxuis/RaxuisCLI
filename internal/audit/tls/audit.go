@@ -4,6 +4,7 @@ package tls
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -24,18 +25,30 @@ type Options struct {
 
 // Audit scans target and returns a schema-v1 report. The Tool field is left for
 // the command layer to populate with build provenance.
-func Audit(_ context.Context, target string, opts Options) (report.Report, error) {
+func Audit(ctx context.Context, target string, opts Options) (report.Report, error) {
+	if ctx == nil {
+		return report.Report{}, fmt.Errorf("audit context must not be nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return report.Report{}, err
+	}
+	if opts.Port < 0 || opts.Port > 65535 || opts.Timeout < 0 {
+		return report.Report{}, fmt.Errorf("invalid port or timeout")
+	}
 	port := opts.Port
 	if port <= 0 {
 		port = defaultPort
 	}
-	host, resolvedPort := splitTarget(target, port)
+	host, resolvedPort, err := parseTarget(target, port)
+	if err != nil {
+		return report.Report{}, err
+	}
 
 	started := time.Now()
-	result := tlsscan.Scan(host, resolvedPort, opts.Timeout)
+	result := tlsscan.ScanContext(ctx, host, resolvedPort, opts.Timeout)
 	duration := time.Since(started)
 
-	resource := fmt.Sprintf("%s:%d", host, resolvedPort)
+	resource := net.JoinHostPort(host, strconv.Itoa(resolvedPort))
 
 	status := "complete"
 	var reportErrors []report.ReportError
@@ -75,6 +88,7 @@ var remediations = map[string]string{
 	"cipher-3des":        "Disable 3DES/DES cipher suites.",
 	"cipher-weak":        "Prefer AEAD suites (AES-GCM, ChaCha20) with ECDHE; remove CBC and RSA key-exchange suites.",
 	"no-forward-secrecy": "Enable ECDHE (or DHE) cipher suites to provide forward secrecy.",
+	"cert-untrusted":     "Install a valid certificate and the complete intermediate chain issued by a trusted CA.",
 	"cert-expired":       "Renew the certificate.",
 	"cert-expiring":      "Renew the certificate before it expires.",
 	"cert-not-yet-valid": "Check the server clock and the certificate validity dates.",
@@ -154,11 +168,33 @@ func toObservations(result *tlsscan.Result) []report.Observation {
 	return observations
 }
 
-func splitTarget(target string, defaultPort int) (string, int) {
-	if idx := strings.LastIndex(target, ":"); idx != -1 {
-		if p, err := strconv.Atoi(target[idx+1:]); err == nil && p > 0 && p <= 65535 {
-			return target[:idx], p
+func parseTarget(target string, defaultPort int) (string, int, error) {
+	target = strings.TrimSpace(target)
+	host, port := target, defaultPort
+	if strings.HasPrefix(target, "[") || strings.Count(target, ":") == 1 {
+		h, p, err := net.SplitHostPort(target)
+		if err != nil {
+			if strings.HasPrefix(target, "[") && strings.HasSuffix(target, "]") {
+				host = strings.Trim(target, "[]")
+				if net.ParseIP(host) == nil {
+					return "", 0, fmt.Errorf("invalid IPv6 host")
+				}
+			} else {
+				return "", 0, fmt.Errorf("invalid TLS host:port: %w", err)
+			}
+		} else {
+			host = h
+			port, err = strconv.Atoi(p)
+			if err != nil {
+				return "", 0, fmt.Errorf("invalid TLS port")
+			}
 		}
 	}
-	return target, defaultPort
+	if host == "" || strings.ContainsAny(host, "/?#@ \t\r\n[]") || port <= 0 || port > 65535 {
+		return "", 0, fmt.Errorf("target must be a host or host:port with a valid port")
+	}
+	if strings.Contains(host, ":") && net.ParseIP(host) == nil {
+		return "", 0, fmt.Errorf("invalid IPv6 host")
+	}
+	return host, port, nil
 }

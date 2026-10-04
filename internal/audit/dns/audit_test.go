@@ -2,8 +2,13 @@ package dns
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
+
+	netdns "github.com/Raxuis/RaxuisCLI/internal/network/dns"
 
 	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/render"
@@ -81,5 +86,105 @@ func TestFirstWithPrefix(t *testing.T) {
 func TestSlug(t *testing.T) {
 	if got := slug("NS1.Example.COM."); got != "ns1-example-com" {
 		t.Errorf("slug = %q", got)
+	}
+}
+
+func TestAuditLookupFailureDoesNotInventMissingPolicies(t *testing.T) {
+	query := func(context.Context, string, netdns.RecordType, string, int) ([]string, error) {
+		return nil, fmt.Errorf("resolver unavailable")
+	}
+	got, err := auditWithLookup(context.Background(), "example.test", Options{SkipAXFR: true}, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Audit.Status != "partial" || len(got.Errors) != 5 || len(got.Findings) != 0 {
+		t.Fatalf("report = %+v", got)
+	}
+	for _, obs := range got.Observations {
+		if (obs.Key == "dns.spf" || obs.Key == "dns.dmarc") && obs.Value != "unknown" {
+			t.Fatalf("observation = %+v", obs)
+		}
+	}
+}
+
+func TestAuditRejectsInvalidDomainBeforeLookup(t *testing.T) {
+	for _, target := range []string{"", "https://example.com", "127.0.0.1", "a..test", "-a.test", "a.test/path"} {
+		t.Run(target, func(t *testing.T) {
+			query := func(context.Context, string, netdns.RecordType, string, int) ([]string, error) {
+				t.Fatal("invalid target queried")
+				return nil, nil
+			}
+			if _, err := auditWithLookup(context.Background(), target, Options{}, query); err == nil {
+				t.Fatal("expected invalid target error")
+			}
+		})
+	}
+}
+
+func TestAuditPartialLookupRetainsOtherFindings(t *testing.T) {
+	query := func(_ context.Context, name string, kind netdns.RecordType, _ string, _ int) ([]string, error) {
+		if kind == netdns.TypeNS {
+			return []string{"ns.example.test."}, nil
+		}
+		if name == "_dmarc.example.test" {
+			return nil, fmt.Errorf("timeout")
+		}
+		if kind == netdns.TypeTXT {
+			return []string{"v=spf1 +all"}, nil
+		}
+		return nil, nil
+	}
+	got, err := auditWithLookup(context.Background(), "example.test", Options{SkipAXFR: true}, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Audit.Status != "partial" || len(got.Findings) != 1 || got.Findings[0].RuleID != "dns.spf-permissive" {
+		t.Fatalf("report = %+v", got)
+	}
+}
+
+func TestPolicyParsingUsesCompleteMechanismsAndTags(t *testing.T) {
+	for _, spf := range []string{"v=spf1 all", "v=spf1 ip4:192.0.2.1 all -all"} {
+		if got := spfFindings("example.test", spf); len(got) != 1 || got[0].RuleID != "dns.spf-permissive" {
+			t.Fatalf("%s: %+v", spf, got)
+		}
+	}
+	if got := spfFindings("example.test", "v=spf1 include:contains+all.example -all"); len(got) != 0 {
+		t.Fatalf("substring false positive: %+v", got)
+	}
+	for _, record := range []string{"v=DMARC1; sp=none; p=reject", "v=DMARC1; p = quarantine"} {
+		if got := dmarcFindings("example.test", record); len(got) != 0 {
+			t.Fatalf("%s: %+v", record, got)
+		}
+	}
+	if got := dmarcFindings("example.test", "v=DMARC1; p=bogus"); len(got) != 1 || got[0].RuleID != "dns.dmarc-invalid-policy" {
+		t.Fatalf("invalid policy: %+v", got)
+	}
+	if got := firstWithPrefix([]string{"v=spf10 +all"}, "v=spf1"); got != "" {
+		t.Fatal("accepted wrong version")
+	}
+}
+
+func TestAuditRejectsMultipleAuthenticationRecords(t *testing.T) {
+	query := func(_ context.Context, name string, kind netdns.RecordType, _ string, _ int) ([]string, error) {
+		if kind != netdns.TypeTXT {
+			return nil, nil
+		}
+		if strings.HasPrefix(name, "_dmarc.") {
+			return []string{"v=DMARC1; p=reject", "v=DMARC1; p=none"}, nil
+		}
+		return []string{"v=spf1 -all", "v=spf1 +all"}, nil
+	}
+	value, err := auditWithLookup(context.Background(), "example.test", Options{SkipAXFR: true}, query)
+	if err != nil || len(value.Findings) != 2 {
+		t.Fatalf("report=%+v err=%v", value, err)
+	}
+	for _, finding := range value.Findings {
+		if finding.RuleID != "dns.spf-multiple" && finding.RuleID != "dns.dmarc-multiple" {
+			t.Fatalf("unexpected rule %s", finding.RuleID)
+		}
+	}
+	if got := spfFindings("example.test", "v=spf1 redirect=_spf.example.test"); len(got) != 0 {
+		t.Fatalf("valid redirect: %+v", got)
 	}
 }

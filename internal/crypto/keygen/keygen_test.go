@@ -66,7 +66,6 @@ func TestGenerateECDSAKeyPairCurves(t *testing.T) {
 		{"prime256v1", 256},
 		{"p384", 384},
 		{"p521", 521},
-		{"unknown-curve", 256}, // defaults to P256
 	}
 
 	for _, tt := range tests {
@@ -245,7 +244,6 @@ func TestGenerateAESKey(t *testing.T) {
 		{128, 128},
 		{192, 192},
 		{256, 256},
-		{999, 256}, // invalid size defaults to 256
 	}
 
 	for _, tt := range tests {
@@ -364,4 +362,16 @@ func TestDisplayFunctionsDoNotPanic(t *testing.T) {
 		t.Fatalf("GenerateAESKey returned error: %v", err)
 	}
 	DisplayAESKey(hexKey, 256)
+}
+
+func TestInvalidKeyParametersReturnErrors(t *testing.T) {
+	if _, err := GenerateECDSAKeyPair("invalid"); err == nil {
+		t.Fatal("invalid curve accepted")
+	}
+	if _, _, err := GenerateAESKey(7); err == nil {
+		t.Fatal("invalid AES size accepted")
+	}
+	if _, _, err := GenerateRandomBytes(-1); err == nil {
+		t.Fatal("negative random length accepted")
+	}
 }

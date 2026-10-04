@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 
@@ -17,5 +19,9 @@ import (
 )
 
 func main() {
-	os.Exit(cmd.Execute())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	cmd.RootCmd.SetContext(ctx)
+	code := cmd.Execute()
+	stop()
+	os.Exit(code)
 }

@@ -74,8 +74,8 @@ Examples:
   raxuiscli http get https://example.com
   raxuiscli http get https://api.com --header "Authorization: Bearer token"
   raxuiscli http get https://example.com --follow`,
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "GET")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "GET")
 	},
 }
 
@@ -88,32 +88,32 @@ Examples:
   raxuiscli http post https://api.com --data '{"key":"value"}'
   raxuiscli http post https://example.com --data "user=test&pass=123"
   raxuiscli http post https://api.com -d @file.json`,
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "POST")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "POST")
 	},
 }
 
 var httpPutCmd = &cobra.Command{
 	Use:   "put [url]",
 	Short: "Perform HTTP PUT request",
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "PUT")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "PUT")
 	},
 }
 
 var httpDeleteCmd = &cobra.Command{
 	Use:   "delete [url]",
 	Short: "Perform HTTP DELETE request",
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "DELETE")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "DELETE")
 	},
 }
 
 var httpHeadCmd = &cobra.Command{
 	Use:   "head [url]",
 	Short: "Perform HTTP HEAD request",
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "HEAD")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "HEAD")
 	},
 }
 
@@ -124,8 +124,8 @@ var httpOptionsCmd = &cobra.Command{
 
 Examples:
   raxuiscli http options https://api.com/endpoint`,
-	Run: func(cmd *cobra.Command, args []string) {
-		runHTTPRequest(cmd, args, "OPTIONS")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runHTTPRequest(cmd, args, "OPTIONS")
 	},
 }
 
@@ -146,10 +146,9 @@ Checks for:
 Examples:
   raxuiscli http headers https://example.com
   raxuiscli http headers https://example.com --verbose`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a url")
 		}
 
 		url := args[0]
@@ -169,8 +168,7 @@ Examples:
 
 		resp, err := httplib.DoRequest(opts)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
+			return err
 		}
 
 		analysis := httplib.AnalyzeSecurityHeaders(resp.Headers)
@@ -208,6 +206,7 @@ Examples:
 			httplib.DisplayHeaderAnalysis(analysis)
 			httplib.DisplayTechnologies(techs)
 		})
+		return nil
 	},
 }
 
@@ -219,10 +218,9 @@ var httpTraceCmd = &cobra.Command{
 Examples:
   raxuiscli http trace https://bit.ly/xxxxx
   raxuiscli http trace http://example.com`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a url")
 		}
 
 		url := args[0]
@@ -241,8 +239,7 @@ Examples:
 
 		resp, err := httplib.DoRequest(opts)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
+			return err
 		}
 
 		payload := map[string]any{
@@ -267,6 +264,7 @@ Examples:
 			fmt.Printf("\nFinal Status: %s\n", resp.Status)
 			fmt.Printf("Duration: %v\n", resp.Duration)
 		})
+		return nil
 	},
 }
 
@@ -278,10 +276,9 @@ var httpCurlCmd = &cobra.Command{
 Examples:
   raxuiscli http curl https://api.com --method POST --data '{"key":"value"}'
   raxuiscli http curl https://example.com --header "Auth: token"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a url")
 		}
 
 		url := args[0]
@@ -319,13 +316,13 @@ Examples:
 		fmt.Println("\n[CURL COMMAND]")
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println(curlCmd)
+		return nil
 	},
 }
 
-func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
+func runHTTPRequest(cmd *cobra.Command, args []string, method string) error {
 	if len(args) == 0 {
-		fmt.Println("Please provide a URL")
-		return
+		return fmt.Errorf("please provide a URL")
 	}
 
 	url := args[0]
@@ -368,8 +365,7 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
 
 	resp, err := httplib.DoRequest(opts)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		return err
 	}
 
 	// Format JSON if requested
@@ -379,7 +375,7 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) {
 
 	showCurl, _ := cmd.Flags().GetBool("curl")
 
-	_ = output.Emit(responseView(resp), func(_ io.Writer) {
+	return output.Emit(responseView(resp), func(_ io.Writer) {
 		httplib.DisplayResponse(resp, showBody, maxBody)
 		if showCurl {
 			fmt.Printf("\n[Curl Equivalent]\n%s\n", httplib.GenerateCurl(opts))

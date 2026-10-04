@@ -306,7 +306,6 @@ func headerResults(resource string, headers http.Header) []models.VulnResult {
 		{"Content-Security-Policy", constants.SeverityMedium, "Missing CSP header. The application may be vulnerable to XSS attacks.", "Implement a Content-Security-Policy header to restrict resource loading."},
 		{"X-Content-Type-Options", constants.SeverityLow, "Missing X-Content-Type-Options header. The browser may MIME-sniff responses.", "Add 'X-Content-Type-Options: nosniff' header."},
 		{"X-Frame-Options", constants.SeverityMedium, "Missing X-Frame-Options header. The application may be vulnerable to clickjacking.", "Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' header."},
-		{"X-XSS-Protection", constants.SeverityLow, "Missing X-XSS-Protection header. Browser XSS filter may not be enabled.", "Add 'X-XSS-Protection: 1; mode=block' header (note: deprecated in favor of CSP)."},
 		{"Referrer-Policy", constants.SeverityLow, "Missing Referrer-Policy header. Sensitive information may leak in referrer.", "Add 'Referrer-Policy: strict-origin-when-cross-origin' header."},
 		{"Permissions-Policy", constants.SeverityLow, "Missing Permissions-Policy header. Browser features are not restricted.", "Add Permissions-Policy header to control browser features."},
 	}

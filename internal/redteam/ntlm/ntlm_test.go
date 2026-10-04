@@ -32,11 +32,10 @@ func TestComputeLMHashLongPassword(t *testing.T) {
 }
 
 func TestComputeLMHashShortPassword(t *testing.T) {
-	// Current implementation always returns the placeholder value, even for
-	// short passwords (documented as simplified/not real DES-based LM hash).
+	// Non-empty supported passwords must not use the disabled-LM marker.
 	got := ComputeLMHash("short")
-	if got == "" {
-		t.Error("ComputeLMHash should never return an empty string")
+	if got == "" || got == "AAD3B435B51404EEAAD3B435B51404EE" {
+		t.Fatal("supported password did not produce an LM hash")
 	}
 }
 
@@ -243,4 +242,15 @@ func TestDisplayFunctions(t *testing.T) {
 	DisplayCrackResult(&CrackResult{Hash: "x", Attempts: 5, Found: false})
 
 	DisplayPTHCommands("alice", "CORP", "8846F7EAEE8FB117AD06BDD830B7586C", "10.0.0.1")
+}
+
+func TestLMHashMicrosoftVector(t *testing.T) {
+	for _, password := range []string{"Password", "PASSWORD", "password"} {
+		if got := ComputeLMHash(password); got != "E52CAC67419A9A224A3B108F3FA6CB6D" {
+			t.Fatalf("%q: %s", password, got)
+		}
+	}
+	if got := ComputeLMHash(""); got != "AAD3B435B51404EEAAD3B435B51404EE" {
+		t.Fatal(got)
+	}
 }

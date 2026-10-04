@@ -10,7 +10,7 @@ RaxuisCLI is a comprehensive cybersecurity CLI toolkit written in Go, designed f
 
 Keep comments minimal. Only comment on non-obvious behavior (why, not what);
 do not add doc comments to every exported function just because it's
-exported — `revive`'s `exported` rule is disabled in `.golangci.yml`
+exported, since `revive`'s `exported` rule is disabled in `.golangci.yml`
 specifically so this isn't required. Prefer clear naming and short functions
 over narration in comments.
 
@@ -422,7 +422,7 @@ round to respect lockout policy. Consumes the `ad`-tagged LDAP targets found by
 with `--round-delay`.
 
 Two protocols via `--protocol`: `ldap` (default, simple bind, ports
-389/636/3268/3269) and `kerberos` (AS-REQ pre-auth, RC4-HMAC, port 88 — reports
+389/636/3268/3269) and `kerberos` (AS-REQ pre-auth, RC4-HMAC, port 88, reports
 expired/locked/unknown accounts and warns when the KDC refuses RC4).
 
 ```bash
