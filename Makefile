@@ -1,7 +1,8 @@
-.PHONY: build build-all clean install test test-race cover lint format install-hooks tidy run help lab
+.PHONY: build build-all clean install test test-race cover lint format install-hooks tidy run help lab vulncheck
 
 BINARY      := raxuiscli
 PKG         := github.com/Raxuis/RaxuisCLI/cmd
+GOVULNCHECK_VERSION ?= v1.10.0
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 DATE        ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -51,6 +52,10 @@ cover:
 ## lint: run golangci-lint (install: https://golangci-lint.run/usage/install/)
 lint:
 	golangci-lint run ./...
+
+## vulncheck: check reachable vulnerabilities with the CI scanner
+vulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 ## format: format all tracked Go source files
 format:

@@ -98,3 +98,27 @@ un développement supplémentaire, distinct de la suppression des faux succès.
 Les fixtures et leur portée sont décrites dans [le laboratoire](../lab/README.md).
 Aucun environnement réel, compte ou secret de production n'a été utilisé pour
 ces contrôles.
+
+## Correction du premier run GitHub
+
+Le [run CI du commit e6827ff](https://github.com/Raxuis/RaxuisCLI/actions/runs/45349913745)
+a réussi les tests sur Linux, macOS et Windows, le lint et les compilations.
+Son job govulncheck a toutefois détecté 14 vulnérabilités atteignables avec le
+compilateur Go 1.26.8 et la dépendance x/net v0.56.0. Ce contrôle n'avait pas été
+inclus dans la vérification locale initiale.
+
+La version minimale de Go est portée à 1.26.11 et x/net à v0.60.0. Ces versions
+intègrent les correctifs requis, notamment [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)
+pour la bibliothèque standard et [GO-2026-6617](https://pkg.go.dev/vuln/GO-2026-6617)
+pour HTTP/2. Les workflows de CI et de release sélectionnent Go depuis go.mod.
+
+`make vulncheck` exécute désormais le même scanner govulncheck v1.10.0 en local
+et en CI. Aucune alerte n'est ignorée et le contrôle reste bloquant. Les résultats
+Go 1.26.8 du tableau initial décrivent le contrôle effectué avant cette mise à
+jour de sécurité.
+
+Vérification du correctif avec Go 1.26.11 : govulncheck v1.10.0 réussit avec
+zéro vulnérabilité atteignable et zéro dans les packages importés ; trois
+alertes concernent des modules requis dont les symboles affectés ne sont pas
+appelés. Vet, les tests avec race detector, le lint et les cinq compilations
+réussissent également sur cette version de Go.

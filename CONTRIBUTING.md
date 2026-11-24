@@ -5,7 +5,7 @@ the conventions, and the checklist for adding a command.
 
 ## Prerequisites
 
-- Go **1.26.8+** (see `go.mod`).
+- Go **1.26.11+** (see `go.mod`).
 - `make` (optional, but the targets below are the easiest path).
 
 ## Build, test, lint
@@ -17,6 +17,7 @@ make test         # go test ./...
 make test-race    # go test -race ./...
 make cover        # coverage profile
 make lint         # golangci-lint (see note below)
+make vulncheck    # reachable vulnerabilities in dependencies and Go
 make tidy         # go mod tidy
 ```
 
@@ -26,6 +27,7 @@ Before opening a pull request, make sure the following pass:
 gofmt -l .        # must print nothing
 go vet ./...
 go test -race ./...
+make vulncheck
 go build ./...
 ```
 
