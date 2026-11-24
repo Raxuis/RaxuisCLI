@@ -19,19 +19,19 @@ import (
 // corrupts the machine-readable stream.
 func vulnLive(format string, a ...any) {
 	if !output.JSON() {
-		fmt.Printf(format, a...)
+		fmt.Fprintf(output.Std, format, a...)
 	}
 }
 
 // emitVuln writes results as JSON ({target, results}) or, in text mode, prints
 // emptyMsg when there are no findings else the human table.
-func emitVuln(target string, results []vuln.VulnResult, emptyMsg string) {
+func emitVuln(target string, results []vuln.VulnResult, emptyMsg string) error {
 	if results == nil {
 		results = []vuln.VulnResult{}
 	}
-	_ = output.Emit(map[string]any{"target": target, "results": results}, func(_ io.Writer) {
+	return output.Emit(map[string]any{"target": target, "results": results}, func(_ io.Writer) {
 		if len(results) == 0 {
-			fmt.Println(emptyMsg)
+			fmt.Fprintln(output.Std, emptyMsg)
 			return
 		}
 		vuln.DisplayResults(results)
@@ -63,10 +63,9 @@ Examples:
   raxuiscli vuln scan "https://example.com/search?q=test"
   raxuiscli vuln scan "https://site.com/page?id=1&name=test" --level 3
   raxuiscli vuln scan https://example.com --threads 20`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL with parameters to test")
-			return
+			return fmt.Errorf("please provide a URL with parameters to test")
 		}
 
 		url := args[0]
@@ -90,12 +89,12 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[VULNERABILITY SCAN]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Level: %d (1=basic, 2=normal, 3=aggressive)\n", level)
-			fmt.Printf("Threads: %d\n\n", threads)
-			fmt.Println("Scanning...")
+			fmt.Fprintf(output.Std, "[VULNERABILITY SCAN]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Level: %d (1=basic, 2=normal, 3=aggressive)\n", level)
+			fmt.Fprintf(output.Std, "Threads: %d\n\n", threads)
+			fmt.Fprintln(output.Std, "Scanning...")
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -112,9 +111,11 @@ Examples:
 				results = append(results, result)
 				vulnLive("  [%s] %s - %s\n", result.Severity, result.Type, result.Parameter)
 			case <-doneChan:
+				for len(resultChan) > 0 {
+					results = append(results, <-resultChan)
+				}
 				vulnLive("\nScan completed in %v\n", time.Since(start))
-				emitVuln(url, results, "No vulnerabilities detected")
-				return
+				return emitVuln(url, results, "No vulnerabilities detected")
 			}
 		}
 	},
@@ -128,10 +129,9 @@ var vulnXSSCmd = &cobra.Command{
 Examples:
   raxuiscli vuln xss "https://site.com/search?q=test"
   raxuiscli vuln xss "https://site.com?name=foo&msg=bar" --level 3`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL with parameters to test")
-			return
+			return fmt.Errorf("please provide a URL with parameters to test")
 		}
 
 		url := args[0]
@@ -155,10 +155,10 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[XSS TESTING]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Level: %d\n\n", level)
+			fmt.Fprintf(output.Std, "[XSS TESTING]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Level: %d\n\n", level)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -174,7 +174,7 @@ Examples:
 			vulnLive("  [FOUND] Parameter: %s\n", result.Parameter)
 		}
 
-		emitVuln(url, results, "No XSS vulnerabilities detected")
+		return emitVuln(url, results, "No XSS vulnerabilities detected")
 	},
 }
 
@@ -188,10 +188,9 @@ Supports error-based, time-based, and boolean-based detection.
 Examples:
   raxuiscli vuln sqli "https://site.com/user?id=1"
   raxuiscli vuln sqli "https://site.com?category=1&sort=name" --level 3`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL with parameters to test")
-			return
+			return fmt.Errorf("please provide a URL with parameters to test")
 		}
 
 		url := args[0]
@@ -215,10 +214,10 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[SQL INJECTION TESTING]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Level: %d\n\n", level)
+			fmt.Fprintf(output.Std, "[SQL INJECTION TESTING]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Level: %d\n\n", level)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -234,7 +233,7 @@ Examples:
 			vulnLive("  [FOUND] %s - %s\n", result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No SQL injection vulnerabilities detected")
+		return emitVuln(url, results, "No SQL injection vulnerabilities detected")
 	},
 }
 
@@ -246,10 +245,9 @@ var vulnLFICmd = &cobra.Command{
 Examples:
   raxuiscli vuln lfi "https://site.com/page?file=about.php"
   raxuiscli vuln lfi "https://site.com?template=home" --level 3`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL with parameters to test")
-			return
+			return fmt.Errorf("please provide a URL with parameters to test")
 		}
 
 		url := args[0]
@@ -273,10 +271,10 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[LFI TESTING]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Level: %d\n\n", level)
+			fmt.Fprintf(output.Std, "[LFI TESTING]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Level: %d\n\n", level)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -292,7 +290,7 @@ Examples:
 			vulnLive("  [FOUND] %s - %s\n", result.Parameter, result.Payload)
 		}
 
-		emitVuln(url, results, "No LFI vulnerabilities detected")
+		return emitVuln(url, results, "No LFI vulnerabilities detected")
 	},
 }
 
@@ -306,10 +304,9 @@ Checks for missing or misconfigured security headers.
 Examples:
   raxuiscli vuln headers https://example.com
   raxuiscli vuln headers https://api.example.com`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL")
-			return
+			return fmt.Errorf("please provide a URL")
 		}
 
 		url := args[0]
@@ -327,13 +324,13 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[SECURITY HEADERS CHECK]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n\n", url)
+			fmt.Fprintf(output.Std, "[SECURITY HEADERS CHECK]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n\n", url)
 		}
 
 		results := vuln.ScanSecurityHeaders(opts)
-		emitVuln(url, results, "No security header issues detected")
+		return emitVuln(url, results, "No security header issues detected")
 	},
 }
 
@@ -348,10 +345,9 @@ Examples:
   raxuiscli vuln payloads xss
   raxuiscli vuln payloads sqli --level 3
   raxuiscli vuln payloads nosqli`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Available payload types: xss, sqli, lfi, cmdi, redirect, nosqli")
-			return
+			return fmt.Errorf("provide a payload type: xss, sqli, lfi, cmdi, redirect, nosqli")
 		}
 
 		level, _ := cmd.Flags().GetInt("level")
@@ -371,25 +367,25 @@ Examples:
 		case "nosqli", "nosql":
 			vulnType = vuln.VulnNoSQLi
 		default:
-			fmt.Println("Unknown payload type. Available: xss, sqli, lfi, cmdi, redirect, nosqli")
-			return
+			return fmt.Errorf("unknown payload type: %s", args[0])
 		}
 
 		payloads := vuln.GetPayloads(vulnType, level)
 
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"type":     strings.ToLower(args[0]),
 			"level":    level,
 			"count":    len(payloads),
 			"payloads": payloads,
 		}, func(_ io.Writer) {
-			fmt.Printf("[%s PAYLOADS - Level %d]\n", strings.ToUpper(args[0]), level)
-			fmt.Println(strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "[%s PAYLOADS - Level %d]\n", strings.ToUpper(args[0]), level)
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
 			for i, p := range payloads {
-				fmt.Printf("%3d. %s\n", i+1, p)
+				fmt.Fprintf(output.Std, "%3d. %s\n", i+1, p)
 			}
-			fmt.Printf("\nTotal: %d payloads\n", len(payloads))
+			fmt.Fprintf(output.Std, "\nTotal: %d payloads\n", len(payloads))
 		})
+
 	},
 }
 
@@ -409,10 +405,9 @@ Examples:
   raxuiscli vuln cors https://api.example.com
   raxuiscli vuln cors https://api.example.com --origin "https://evil.com"
   raxuiscli vuln cors https://api.example.com --full`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL to test")
-			return
+			return fmt.Errorf("please provide a URL to test")
 		}
 
 		url := args[0]
@@ -436,13 +431,13 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[CORS MISCONFIGURATION TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
+			fmt.Fprintf(output.Std, "[CORS MISCONFIGURATION TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
 			if origin != "" {
-				fmt.Printf("Custom Origin: %s\n", origin)
+				fmt.Fprintf(output.Std, "Custom Origin: %s\n", origin)
 			}
-			fmt.Println()
+			fmt.Fprintln(output.Std)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -458,7 +453,7 @@ Examples:
 			vulnLive("  [%s] %s: %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No CORS misconfigurations detected")
+		return emitVuln(url, results, "No CORS misconfigurations detected")
 	},
 }
 
@@ -478,10 +473,9 @@ Examples:
   raxuiscli vuln nosqli "https://api.com/users?id=1"
   raxuiscli vuln nosqli "https://api.com/login" -d '{"user":"test","pass":"test"}'
   raxuiscli vuln nosqli "https://api.com" --type mongodb --level 3`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL to test")
-			return
+			return fmt.Errorf("please provide a URL to test")
 		}
 
 		url := args[0]
@@ -512,14 +506,14 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[NoSQL INJECTION TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Level: %d\n", level)
+			fmt.Fprintf(output.Std, "[NoSQL INJECTION TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Level: %d\n", level)
 			if data != "" {
-				fmt.Printf("Data: %s\n", data)
+				fmt.Fprintf(output.Std, "Data: %s\n", data)
 			}
-			fmt.Println()
+			fmt.Fprintln(output.Std)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -535,7 +529,7 @@ Examples:
 			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No NoSQL injection vulnerabilities detected")
+		return emitVuln(url, results, "No NoSQL injection vulnerabilities detected")
 	},
 }
 
@@ -555,10 +549,9 @@ Examples:
   raxuiscli vuln xxe https://api.com/upload
   raxuiscli vuln xxe https://api.com --payload file
   raxuiscli vuln xxe https://api.com --oob http://callback.attacker.com`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL to test")
-			return
+			return fmt.Errorf("please provide a URL to test")
 		}
 
 		url := args[0]
@@ -582,16 +575,16 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[XXE VULNERABILITY TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
+			fmt.Fprintf(output.Std, "[XXE VULNERABILITY TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
 			if oobCallback != "" {
-				fmt.Printf("OOB Callback: %s\n", oobCallback)
+				fmt.Fprintf(output.Std, "OOB Callback: %s\n", oobCallback)
 			}
 			if payloadType != "" {
-				fmt.Printf("Payload Type: %s\n", payloadType)
+				fmt.Fprintf(output.Std, "Payload Type: %s\n", payloadType)
 			}
-			fmt.Println()
+			fmt.Fprintln(output.Std)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -607,7 +600,7 @@ Examples:
 			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No XXE vulnerabilities detected\n\nNote: Use --oob with a callback server for blind XXE detection")
+		return emitVuln(url, results, "No XXE vulnerabilities detected\n\nNote: Use --oob with a callback server for blind XXE detection")
 	},
 }
 
@@ -628,10 +621,9 @@ Examples:
   raxuiscli vuln graphql https://api.com/graphql
   raxuiscli vuln graphql https://api.com/graphql --introspect
   raxuiscli vuln graphql https://api.com/graphql --dos`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a GraphQL endpoint URL")
-			return
+			return fmt.Errorf("please provide a GraphQL endpoint URL")
 		}
 
 		url := args[0]
@@ -655,11 +647,11 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[GRAPHQL SECURITY TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("DoS Testing: %v\n", dos)
-			fmt.Println()
+			fmt.Fprintf(output.Std, "[GRAPHQL SECURITY TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "DoS Testing: %v\n", dos)
+			fmt.Fprintln(output.Std)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -675,7 +667,7 @@ Examples:
 			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No GraphQL security issues detected")
+		return emitVuln(url, results, "No GraphQL security issues detected")
 	},
 }
 
@@ -696,10 +688,9 @@ Examples:
   raxuiscli vuln host https://example.com
   raxuiscli vuln host https://example.com --poison
   raxuiscli vuln host https://example.com --cache`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL to test")
-			return
+			return fmt.Errorf("please provide a URL to test")
 		}
 
 		url := args[0]
@@ -723,12 +714,12 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[HOST HEADER INJECTION TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Password Reset Poisoning: %v\n", poison)
-			fmt.Printf("Cache Poisoning: %v\n", cache)
-			fmt.Println()
+			fmt.Fprintf(output.Std, "[HOST HEADER INJECTION TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Password Reset Poisoning: %v\n", poison)
+			fmt.Fprintf(output.Std, "Cache Poisoning: %v\n", cache)
+			fmt.Fprintln(output.Std)
 		}
 
 		resultChan := make(chan vuln.VulnResult, 100)
@@ -744,7 +735,7 @@ Examples:
 			vulnLive("  [%s] %s - %s\n", result.Severity, result.Parameter, result.Evidence)
 		}
 
-		emitVuln(url, results, "No Host header injection vulnerabilities detected")
+		return emitVuln(url, results, "No Host header injection vulnerabilities detected")
 	},
 }
 
@@ -764,10 +755,9 @@ Examples:
   raxuiscli vuln race "https://api.com/transfer" -d '{"amount":100}' --requests 50
   raxuiscli vuln race "https://api.com/redeem" -d '{"code":"PROMO"}' --requests 20
   raxuiscli vuln race "https://api.com/vote" --method POST --requests 30`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide a URL to test")
-			return
+			return fmt.Errorf("please provide a URL to test")
 		}
 
 		url := args[0]
@@ -795,16 +785,16 @@ Examples:
 		}
 
 		if !output.JSON() {
-			fmt.Printf("[RACE CONDITION TEST]\n")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("Target: %s\n", url)
-			fmt.Printf("Method: %s\n", method)
-			fmt.Printf("Concurrent Requests: %d\n", requests)
+			fmt.Fprintf(output.Std, "[RACE CONDITION TEST]\n")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Target: %s\n", url)
+			fmt.Fprintf(output.Std, "Method: %s\n", method)
+			fmt.Fprintf(output.Std, "Concurrent Requests: %d\n", requests)
 			if data != "" {
-				fmt.Printf("Data: %s\n", data)
+				fmt.Fprintf(output.Std, "Data: %s\n", data)
 			}
-			fmt.Println()
-			fmt.Println("Firing concurrent requests...")
+			fmt.Fprintln(output.Std)
+			fmt.Fprintln(output.Std, "Firing concurrent requests...")
 		}
 
 		start := time.Now()
@@ -833,7 +823,7 @@ Examples:
 			}
 		}
 
-		emitVuln(url, significantResults, "No race condition vulnerabilities detected")
+		return emitVuln(url, significantResults, "No race condition vulnerabilities detected")
 	},
 }
 

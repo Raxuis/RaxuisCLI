@@ -1,9 +1,7 @@
 package tools
 
 import (
-	"fmt"
 	"io"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
@@ -37,7 +35,7 @@ Examples:
   raxuiscli strings file.bin --offset
   raxuiscli strings file.bin --encoding all --show-encoding`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]
 
 		opts := strings.Options{
@@ -50,8 +48,7 @@ Examples:
 		if output.JSON() {
 			results, err := strings.Extract(path, opts)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 			type strOut struct {
 				Offset   int64  `json:"offset"`
@@ -62,14 +59,13 @@ Examples:
 			for _, r := range results {
 				view = append(view, strOut{Offset: r.Offset, String: r.String, Encoding: string(r.Encoding)})
 			}
-			_ = output.Emit(map[string]any{"file": path, "strings": view}, func(io.Writer) {})
-			return
+			return output.Emit(map[string]any{"file": path, "strings": view}, func(io.Writer) {})
 		}
 
 		if err := strings.StreamExtract(path, opts, output.Std); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
+		return nil
 	},
 }
 

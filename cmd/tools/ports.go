@@ -3,7 +3,6 @@ package tools
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
@@ -36,7 +35,7 @@ Examples:
   raxuiscli ports -H example.com -p 3000
   raxuiscli ports -H 192.168.1.1 -p 1-1024
   raxuiscli ports -H localhost -p 22,80,443,3000`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		options := ports.Options{
 			Host:      portsHost,
 			PortRange: portsPortRange,
@@ -44,31 +43,29 @@ Examples:
 			ScanType:  portsScanType,
 		}
 
-		if output.JSON() {
-			results, err := ports.ScanResults(options)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
-			}
-			type portOut struct {
-				Port    int    `json:"port"`
-				Status  string `json:"status"`
-				Service string `json:"service"`
-			}
-			view := make([]portOut, 0, len(results))
-			for _, r := range results {
-				view = append(view, portOut{Port: r.Port, Status: r.Status, Service: r.Service})
-			}
-			_ = output.Emit(map[string]any{
-				"host":       options.Host,
-				"scan_type":  options.ScanType,
-				"port_range": options.PortRange,
-				"results":    view,
-			}, func(io.Writer) {})
-			return
+		results, err := ports.ScanResultsContext(cmd.Context(), options)
+		if err != nil {
+			return err
 		}
-
-		ports.Scan(options)
+		type portOut struct {
+			Port    int    `json:"port"`
+			Status  string `json:"status"`
+			Service string `json:"service"`
+		}
+		view := make([]portOut, 0, len(results))
+		for _, r := range results {
+			view = append(view, portOut{Port: r.Port, Status: r.Status, Service: r.Service})
+		}
+		return output.Emit(map[string]any{"host": options.Host, "scan_type": options.ScanType, "port_range": options.PortRange, "results": view}, func(w io.Writer) {
+			fmt.Fprintf(w, "Port scan: %s (%s), range %s\n", options.Host, options.ScanType, options.PortRange)
+			if len(results) == 0 {
+				fmt.Fprintln(w, "No open ports found")
+				return
+			}
+			for _, r := range results {
+				fmt.Fprintf(w, "Port %-6d: %s %s\n", r.Port, r.Status, r.Service)
+			}
+		})
 	},
 }
 

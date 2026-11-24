@@ -2,11 +2,11 @@ package redteam
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/ldap"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -23,32 +23,25 @@ var ldapCmd = &cobra.Command{
 	Short: "Active Directory LDAP enumeration",
 	Long: `LDAP enumeration toolkit for Active Directory reconnaissance.
 
-Enumerate users, computers, groups, and GPOs from Active Directory.
-Identify potentially vulnerable configurations like Kerberoastable accounts,
-AS-REP roastable users, and unconstrained delegation.
+Connectivity and simple-bind authentication checks are available through ldap test.
+LDAP search and AD enumeration are not implemented; enum and users return explicit
+errors without connecting.
 
 Examples:
-  raxuiscli ldap enum dc.corp.local -u user -p pass -d corp.local
-  raxuiscli ldap users dc.corp.local -u user -p pass
-  raxuiscli ldap computers dc.corp.local -u user -p pass
-  raxuiscli ldap groups dc.corp.local -u user -p pass`,
-	Run: func(cmd *cobra.Command, args []string) {
+  raxuiscli ldap test dc.corp.local
+  raxuiscli ldap test dc.corp.local -u user -p pass -d corp.local`,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
 var ldapEnumCmd = &cobra.Command{
 	Use:   "enum [host]",
 	Short: "Full AD enumeration",
-	Long: `Perform comprehensive Active Directory enumeration.
-
-Enumerates users, computers, groups, and identifies:
-- Kerberoastable accounts (users with SPNs)
-- AS-REP roastable users (no pre-auth required)
-- Unconstrained delegation
-- Admin accounts`,
-	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  `Active Directory enumeration is not implemented. This command returns an explicit error without connecting.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := ldap.LDAPOptions{
 			Host:     args[0],
 			Port:     ldapPort,
@@ -59,53 +52,17 @@ Enumerates users, computers, groups, and identifies:
 			Timeout:  ldapTimeout,
 		}
 
-		// Test connection first
-		fmt.Printf("Connecting to %s:%d...\n", opts.Host, opts.Port)
-
-		if err := ldap.TestConnection(opts.Host, opts.Port, opts.Timeout); err != nil {
-			fmt.Fprintf(os.Stderr, "Connection failed: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("Connection successful!")
-
-		// Check anonymous bind
-		anon, _ := ldap.CheckAnonymousBind(opts.Host, opts.Port, opts.Timeout)
-		if anon {
-			fmt.Println("WARNING: Anonymous bind is allowed!")
-		}
-
-		// Enumerate users
-		users, err := ldap.EnumerateUsers(opts, "")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "User enumeration failed: %v\n", err)
-		} else {
-			ldap.DisplayUsers(users, ldapShowAll)
-
-			// Show security findings
-			if kerberoastable := ldap.FindKerberoastable(users); len(kerberoastable) > 0 {
-				fmt.Printf("\n[!] Kerberoastable accounts: %d\n", len(kerberoastable))
-				for _, u := range kerberoastable {
-					fmt.Printf("    %s (SPNs: %v)\n", u.SAMAccountName, u.ServicePrincipal)
-				}
-			}
-
-			if asrep := ldap.FindASREPRoastable(users); len(asrep) > 0 {
-				fmt.Printf("\n[!] AS-REP Roastable accounts: %d\n", len(asrep))
-				for _, u := range asrep {
-					fmt.Printf("    %s\n", u.SAMAccountName)
-				}
-			}
-		}
+		_, err := ldap.EnumerateUsers(opts, "")
+		return err
 	},
 }
 
 var ldapUsersCmd = &cobra.Command{
 	Use:   "users [host]",
 	Short: "Enumerate AD users",
-	Long:  `Enumerate Active Directory users and their attributes.`,
+	Long:  `LDAP user enumeration is not implemented. This command returns an explicit error without connecting.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := ldap.LDAPOptions{
 			Host:     args[0],
 			Port:     ldapPort,
@@ -116,13 +73,8 @@ var ldapUsersCmd = &cobra.Command{
 			Timeout:  ldapTimeout,
 		}
 
-		users, err := ldap.EnumerateUsers(opts, "")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		ldap.DisplayUsers(users, ldapShowAll)
+		_, err := ldap.EnumerateUsers(opts, "")
+		return err
 	},
 }
 
@@ -131,24 +83,23 @@ var ldapTestCmd = &cobra.Command{
 	Short: "Test LDAP connectivity",
 	Long:  `Test LDAP connectivity and authentication.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		host := args[0]
 
-		fmt.Printf("Testing connection to %s:%d...\n", host, ldapPort)
+		fmt.Fprintf(output.Std, "Testing connection to %s:%d...\n", host, ldapPort)
 
 		// Test TCP connection
 		if err := ldap.TestConnection(host, ldapPort, ldapTimeout); err != nil {
-			fmt.Fprintf(os.Stderr, "TCP connection failed: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("TCP connection failed: %v", err)
 		}
-		fmt.Println("[+] TCP connection successful")
+		fmt.Fprintln(output.Std, "[+] TCP connection successful")
 
 		// Test anonymous bind
 		anon, err := ldap.CheckAnonymousBind(host, ldapPort, ldapTimeout)
 		if anon {
-			fmt.Println("[+] Anonymous bind: ALLOWED (potential vulnerability)")
+			fmt.Fprintln(output.Std, "[+] Anonymous bind: ALLOWED (potential vulnerability)")
 		} else {
-			fmt.Printf("[-] Anonymous bind: NOT ALLOWED (%v)\n", err)
+			fmt.Fprintf(output.Std, "[-] Anonymous bind: NOT ALLOWED (%v)\n", err)
 		}
 
 		// Test authentication if credentials provided
@@ -165,18 +116,17 @@ var ldapTestCmd = &cobra.Command{
 
 			conn, err := ldap.Connect(opts)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Connection failed: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("connection failed: %v", err)
 			}
 			defer conn.Close()
 
 			err = conn.Bind(ldapUser, ldapPass, ldapDomain)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "[-] Authentication failed: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("[-] Authentication failed: %v", err)
 			}
-			fmt.Println("[+] Authentication successful!")
+			fmt.Fprintln(output.Std, "[+] Authentication successful!")
 		}
+		return nil
 	},
 }
 

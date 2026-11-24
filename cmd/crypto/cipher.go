@@ -32,7 +32,8 @@ Examples:
   raxuiscli cipher xor "hello" --key "secret"
   raxuiscli cipher xor "48656c6c6f" --key "key" --hex
   raxuiscli cipher xor -f encrypted.bin --key "password"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		key, _ := cmd.Flags().GetString("key")
 		hexInput, _ := cmd.Flags().GetBool("hex")
 		hexKey, _ := cmd.Flags().GetBool("hex-key")
@@ -45,38 +46,33 @@ Examples:
 		if file != "" {
 			data, err = os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("error reading file: %v", err)
 			}
 		} else if len(args) > 0 {
 			if hexInput {
 				data, err = hex.DecodeString(strings.ReplaceAll(args[0], " ", ""))
 				if err != nil {
-					fmt.Printf("Invalid hex input: %v\n", err)
-					return
+					return fmt.Errorf("invalid hex input: %v", err)
 				}
 			} else {
 				data = []byte(args[0])
 			}
 		} else {
-			fmt.Println("Please provide text or use -f for file input")
-			return
+			return fmt.Errorf("please provide text or use -f for file input")
 		}
 
 		var keyBytes []byte
 		if hexKey {
 			keyBytes, err = hex.DecodeString(strings.ReplaceAll(key, " ", ""))
 			if err != nil {
-				fmt.Printf("Invalid hex key: %v\n", err)
-				return
+				return fmt.Errorf("invalid hex key: %v", err)
 			}
 		} else {
 			keyBytes = []byte(key)
 		}
 
 		if len(keyBytes) == 0 {
-			fmt.Println("Please provide a key with --key")
-			return
+			return fmt.Errorf("please provide a key with --key")
 		}
 
 		result := cipher.XOREncrypt(data, keyBytes)
@@ -89,19 +85,20 @@ Examples:
 		if printable {
 			payload["text"] = string(result)
 		}
-		_ = output.Emit(payload, func(_ io.Writer) {
-			fmt.Println("\n[XOR RESULT]")
-			fmt.Println(strings.Repeat("=", 50))
+		return output.Emit(payload, func(_ io.Writer) {
+			fmt.Fprintln(output.Std, "\n[XOR RESULT]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
 			if outputHex {
-				fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
+				fmt.Fprintf(output.Std, "Hex: %s\n", hex.EncodeToString(result))
 			}
 			if printable {
-				fmt.Printf("Text: %s\n", string(result))
+				fmt.Fprintf(output.Std, "Text: %s\n", string(result))
 			} else if !outputHex {
-				fmt.Printf("Hex: %s\n", hex.EncodeToString(result))
-				fmt.Println("(Result contains non-printable characters)")
+				fmt.Fprintf(output.Std, "Hex: %s\n", hex.EncodeToString(result))
+				fmt.Fprintln(output.Std, "(Result contains non-printable characters)")
 			}
 		})
+
 	},
 }
 
@@ -117,7 +114,8 @@ Examples:
   raxuiscli cipher xor-brute "encrypted_text"
   raxuiscli cipher xor-brute "1b37373331" --hex
   raxuiscli cipher xor-brute -f encrypted.bin --max-key-len 8`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hexInput, _ := cmd.Flags().GetBool("hex")
 		file, _ := cmd.Flags().GetString("file")
 		maxKeyLen, _ := cmd.Flags().GetInt("max-key-len")
@@ -129,30 +127,48 @@ Examples:
 		if file != "" {
 			data, err = os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("error reading file: %v", err)
 			}
 		} else if len(args) > 0 {
 			if hexInput {
 				data, err = hex.DecodeString(strings.ReplaceAll(args[0], " ", ""))
 				if err != nil {
-					fmt.Printf("Invalid hex input: %v\n", err)
-					return
+					return fmt.Errorf("invalid hex input: %v", err)
 				}
 			} else {
 				data = []byte(args[0])
 			}
 		} else {
-			fmt.Println("Please provide text or use -f for file input")
-			return
+			return fmt.Errorf("please provide text or use -f for file input")
 		}
 
+		if maxKeyLen <= 0 {
+			return fmt.Errorf("--max-key-len must be positive")
+		}
+		if maxKeyLen > len(data) && len(data) > 0 {
+			return fmt.Errorf("--max-key-len must not exceed input length")
+		}
+		if len(data) == 0 {
+			return fmt.Errorf("input must not be empty")
+		}
 		if maxKeyLen == 1 {
 			results := cipher.XORBruteForce(data)
-			cipher.DisplayXORResults(results, topResults)
+			if topResults <= 0 {
+				return fmt.Errorf("--top must be positive")
+			}
+			if topResults < len(results) {
+				results = results[:topResults]
+			}
+			return output.Emit(map[string]any{"results": results}, func(io.Writer) { cipher.DisplayXORResults(results, topResults) })
 		} else {
 			results := cipher.XORBruteForceMultiByte(data, maxKeyLen)
-			cipher.DisplayXORResults(results, topResults)
+			if topResults <= 0 {
+				return fmt.Errorf("--top must be positive")
+			}
+			if topResults < len(results) {
+				results = results[:topResults]
+			}
+			return output.Emit(map[string]any{"results": results}, func(io.Writer) { cipher.DisplayXORResults(results, topResults) })
 		}
 	},
 }
@@ -165,18 +181,17 @@ var cipherVigenereCmd = &cobra.Command{
 Examples:
   raxuiscli cipher vigenere "hello world" --key "KEY"
   raxuiscli cipher vigenere "RIJVS UYVJN" --key "KEY" --decrypt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		key, _ := cmd.Flags().GetString("key")
 		decrypt, _ := cmd.Flags().GetBool("decrypt")
 
 		if len(args) == 0 {
-			fmt.Println("Please provide text to encrypt/decrypt")
-			return
+			return fmt.Errorf("please provide text to encrypt/decrypt")
 		}
 
 		if key == "" {
-			fmt.Println("Please provide a key with --key")
-			return
+			return fmt.Errorf("please provide a key with --key")
 		}
 
 		var result string
@@ -191,16 +206,17 @@ Examples:
 			operation = "Decrypted"
 		}
 
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"operation": strings.ToLower(operation),
 			"key":       key,
 			"result":    result,
 		}, func(_ io.Writer) {
-			fmt.Printf("\n[VIGENERE %s]\n", strings.ToUpper(operation))
-			fmt.Println(strings.Repeat("=", 50))
-			fmt.Printf("Key: %s\n", key)
-			fmt.Printf("Result: %s\n", result)
+			fmt.Fprintf(output.Std, "\n[VIGENERE %s]\n", strings.ToUpper(operation))
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
+			fmt.Fprintf(output.Std, "Key: %s\n", key)
+			fmt.Fprintf(output.Std, "Result: %s\n", result)
 		})
+
 	},
 }
 
@@ -215,7 +231,8 @@ then frequency analysis to recover the key.
 Examples:
   raxuiscli cipher vigenere-crack "LXFOPVEFRNHR..."
   raxuiscli cipher vigenere-crack -f encrypted.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 		topResults, _ := cmd.Flags().GetInt("top")
 
@@ -224,19 +241,23 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("error reading file: %v", err)
 			}
 			text = string(data)
 		} else if len(args) > 0 {
 			text = args[0]
 		} else {
-			fmt.Println("Please provide ciphertext or use -f for file input")
-			return
+			return fmt.Errorf("please provide ciphertext or use -f for file input")
 		}
 
 		results := cipher.VigenereCrack(text)
-		cipher.DisplayVigenereResults(results, topResults)
+		if topResults <= 0 {
+			return fmt.Errorf("--top must be positive")
+		}
+		if topResults < len(results) {
+			results = results[:topResults]
+		}
+		return output.Emit(map[string]any{"results": results}, func(io.Writer) { cipher.DisplayVigenereResults(results, topResults) })
 	},
 }
 
@@ -250,7 +271,8 @@ Shows character frequencies compared to English averages.
 Examples:
   raxuiscli cipher freq "encrypted text here"
   raxuiscli cipher freq -f ciphertext.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 
 		var text string
@@ -258,23 +280,25 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("error reading file: %v", err)
 			}
 			text = string(data)
 		} else if len(args) > 0 {
 			text = args[0]
 		} else {
-			fmt.Println("Please provide text or use -f for file input")
-			return
+			return fmt.Errorf("please provide text or use -f for file input")
 		}
 
 		results := cipher.AnalyzeFrequency(text)
+		if output.JSON() {
+			return output.Emit(map[string]any{"frequencies": results, "detected_type": cipher.DetectCipherType(text)}, func(io.Writer) {})
+		}
 		cipher.DisplayFrequencyAnalysis(results)
 
 		// Also try to detect cipher type
 		cipherType := cipher.DetectCipherType(text)
-		fmt.Printf("Cipher detection: %s\n", cipherType)
+		fmt.Fprintf(output.Std, "Cipher detection: %s\n", cipherType)
+		return nil
 	},
 }
 
@@ -287,23 +311,28 @@ Examples:
   raxuiscli cipher caesar "hello" --shift 3
   raxuiscli cipher caesar "khoor" --shift 3 --decrypt
   raxuiscli cipher caesar "khoor" --brute`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		shift, _ := cmd.Flags().GetInt("shift")
 		decrypt, _ := cmd.Flags().GetBool("decrypt")
 		brute, _ := cmd.Flags().GetBool("brute")
 		topResults, _ := cmd.Flags().GetInt("top")
 
 		if len(args) == 0 {
-			fmt.Println("Please provide text")
-			return
+			return fmt.Errorf("please provide text")
 		}
 
 		text := args[0]
 
 		if brute {
 			results := cipher.CaesarBruteForce(text)
-			cipher.DisplayCaesarResults(results, topResults)
-			return
+			if topResults <= 0 {
+				return fmt.Errorf("--top must be positive")
+			}
+			if topResults < len(results) {
+				results = results[:topResults]
+			}
+			return output.Emit(map[string]any{"results": results}, func(io.Writer) { cipher.DisplayCaesarResults(results, topResults) })
 		}
 
 		var result string
@@ -319,16 +348,17 @@ Examples:
 			operation = "Decrypted"
 		}
 
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"operation": strings.ToLower(operation),
 			"shift":     shift,
 			"result":    result,
 		}, func(_ io.Writer) {
-			fmt.Printf("\n[CAESAR %s]\n", strings.ToUpper(operation))
-			fmt.Println(strings.Repeat("=", 50))
-			fmt.Printf("Shift: %d\n", shift)
-			fmt.Printf("Result: %s\n", result)
+			fmt.Fprintf(output.Std, "\n[CAESAR %s]\n", strings.ToUpper(operation))
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
+			fmt.Fprintf(output.Std, "Shift: %d\n", shift)
+			fmt.Fprintf(output.Std, "Result: %s\n", result)
 		})
+
 	},
 }
 
@@ -342,19 +372,20 @@ ROT13 is self-inverting: applying it twice returns the original.
 Examples:
   raxuiscli cipher rot13 "hello"
   raxuiscli cipher rot13 "uryyb"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide text")
-			return
+			return fmt.Errorf("please provide text")
 		}
 
 		result := cipher.ROT13(args[0])
 
-		_ = output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
-			fmt.Println("\n[ROT13]")
-			fmt.Println(strings.Repeat("=", 50))
-			fmt.Printf("Result: %s\n", result)
+		return output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
+			fmt.Fprintln(output.Std, "\n[ROT13]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
+			fmt.Fprintf(output.Std, "Result: %s\n", result)
 		})
+
 	},
 }
 
@@ -369,19 +400,20 @@ It is self-inverting.
 Examples:
   raxuiscli cipher atbash "hello"
   raxuiscli cipher atbash "svool"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			fmt.Println("Please provide text")
-			return
+			return fmt.Errorf("please provide text")
 		}
 
 		result := cipher.AtbashDecrypt(args[0])
 
-		_ = output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
-			fmt.Println("\n[ATBASH]")
-			fmt.Println(strings.Repeat("=", 50))
-			fmt.Printf("Result: %s\n", result)
+		return output.Emit(map[string]any{"result": result}, func(_ io.Writer) {
+			fmt.Fprintln(output.Std, "\n[ATBASH]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
+			fmt.Fprintf(output.Std, "Result: %s\n", result)
 		})
+
 	},
 }
 
@@ -398,7 +430,8 @@ Analyzes the text using various heuristics including:
 Examples:
   raxuiscli cipher detect "khoor zruog"
   raxuiscli cipher detect -f ciphertext.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		file, _ := cmd.Flags().GetString("file")
 
 		var text string
@@ -406,15 +439,13 @@ Examples:
 		if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
+				return fmt.Errorf("error reading file: %v", err)
 			}
 			text = string(data)
 		} else if len(args) > 0 {
 			text = args[0]
 		} else {
-			fmt.Println("Please provide text or use -f for file input")
-			return
+			return fmt.Errorf("please provide text or use -f for file input")
 		}
 
 		cipherType := cipher.DetectCipherType(text)
@@ -429,21 +460,22 @@ Examples:
 			top = append(top, charFreq{Char: string(freq[i].Char), Frequency: freq[i].Frequency})
 		}
 
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"detection": fmt.Sprintf("%v", cipherType),
 			"top_chars": top,
 		}, func(_ io.Writer) {
-			fmt.Println("\n[CIPHER DETECTION]")
-			fmt.Println(strings.Repeat("=", 50))
-			fmt.Printf("Detection: %s\n", cipherType)
+			fmt.Fprintln(output.Std, "\n[CIPHER DETECTION]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 50))
+			fmt.Fprintf(output.Std, "Detection: %s\n", cipherType)
 			if len(freq) > 0 {
-				fmt.Printf("\nTop 5 characters: ")
+				fmt.Fprintf(output.Std, "\nTop 5 characters: ")
 				for i := 0; i < min(5, len(freq)); i++ {
-					fmt.Printf("%c(%.1f%%) ", freq[i].Char, freq[i].Frequency)
+					fmt.Fprintf(output.Std, "%c(%.1f%%) ", freq[i].Char, freq[i].Frequency)
 				}
-				fmt.Println()
+				fmt.Fprintln(output.Std)
 			}
 		})
+
 	},
 }
 

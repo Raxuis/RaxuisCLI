@@ -3,6 +3,7 @@ package smb
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -92,19 +93,47 @@ func Connect(opts SMBOptions) (*ScanResult, error) {
 		return result, err
 	}
 
-	// Read response
-	response := make([]byte, 4096)
-	n, err := conn.Read(response)
-	if err != nil {
-		result.Error = fmt.Errorf("read response failed: %v", err)
-		return result, err
+	// TCP reads need not align with NetBIOS frames. Read the declared frame
+	// completely before interpreting any protocol fields, and bound allocations.
+	header := make([]byte, 4)
+	if _, err = io.ReadFull(conn, header); err != nil {
+		result.Error = fmt.Errorf("read response header failed: %w", err)
+		return result, result.Error
 	}
-
-	// Parse response
-	if n > 0 {
-		result.SMBVersion = detectSMBVersion(response[:n])
-		parseSMBResponse(response[:n], result)
+	length := int(header[1])<<16 | int(header[2])<<8 | int(header[3])
+	if header[0] != 0 || length < 32 || length > 1<<20 {
+		result.Error = fmt.Errorf("invalid SMB response frame")
+		return result, result.Error
 	}
+	response := make([]byte, 4+length)
+	copy(response, header)
+	if _, err = io.ReadFull(conn, response[4:]); err != nil {
+		result.Error = fmt.Errorf("read response body failed: %w", err)
+		return result, result.Error
+	}
+	result.SMBVersion = detectSMBVersion(response)
+	switch result.SMBVersion {
+	case "SMB2/3":
+		data := response[4:]
+		if len(data) < 128 || binary.LittleEndian.Uint16(data[4:6]) != 64 ||
+			binary.LittleEndian.Uint32(data[8:12]) != 0 ||
+			binary.LittleEndian.Uint16(data[12:14]) != 0 ||
+			binary.LittleEndian.Uint32(data[16:20])&1 == 0 ||
+			binary.LittleEndian.Uint16(data[64:66]) != 65 {
+			result.Error = fmt.Errorf("invalid SMB2 negotiate response")
+			return result, result.Error
+		}
+	case "SMB1":
+		data := response[4:]
+		if len(data) < 69 || data[4] != 0x72 || binary.LittleEndian.Uint32(data[5:9]) != 0 || data[9]&0x80 == 0 || data[32] != 17 {
+			result.Error = fmt.Errorf("invalid SMB1 negotiate response")
+			return result, result.Error
+		}
+	default:
+		result.Error = fmt.Errorf("unrecognized SMB response protocol")
+		return result, result.Error
+	}
+	parseSMBResponse(response, result)
 
 	return result, nil
 }
@@ -206,80 +235,24 @@ func parseSMBResponse(response []byte, result *ScanResult) {
 	// Skip NetBIOS header
 	data := response[4:]
 
-	// Check SMB2
-	if len(data) >= 4 && data[0] == 0xfe && data[1] == 'S' && data[2] == 'M' && data[3] == 'B' {
-		// SMB2 negotiate response
-		if len(data) >= 70 {
-			// Security mode at offset 3
-			secMode := data[3]
-			result.Signing = (secMode & 0x01) != 0
-			result.SignRequired = (secMode & 0x02) != 0
-		}
+	if len(data) >= 68 && data[0] == 0xfe && data[1] == 'S' && data[2] == 'M' && data[3] == 'B' {
+		secMode := binary.LittleEndian.Uint16(data[66:68])
+		result.Signing = secMode&1 != 0
+		result.SignRequired = secMode&2 != 0
+	} else if len(data) >= 36 && data[0] == 0xff && data[1] == 'S' && data[2] == 'M' && data[3] == 'B' {
+		result.Signing = data[35]&4 != 0
+		result.SignRequired = data[35]&8 != 0
 	}
 }
 
 // EnumerateShares attempts to enumerate SMB shares
 func EnumerateShares(opts SMBOptions) ([]ShareInfo, error) {
-	// This would require full SMB session establishment
-	// For now, return common shares to probe
-
-	commonShares := []string{
-		"ADMIN$",
-		"C$",
-		"D$",
-		"IPC$",
-		"NETLOGON",
-		"SYSVOL",
-		"print$",
-		"Users",
-		"Public",
-		"Shared",
-		"Data",
-		"Backup",
-		"Software",
-		"IT",
-		"HR",
-		"Finance",
-	}
-
-	var shares []ShareInfo
-	for _, name := range commonShares {
-		share := ShareInfo{
-			Name: name,
-			Type: guessShareType(name),
-		}
-		shares = append(shares, share)
-	}
-
-	return shares, nil
-}
-
-// guessShareType guesses share type from name
-func guessShareType(name string) string {
-	if strings.HasSuffix(name, "$") {
-		return "Hidden"
-	}
-	if strings.EqualFold(name, "print$") || strings.Contains(strings.ToLower(name), "print") {
-		return "Printer"
-	}
-	return "Disk"
+	return nil, fmt.Errorf("SMB share enumeration is not implemented: authenticated session setup and RPC are required")
 }
 
 // CheckNullSession tests for null session access
 func CheckNullSession(host string, port int, timeout int) (bool, error) {
-	opts := SMBOptions{
-		Host:    host,
-		Port:    port,
-		Timeout: timeout,
-	}
-
-	result, err := Connect(opts)
-	if err != nil {
-		return false, err
-	}
-
-	// If we got a valid response, null session might be possible
-	return result.SMBVersion != "", nil
+	return false, fmt.Errorf("SMB null session authentication is not implemented: negotiation alone does not establish a session")
 }
 
 // BuildSMB2Header builds an SMB2 header

@@ -1,4 +1,4 @@
-.PHONY: build build-all clean install test test-race cover lint format install-hooks tidy run help
+.PHONY: build build-all clean install test test-race cover lint format install-hooks tidy run help lab
 
 BINARY      := raxuiscli
 PKG         := github.com/Raxuis/RaxuisCLI/cmd
@@ -33,6 +33,10 @@ install:
 ## test: run the test suite
 test:
 	go test ./...
+
+## lab: run local protocol fixtures without external services
+lab:
+	./scripts/lab/run.sh
 
 ## test-race: run the test suite with the race detector
 test-race:

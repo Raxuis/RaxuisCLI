@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Raxuis/RaxuisCLI/internal/crypto/keygen"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 )
 
 var keygenCmd = &cobra.Command{
@@ -31,17 +33,22 @@ Examples:
   raxuiscli keygen rsa
   raxuiscli keygen rsa --bits 4096
   raxuiscli keygen rsa --bits 2048 --out key.pem`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bits, _ := cmd.Flags().GetInt("bits")
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
+		if pubFile != "" && outFile == "" {
+			return fmt.Errorf("--pub requires --out")
+		}
 
+		if bits < 1024 {
+			return fmt.Errorf("RSA key size must be at least 1024 bits")
+		}
 		kp, err := keygen.GenerateRSAKeyPair(bits)
 		if err != nil {
 			return fmt.Errorf("generating RSA key: %w", err)
 		}
-
-		keygen.DisplayKeyPair(kp)
 
 		if outFile != "" {
 			if pubFile == "" {
@@ -50,10 +57,14 @@ Examples:
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
 				return fmt.Errorf("saving keys: %w", err)
 			}
-			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
-			fmt.Printf("Public key saved to:  %s\n", pubFile)
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "\nPrivate key saved to: %s\n", outFile)
+			}
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Public key saved to:  %s\n", pubFile)
+			}
 		}
-		return nil
+		return emitKeyPair(kp)
 	},
 }
 
@@ -68,17 +79,19 @@ Examples:
   raxuiscli keygen ecdsa
   raxuiscli keygen ecdsa --curve P384
   raxuiscli keygen ecdsa --curve P521 --out key.pem`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		curve, _ := cmd.Flags().GetString("curve")
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
+		if pubFile != "" && outFile == "" {
+			return fmt.Errorf("--pub requires --out")
+		}
 
 		kp, err := keygen.GenerateECDSAKeyPair(curve)
 		if err != nil {
 			return fmt.Errorf("generating ECDSA key: %w", err)
 		}
-
-		keygen.DisplayKeyPair(kp)
 
 		if outFile != "" {
 			if pubFile == "" {
@@ -87,10 +100,14 @@ Examples:
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
 				return fmt.Errorf("saving keys: %w", err)
 			}
-			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
-			fmt.Printf("Public key saved to:  %s\n", pubFile)
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "\nPrivate key saved to: %s\n", outFile)
+			}
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Public key saved to:  %s\n", pubFile)
+			}
 		}
-		return nil
+		return emitKeyPair(kp)
 	},
 }
 
@@ -104,16 +121,18 @@ Ed25519 is a modern, secure, and fast algorithm.
 Examples:
   raxuiscli keygen ed25519
   raxuiscli keygen ed25519 --out key.pem`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outFile, _ := cmd.Flags().GetString("out")
 		pubFile, _ := cmd.Flags().GetString("pub")
+		if pubFile != "" && outFile == "" {
+			return fmt.Errorf("--pub requires --out")
+		}
 
 		kp, err := keygen.GenerateEd25519KeyPair()
 		if err != nil {
 			return fmt.Errorf("generating Ed25519 key: %w", err)
 		}
-
-		keygen.DisplayKeyPair(kp)
 
 		if outFile != "" {
 			if pubFile == "" {
@@ -122,10 +141,14 @@ Examples:
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
 				return fmt.Errorf("saving keys: %w", err)
 			}
-			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
-			fmt.Printf("Public key saved to:  %s\n", pubFile)
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "\nPrivate key saved to: %s\n", outFile)
+			}
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Public key saved to:  %s\n", pubFile)
+			}
 		}
-		return nil
+		return emitKeyPair(kp)
 	},
 }
 
@@ -141,6 +164,7 @@ Examples:
   raxuiscli keygen ssh --type ed25519
   raxuiscli keygen ssh --type rsa --bits 4096
   raxuiscli keygen ssh --type ed25519 --out id_ed25519`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		keyType, _ := cmd.Flags().GetString("type")
 		bits, _ := cmd.Flags().GetInt("bits")
@@ -151,17 +175,19 @@ Examples:
 			return fmt.Errorf("generating SSH key: %w", err)
 		}
 
-		keygen.DisplayKeyPair(kp)
-
 		if outFile != "" {
 			pubFile := outFile + ".pub"
 			if err := keygen.SaveKeyPair(kp, outFile, pubFile); err != nil {
 				return fmt.Errorf("saving keys: %w", err)
 			}
-			fmt.Printf("\nPrivate key saved to: %s\n", outFile)
-			fmt.Printf("Public key saved to:  %s\n", pubFile)
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "\nPrivate key saved to: %s\n", outFile)
+			}
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Public key saved to:  %s\n", pubFile)
+			}
 		}
-		return nil
+		return emitKeyPair(kp)
 	},
 }
 
@@ -174,6 +200,7 @@ Examples:
   raxuiscli keygen cert --cn example.com
   raxuiscli keygen cert --cn test.local --days 365
   raxuiscli keygen cert --cn mysite.com --days 730 --out cert.pem --key key.pem`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cn, _ := cmd.Flags().GetString("cn")
 		days, _ := cmd.Flags().GetInt("days")
@@ -185,12 +212,19 @@ Examples:
 			return fmt.Errorf("please provide a Common Name with --cn")
 		}
 
+		if days <= 0 {
+			return fmt.Errorf("certificate validity days must be positive")
+		}
+		if bits < 1024 {
+			return fmt.Errorf("RSA key size must be at least 1024 bits")
+		}
+		if certFile == "" && keyFile != "" {
+			return fmt.Errorf("--key requires --out")
+		}
 		cert, err := keygen.GenerateSelfSignedCert(cn, days, bits)
 		if err != nil {
 			return fmt.Errorf("generating certificate: %w", err)
 		}
-
-		keygen.DisplayCertificate(cert)
 
 		if certFile != "" {
 			if keyFile == "" {
@@ -199,10 +233,14 @@ Examples:
 			if err := keygen.SaveCertificate(cert, certFile, keyFile); err != nil {
 				return fmt.Errorf("saving certificate: %w", err)
 			}
-			fmt.Printf("\nCertificate saved to: %s\n", certFile)
-			fmt.Printf("Private key saved to: %s\n", keyFile)
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "\nCertificate saved to: %s\n", certFile)
+			}
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Private key saved to: %s\n", keyFile)
+			}
 		}
-		return nil
+		return output.Emit(map[string]any{"subject": cert.Subject, "issuer": cert.Issuer, "not_before": cert.NotBefore, "not_after": cert.NotAfter, "serial_number": cert.SerialNumber, "certificate": string(cert.CertPEM), "private_key": string(cert.KeyPEM)}, func(io.Writer) { keygen.DisplayCertificate(cert) })
 	},
 }
 
@@ -217,6 +255,7 @@ Examples:
   raxuiscli keygen aes
   raxuiscli keygen aes --bits 256
   raxuiscli keygen aes --bits 128`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bits, _ := cmd.Flags().GetInt("bits")
 
@@ -225,8 +264,7 @@ Examples:
 			return fmt.Errorf("generating AES key: %w", err)
 		}
 
-		keygen.DisplayAESKey(hexKey, bits)
-		return nil
+		return output.Emit(map[string]any{"algorithm": "AES", "bits": bits, "hex": hexKey}, func(io.Writer) { keygen.DisplayAESKey(hexKey, bits) })
 	},
 }
 
@@ -239,6 +277,7 @@ Examples:
   raxuiscli keygen random
   raxuiscli keygen random --length 32
   raxuiscli keygen random --length 16`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		length, _ := cmd.Flags().GetInt("length")
 
@@ -247,11 +286,12 @@ Examples:
 			return fmt.Errorf("generating random bytes: %w", err)
 		}
 
-		fmt.Println("\n[RANDOM BYTES GENERATED]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Length: %d bytes\n", length)
-		fmt.Printf("Hex:    %s\n", hexBytes)
-		return nil
+		return output.Emit(map[string]any{"length": length, "hex": hexBytes}, func(io.Writer) {
+			fmt.Fprintln(output.Std, "\n[RANDOM BYTES GENERATED]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "Length: %d bytes\n", length)
+			fmt.Fprintf(output.Std, "Hex:    %s\n", hexBytes)
+		})
 	},
 }
 
@@ -296,4 +336,8 @@ func init() {
 	// Random command
 	keygenCmd.AddCommand(keygenRandomCmd)
 	keygenRandomCmd.Flags().IntP("length", "l", 32, "Number of bytes to generate")
+}
+
+func emitKeyPair(kp *keygen.KeyPair) error {
+	return output.Emit(map[string]any{"algorithm": kp.Algorithm, "bits": kp.Bits, "private_key": kp.PrivateKey, "public_key": kp.PublicKey, "fingerprint": kp.Fingerprint}, func(io.Writer) { keygen.DisplayKeyPair(kp) })
 }

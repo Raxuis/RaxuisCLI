@@ -2,12 +2,13 @@ package redteam
 
 import (
 	"fmt"
-	"os"
+
 	"runtime"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/persist"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -28,8 +29,9 @@ Examples:
   raxuiscli persist cron "*/5 * * * * /tmp/beacon.sh"
   raxuiscli persist systemd --name backdoor --command /tmp/beacon
   raxuiscli persist check                    # Check existing persistence`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -37,7 +39,7 @@ var persistListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List persistence techniques",
 	Long:  `List available persistence techniques for the specified OS.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if persistOS == "" {
 			persistOS = runtime.GOOS
 		}
@@ -52,18 +54,19 @@ var persistListCmd = &cobra.Command{
 		case "windows":
 			techniques = persist.WindowsTechniques
 		case "all":
-			fmt.Println("\n=== LINUX ===")
+			fmt.Fprintln(output.Std, "\n=== LINUX ===")
 			persist.DisplayTechniques(persist.LinuxTechniques, persistDetailed)
-			fmt.Println("\n=== macOS ===")
+			fmt.Fprintln(output.Std, "\n=== macOS ===")
 			persist.DisplayTechniques(persist.MacOSTechniques, persistDetailed)
-			fmt.Println("\n=== WINDOWS ===")
+			fmt.Fprintln(output.Std, "\n=== WINDOWS ===")
 			persist.DisplayTechniques(persist.WindowsTechniques, persistDetailed)
-			return
+			return nil
 		default:
 			techniques = persist.ListTechniques()
 		}
 
 		persist.DisplayTechniques(techniques, persistDetailed)
+		return nil
 	},
 }
 
@@ -71,9 +74,10 @@ var persistCheckCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Check existing persistence",
 	Long:  `Check for existing persistence mechanisms on the system.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		findings := persist.CheckExistingPersistence()
 		persist.DisplayExistingPersistence(findings)
+		return nil
 	},
 }
 
@@ -82,20 +86,21 @@ var persistCronCmd = &cobra.Command{
 	Short: "Generate cron persistence",
 	Long:  `Generate cron entry for persistence.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		entry := args[0]
 
-		fmt.Println("\n[CRON PERSISTENCE]")
-		fmt.Println("==================")
-		fmt.Println("\nAdd to user crontab:")
-		fmt.Printf("  crontab -e\n")
-		fmt.Printf("  %s\n", entry)
+		fmt.Fprintln(output.Std, "\n[CRON PERSISTENCE]")
+		fmt.Fprintln(output.Std, "==================")
+		fmt.Fprintln(output.Std, "\nAdd to user crontab:")
+		fmt.Fprintf(output.Std, "  crontab -e\n")
+		fmt.Fprintf(output.Std, "  %s\n", entry)
 
-		fmt.Println("\nOr add to system crontab (requires root):")
-		fmt.Printf("  echo '%s' >> /etc/crontab\n", entry)
+		fmt.Fprintln(output.Std, "\nOr add to system crontab (requires root):")
+		fmt.Fprintf(output.Std, "  echo '%s' >> /etc/crontab\n", entry)
 
-		fmt.Println("\nOr create a file in /etc/cron.d/:")
-		fmt.Printf("  echo '%s' > /etc/cron.d/backdoor\n", entry)
+		fmt.Fprintln(output.Std, "\nOr create a file in /etc/cron.d/:")
+		fmt.Fprintf(output.Std, "  echo '%s' > /etc/cron.d/backdoor\n", entry)
+		return nil
 	},
 }
 
@@ -107,10 +112,9 @@ var persistSystemdCmd = &cobra.Command{
 	Use:   "systemd",
 	Short: "Generate systemd service",
 	Long:  `Generate a systemd service file for persistence.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if persistSystemdName == "" || persistSystemdCommand == "" {
-			fmt.Fprintln(os.Stderr, "Error: --name and --command are required")
-			os.Exit(1)
+			return fmt.Errorf("--name and --command are required")
 		}
 
 		service := persist.GenerateSystemdService(
@@ -119,18 +123,19 @@ var persistSystemdCmd = &cobra.Command{
 			persistSystemdDescription,
 		)
 
-		fmt.Println("\n[SYSTEMD PERSISTENCE]")
-		fmt.Println("=====================")
-		fmt.Printf("\nService file: /etc/systemd/system/%s.service\n\n", persistSystemdName)
-		fmt.Println(service)
+		fmt.Fprintln(output.Std, "\n[SYSTEMD PERSISTENCE]")
+		fmt.Fprintln(output.Std, "=====================")
+		fmt.Fprintf(output.Std, "\nService file: /etc/systemd/system/%s.service\n\n", persistSystemdName)
+		fmt.Fprintln(output.Std, service)
 
-		fmt.Println("\nInstallation commands:")
-		fmt.Printf("  sudo tee /etc/systemd/system/%s.service << 'EOF'\n", persistSystemdName)
-		fmt.Println("  [paste service content]")
-		fmt.Println("  EOF")
-		fmt.Println("  sudo systemctl daemon-reload")
-		fmt.Printf("  sudo systemctl enable %s\n", persistSystemdName)
-		fmt.Printf("  sudo systemctl start %s\n", persistSystemdName)
+		fmt.Fprintln(output.Std, "\nInstallation commands:")
+		fmt.Fprintf(output.Std, "  sudo tee /etc/systemd/system/%s.service << 'EOF'\n", persistSystemdName)
+		fmt.Fprintln(output.Std, "  [paste service content]")
+		fmt.Fprintln(output.Std, "  EOF")
+		fmt.Fprintln(output.Std, "  sudo systemctl daemon-reload")
+		fmt.Fprintf(output.Std, "  sudo systemctl enable %s\n", persistSystemdName)
+		fmt.Fprintf(output.Std, "  sudo systemctl start %s\n", persistSystemdName)
+		return nil
 	},
 }
 
@@ -141,26 +146,26 @@ var persistLaunchdCmd = &cobra.Command{
 	Use:   "launchd",
 	Short: "Generate launchd plist (macOS)",
 	Long:  `Generate a macOS launchd plist for persistence.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if persistLaunchdLabel == "" || persistLaunchdCommand == "" {
-			fmt.Fprintln(os.Stderr, "Error: --label and --command are required")
-			os.Exit(1)
+			return fmt.Errorf("--label and --command are required")
 		}
 
 		plist := persist.GenerateLaunchdPlist(persistLaunchdLabel, persistLaunchdCommand, true)
 
-		fmt.Println("\n[LAUNCHD PERSISTENCE]")
-		fmt.Println("=====================")
-		fmt.Printf("\nUser LaunchAgent: ~/Library/LaunchAgents/%s.plist\n", persistLaunchdLabel)
-		fmt.Printf("System LaunchDaemon: /Library/LaunchDaemons/%s.plist\n\n", persistLaunchdLabel)
-		fmt.Println(plist)
+		fmt.Fprintln(output.Std, "\n[LAUNCHD PERSISTENCE]")
+		fmt.Fprintln(output.Std, "=====================")
+		fmt.Fprintf(output.Std, "\nUser LaunchAgent: ~/Library/LaunchAgents/%s.plist\n", persistLaunchdLabel)
+		fmt.Fprintf(output.Std, "System LaunchDaemon: /Library/LaunchDaemons/%s.plist\n\n", persistLaunchdLabel)
+		fmt.Fprintln(output.Std, plist)
 
-		fmt.Println("\nInstallation:")
-		fmt.Printf("  # User level\n")
-		fmt.Printf("  tee ~/Library/LaunchAgents/%s.plist << 'EOF'\n", persistLaunchdLabel)
-		fmt.Println("  [paste plist]")
-		fmt.Println("  EOF")
-		fmt.Printf("  launchctl load ~/Library/LaunchAgents/%s.plist\n", persistLaunchdLabel)
+		fmt.Fprintln(output.Std, "\nInstallation:")
+		fmt.Fprintf(output.Std, "  # User level\n")
+		fmt.Fprintf(output.Std, "  tee ~/Library/LaunchAgents/%s.plist << 'EOF'\n", persistLaunchdLabel)
+		fmt.Fprintln(output.Std, "  [paste plist]")
+		fmt.Fprintln(output.Std, "  EOF")
+		fmt.Fprintf(output.Std, "  launchctl load ~/Library/LaunchAgents/%s.plist\n", persistLaunchdLabel)
+		return nil
 	},
 }
 

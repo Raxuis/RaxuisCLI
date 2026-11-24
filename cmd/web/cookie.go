@@ -43,25 +43,31 @@ Examples:
   raxuiscli cookie decode "eyJhZG1pbiI6dHJ1ZX0="
   raxuiscli cookie decode "name=value"
   raxuiscli cookie decode "%7B%22user%22%3A%22admin%22%7D"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide a cookie value to decode")
 		}
 
 		value := args[0]
+		cookieName := ""
 
 		// If it's a name=value pair, extract the value (but not if it looks like base64)
 		if strings.Contains(value, "=") && !strings.Contains(value, ";") && !strings.HasSuffix(value, "=") && !strings.HasSuffix(value, "==") {
 			parts := strings.SplitN(value, "=", 2)
 			if len(parts) == 2 && len(parts[0]) < 50 && !strings.ContainsAny(parts[0], "+/") {
-				fmt.Printf("Cookie name: %s\n", parts[0])
+				cookieName = parts[0]
 				value = parts[1]
 			}
 		}
 
 		decoded := cookie.DecodeCookieValue(value)
-		cookie.DisplayDecodedCookie(decoded)
-		return nil
+		return output.Emit(map[string]any{"name": cookieName, "decoded": decoded}, func(io.Writer) {
+			if cookieName != "" {
+				fmt.Fprintf(output.Std, "Cookie name: %s\n", cookieName)
+			}
+			cookie.DisplayDecodedCookie(decoded)
+		})
 	},
 }
 
@@ -81,13 +87,20 @@ Examples:
   raxuiscli cookie analyze "session=abc123; HttpOnly; Secure"
   raxuiscli cookie analyze "PHPSESSID=xxx; path=/"
   raxuiscli cookie analyze "user=admin; domain=.example.com"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide a cookie string to analyze")
 		}
 
 		cookieStr := args[0]
+		if !strings.Contains(cookieStr, "=") || strings.TrimSpace(strings.SplitN(cookieStr, "=", 2)[0]) == "" {
+			return fmt.Errorf("provide a cookie as name=value")
+		}
 		parsed := cookie.ParseCookieString(cookieStr)
+		if output.JSON() {
+			return output.Emit(parsed, func(io.Writer) {})
+		}
 		cookie.DisplayCookieInfo(parsed)
 		return nil
 	},
@@ -104,6 +117,7 @@ Provide --secret to verify the signature.
 Examples:
   raxuiscli cookie flask ".eJxNjDEOwCAIAP-C..."
   raxuiscli cookie flask ".eJxNjDEOwCAIAP-C..." --secret "development key"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide a Flask session cookie")
@@ -117,8 +131,7 @@ Examples:
 			return fmt.Errorf("decoding Flask session: %w", err)
 		}
 
-		cookie.DisplayFlaskSession(session)
-		return nil
+		return output.Emit(session, func(io.Writer) { cookie.DisplayFlaskSession(session) })
 	},
 }
 
@@ -132,6 +145,7 @@ Express sessions typically start with "s:" followed by JSON data and a signature
 Examples:
   raxuiscli cookie express "s:%7B%22user%22%3A%22admin%22%7D.signature"
   raxuiscli cookie express "s:..." --secret "keyboard cat"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide an Express session cookie")
@@ -145,14 +159,15 @@ Examples:
 			return fmt.Errorf("decoding Express session: %w", err)
 		}
 
-		fmt.Println("\n[EXPRESS SESSION]")
-		fmt.Println(strings.Repeat("=", 60))
+		return output.Emit(data, func(io.Writer) {
+			fmt.Fprintln(output.Std, "\n[EXPRESS SESSION]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
 
-		fmt.Printf("\n[Session Data]\n")
-		for key, value := range data {
-			fmt.Printf("  %s: %v\n", key, value)
-		}
-		return nil
+			fmt.Fprintf(output.Std, "\n[Session Data]\n")
+			for key, value := range data {
+				fmt.Fprintf(output.Std, "  %s: %v\n", key, value)
+			}
+		})
 	},
 }
 
@@ -166,6 +181,7 @@ Provide cookies as separate arguments or as a single string separated by semicol
 Examples:
   raxuiscli cookie bulk "session=abc" "user=admin" "token=xyz"
   raxuiscli cookie bulk "session=abc; user=admin; token=xyz"`,
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide cookie strings to analyze")
@@ -186,13 +202,19 @@ Examples:
 		}
 
 		if len(cookies) == 0 {
-			fmt.Println("No valid cookies found")
-			return nil
+			return fmt.Errorf("no valid cookies found")
 		}
 
-		fmt.Printf("[BULK COOKIE ANALYSIS]\n")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Found %d cookies to analyze\n", len(cookies))
+		if output.JSON() {
+			parsed := make([]*cookie.CookieInfo, 0, len(cookies))
+			for _, c := range cookies {
+				parsed = append(parsed, cookie.ParseCookieString(c))
+			}
+			return output.Emit(map[string]any{"cookies": parsed, "count": len(parsed)}, func(io.Writer) {})
+		}
+		fmt.Fprintf(output.Std, "[BULK COOKIE ANALYSIS]\n")
+		fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+		fmt.Fprintf(output.Std, "Found %d cookies to analyze\n", len(cookies))
 
 		// Summary counters
 		var totalIssues, critical, high, medium, low int
@@ -200,11 +222,11 @@ Examples:
 		for i, c := range cookies {
 			parsed := cookie.ParseCookieString(c)
 
-			fmt.Printf("\n[Cookie %d: %s]\n", i+1, parsed.Name)
-			fmt.Printf("Value: %s\n", truncateCookie(parsed.Value, 40))
+			fmt.Fprintf(output.Std, "\n[Cookie %d: %s]\n", i+1, parsed.Name)
+			fmt.Fprintf(output.Std, "Value: %s\n", truncateCookie(parsed.Value, 40))
 
 			if parsed.Encoding != "none" {
-				fmt.Printf("Encoding: %s\n", parsed.Encoding)
+				fmt.Fprintf(output.Std, "Encoding: %s\n", parsed.Encoding)
 			}
 
 			// Count issues
@@ -223,25 +245,25 @@ Examples:
 			}
 
 			if len(parsed.Issues) > 0 {
-				fmt.Printf("Issues: %d\n", len(parsed.Issues))
+				fmt.Fprintf(output.Std, "Issues: %d\n", len(parsed.Issues))
 				for _, issue := range parsed.Issues {
-					fmt.Printf("  [%s] %s\n", issue.Severity, issue.Title)
+					fmt.Fprintf(output.Std, "  [%s] %s\n", issue.Severity, issue.Title)
 				}
 			} else {
-				fmt.Println("Issues: None detected")
+				fmt.Fprintln(output.Std, "Issues: None detected")
 			}
 		}
 
 		// Summary
-		fmt.Printf("\n[SUMMARY]\n")
-		fmt.Println(strings.Repeat("-", 40))
-		fmt.Printf("Total cookies: %d\n", len(cookies))
-		fmt.Printf("Total issues: %d\n", totalIssues)
+		fmt.Fprintf(output.Std, "\n[SUMMARY]\n")
+		fmt.Fprintln(output.Std, strings.Repeat("-", 40))
+		fmt.Fprintf(output.Std, "Total cookies: %d\n", len(cookies))
+		fmt.Fprintf(output.Std, "Total issues: %d\n", totalIssues)
 		if totalIssues > 0 {
-			fmt.Printf("  Critical: %d\n", critical)
-			fmt.Printf("  High: %d\n", high)
-			fmt.Printf("  Medium: %d\n", medium)
-			fmt.Printf("  Low: %d\n", low)
+			fmt.Fprintf(output.Std, "  Critical: %d\n", critical)
+			fmt.Fprintf(output.Std, "  High: %d\n", high)
+			fmt.Fprintf(output.Std, "  Medium: %d\n", medium)
+			fmt.Fprintf(output.Std, "  Low: %d\n", low)
 		}
 		return nil
 	},
@@ -264,6 +286,7 @@ Supported types:
 Examples:
   raxuiscli cookie detect ".eJx..."
   raxuiscli cookie detect "s:json.signature"`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide a cookie value")
@@ -273,38 +296,37 @@ Examples:
 		sessionType := cookie.DetectSessionType(value)
 
 		if output.JSON() {
-			_ = output.Emit(map[string]any{"value": value, "detected_type": sessionType}, func(io.Writer) {})
-			return nil
+			return output.Emit(map[string]any{"value": value, "detected_type": sessionType}, func(io.Writer) {})
 		}
 
-		fmt.Println("\n[SESSION TYPE DETECTION]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Value: %s\n", truncateCookie(value, 50))
-		fmt.Printf("Detected Type: %s\n", sessionType)
+		fmt.Fprintln(output.Std, "\n[SESSION TYPE DETECTION]")
+		fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+		fmt.Fprintf(output.Std, "Value: %s\n", truncateCookie(value, 50))
+		fmt.Fprintf(output.Std, "Detected Type: %s\n", sessionType)
 
 		// Provide additional info based on type
 		switch sessionType {
 		case "Flask":
-			fmt.Println("\nFlask sessions use itsdangerous for signing.")
-			fmt.Println("Use 'raxuiscli cookie flask' to decode the payload.")
+			fmt.Fprintln(output.Std, "\nFlask sessions use itsdangerous for signing.")
+			fmt.Fprintln(output.Std, "Use 'raxuiscli cookie flask' to decode the payload.")
 		case "JWT":
-			fmt.Println("\nThis appears to be a JWT token.")
-			fmt.Println("Use 'raxuiscli jwt decode' for detailed analysis.")
+			fmt.Fprintln(output.Std, "\nThis appears to be a JWT token.")
+			fmt.Fprintln(output.Std, "Use 'raxuiscli jwt decode' for detailed analysis.")
 		case "Express.js":
-			fmt.Println("\nExpress.js sessions use connect/express-session.")
-			fmt.Println("Use 'raxuiscli cookie express' to decode the payload.")
+			fmt.Fprintln(output.Std, "\nExpress.js sessions use connect/express-session.")
+			fmt.Fprintln(output.Std, "Use 'raxuiscli cookie express' to decode the payload.")
 		case "Django (Pickle)":
-			fmt.Println("\nDjango pickled sessions may contain serialized Python objects.")
-			fmt.Println("Warning: Unpickling untrusted data is dangerous!")
+			fmt.Fprintln(output.Std, "\nDjango pickled sessions may contain serialized Python objects.")
+			fmt.Fprintln(output.Std, "Warning: Unpickling untrusted data is dangerous!")
 		case "PHP Serialized":
-			fmt.Println("\nPHP serialized data detected.")
-			fmt.Println("Warning: Unserializing untrusted data can lead to RCE!")
+			fmt.Fprintln(output.Std, "\nPHP serialized data detected.")
+			fmt.Fprintln(output.Std, "Warning: Unserializing untrusted data can lead to RCE!")
 		case "ASP.NET ViewState":
-			fmt.Println("\nASP.NET ViewState detected.")
-			fmt.Println("May contain encrypted/signed application state.")
+			fmt.Fprintln(output.Std, "\nASP.NET ViewState detected.")
+			fmt.Fprintln(output.Std, "May contain encrypted/signed application state.")
 		case "Rails":
-			fmt.Println("\nRuby on Rails session detected.")
-			fmt.Println("Uses MessageVerifier for signing.")
+			fmt.Fprintln(output.Std, "\nRuby on Rails session detected.")
+			fmt.Fprintln(output.Std, "Uses MessageVerifier for signing.")
 		}
 		return nil
 	},
@@ -329,6 +351,7 @@ Detects:
 Examples:
   raxuiscli cookie sensitive "user=admin&role=superuser"
   raxuiscli cookie sensitive "eyJhZG1pbiI6dHJ1ZX0="`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("please provide a cookie value")
@@ -337,23 +360,26 @@ Examples:
 		value := args[0]
 		decoded := cookie.DecodeCookieValue(value)
 
-		fmt.Println("\n[SENSITIVE DATA CHECK]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Printf("Original: %s\n", truncateCookie(value, 50))
+		if output.JSON() {
+			return output.Emit(decoded, func(io.Writer) {})
+		}
+		fmt.Fprintln(output.Std, "\n[SENSITIVE DATA CHECK]")
+		fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+		fmt.Fprintf(output.Std, "Original: %s\n", truncateCookie(value, 50))
 
 		if decoded.Encoding != "none" {
-			fmt.Printf("Encoding: %s\n", decoded.Encoding)
-			fmt.Printf("Decoded: %s\n", truncateCookie(decoded.Decoded, 50))
+			fmt.Fprintf(output.Std, "Encoding: %s\n", decoded.Encoding)
+			fmt.Fprintf(output.Std, "Decoded: %s\n", truncateCookie(decoded.Decoded, 50))
 		}
 
 		if len(decoded.Sensitive) == 0 {
-			fmt.Println("\nNo sensitive data patterns detected.")
+			fmt.Fprintln(output.Std, "\nNo sensitive data patterns detected.")
 		} else {
-			fmt.Printf("\n[FOUND %d SENSITIVE ITEMS]\n", len(decoded.Sensitive))
+			fmt.Fprintf(output.Std, "\n[FOUND %d SENSITIVE ITEMS]\n", len(decoded.Sensitive))
 			for _, s := range decoded.Sensitive {
-				fmt.Printf("\n  Type: %s\n", s.Type)
-				fmt.Printf("  Value: %s\n", s.Value)
-				fmt.Printf("  Risk: %s\n", s.Risk)
+				fmt.Fprintf(output.Std, "\n  Type: %s\n", s.Type)
+				fmt.Fprintf(output.Std, "  Value: %s\n", s.Value)
+				fmt.Fprintf(output.Std, "  Risk: %s\n", s.Risk)
 			}
 		}
 		return nil

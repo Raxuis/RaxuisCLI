@@ -2,11 +2,11 @@ package redteam
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/ntlm"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -24,8 +24,9 @@ Examples:
   raxuiscli ntlm crack <hash> -w wordlist.txt # Crack hash
   raxuiscli ntlm parse "user:1001:lm:nt:::"   # Parse dump format
   raxuiscli ntlm pth -u admin -H <hash> -t 10.0.0.1`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -34,16 +35,17 @@ var ntlmHashCmd = &cobra.Command{
 	Short: "Generate NTLM hash",
 	Long:  `Generate NT hash from a password.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		password := args[0]
 
 		ntHash := ntlm.ComputeNTHash(password)
 
-		fmt.Println("\n[NTLM HASH GENERATION]")
-		fmt.Printf("Password: %s\n", password)
-		fmt.Printf("NT Hash:  %s\n", ntHash)
-		fmt.Printf("\nHashcat format: %s\n", ntHash)
-		fmt.Printf("John format:    $NT$%s\n", ntHash)
+		fmt.Fprintln(output.Std, "\n[NTLM HASH GENERATION]")
+		fmt.Fprintf(output.Std, "Password: %s\n", password)
+		fmt.Fprintf(output.Std, "NT Hash:  %s\n", ntHash)
+		fmt.Fprintf(output.Std, "\nHashcat format: %s\n", ntHash)
+		fmt.Fprintf(output.Std, "John format:    $NT$%s\n", ntHash)
+		return nil
 	},
 }
 
@@ -52,30 +54,28 @@ var ntlmCrackCmd = &cobra.Command{
 	Short: "Crack NTLM hash",
 	Long:  `Crack an NTLM hash using a wordlist.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hash := args[0]
 
 		if ntlmWordlist == "" {
-			fmt.Fprintln(os.Stderr, "Error: --wordlist is required")
-			os.Exit(1)
+			return fmt.Errorf("--wordlist is required")
 		}
 
 		// Validate hash
 		if !ntlm.ValidateHash(hash) {
-			fmt.Fprintln(os.Stderr, "Error: invalid hash format (expected 32 hex chars)")
-			os.Exit(1)
+			return fmt.Errorf("invalid hash format (expected 32 hex chars)")
 		}
 
-		fmt.Printf("Cracking hash: %s\n", hash)
-		fmt.Printf("Wordlist: %s\n", ntlmWordlist)
+		fmt.Fprintf(output.Std, "Cracking hash: %s\n", hash)
+		fmt.Fprintf(output.Std, "Wordlist: %s\n", ntlmWordlist)
 
 		result, err := ntlm.CrackNTHash(hash, ntlmWordlist)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		ntlm.DisplayCrackResult(result)
+		return nil
 	},
 }
 
@@ -84,20 +84,20 @@ var ntlmParseCmd = &cobra.Command{
 	Short: "Parse NTLM dump format",
 	Long:  `Parse NTLM hash dump format (user:uid:lmhash:nthash:::).`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		line := args[0]
 
 		hash, err := ntlm.ParseNTLMDump(line)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error parsing: %v", err)
 		}
 
 		ntlm.DisplayHash(hash)
 
-		fmt.Println("Export formats:")
-		fmt.Printf("  Hashcat: %s\n", ntlm.FormatHashcat(hash))
-		fmt.Printf("  John:    %s\n", ntlm.FormatJohn(hash))
+		fmt.Fprintln(output.Std, "Export formats:")
+		fmt.Fprintf(output.Std, "  Hashcat: %s\n", ntlm.FormatHashcat(hash))
+		fmt.Fprintf(output.Std, "  John:    %s\n", ntlm.FormatJohn(hash))
+		return nil
 	},
 }
 
@@ -106,13 +106,14 @@ var ntlmIdentifyCmd = &cobra.Command{
 	Short: "Identify hash type",
 	Long:  `Identify the type of a hash.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hash := args[0]
 
 		hashType := ntlm.IdentifyHashType(hash)
 
-		fmt.Printf("\nHash: %s\n", hash)
-		fmt.Printf("Type: %s\n", hashType)
+		fmt.Fprintf(output.Std, "\nHash: %s\n", hash)
+		fmt.Fprintf(output.Std, "Type: %s\n", hashType)
+		return nil
 	},
 }
 
@@ -127,13 +128,13 @@ var ntlmPTHCmd = &cobra.Command{
 	Long: `Generate commands for pass-the-hash attacks.
 
 Generates commands for various tools to perform PTH attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if ntlmPTHUser == "" || ntlmPTHHash == "" || ntlmPTHTarget == "" {
-			fmt.Fprintln(os.Stderr, "Error: --user, --hash, and --target are required")
-			os.Exit(1)
+			return fmt.Errorf("--user, --hash, and --target are required")
 		}
 
 		ntlm.DisplayPTHCommands(ntlmPTHUser, ntlmPTHDomain, ntlmPTHHash, ntlmPTHTarget)
+		return nil
 	},
 }
 

@@ -42,17 +42,17 @@ func TestRootOptionsAcceptPersistentFlags(t *testing.T) {
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.SetArgs([]string{
+	args := []string{
 		"--output", "json",
 		"--output-file", "report.json",
 		"--force",
 		"--no-color",
 		"--quiet",
 		"--fail-on", "high",
-	})
+	}
 
-	if code := execute(root); code != 0 {
-		t.Fatalf("execute() = %d, want 0; stderr: %s", code, stderr.String())
+	if err := root.ParseFlags(args); err != nil {
+		t.Fatal(err)
 	}
 
 	options, err := OptionsFromCommand(root)

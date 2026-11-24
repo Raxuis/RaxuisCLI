@@ -30,12 +30,13 @@ const (
 
 // Entry is the user-facing metadata for one visible Cobra command.
 type Entry struct {
-	Path       string
-	Summary    string
-	Category   string
-	Maturity   Maturity
-	Safety     SafetyLevel
-	TUIAllowed bool
+	Path         string
+	Summary      string
+	Category     string
+	Maturity     Maturity
+	Safety       SafetyLevel
+	TUIAllowed   bool
+	Capabilities Capabilities
 }
 
 const (
@@ -109,6 +110,7 @@ var commandSpecs = []commandSpec{
 	{Path: "raxuiscli creds merge", Summary: "Merge and deduplicate credential files"},
 	{Path: "raxuiscli demo", Summary: "Run safe local demonstrations without public network access"},
 	{Path: "raxuiscli demo web", Summary: "Audit an intentionally weak local HTTPS fixture"},
+	{Path: "raxuiscli doctor", Summary: "Check local runtime and optional tools without changing the environment"},
 	{Path: "raxuiscli dns", Summary: "DNS lookup and analysis tools"},
 	{Path: "raxuiscli dns axfr", Summary: "Attempt DNS zone transfer"},
 	{Path: "raxuiscli dns brute", Summary: "Bruteforce subdomains"},
@@ -272,12 +274,13 @@ func buildEntries(specs []commandSpec) []Entry {
 	result := make([]Entry, 0, len(specs))
 	for _, spec := range specs {
 		result = append(result, Entry{
-			Path:       spec.Path,
-			Summary:    spec.Summary,
-			Category:   categoryFor(spec.Path),
-			Maturity:   maturityFor(spec.Path),
-			Safety:     safetyFor(spec.Path),
-			TUIAllowed: spec.Path == "raxuiscli audit web" || spec.Path == "raxuiscli compare" || spec.Path == "raxuiscli demo web",
+			Path:         spec.Path,
+			Capabilities: CapabilitiesFor(spec.Path),
+			Summary:      spec.Summary,
+			Category:     categoryFor(spec.Path),
+			Maturity:     maturityFor(spec.Path),
+			Safety:       safetyFor(spec.Path),
+			TUIAllowed:   spec.Path == "raxuiscli audit web" || spec.Path == "raxuiscli compare" || spec.Path == "raxuiscli demo web",
 		})
 	}
 	return result
@@ -301,7 +304,7 @@ func categoryFor(path string) string {
 		return "core"
 	}
 	switch parts[1] {
-	case "completion", "help":
+	case "completion", "help", "doctor", "version":
 		return "core"
 	case "audit", "compare", "demo", "interactive":
 		return "audit & reporting"
@@ -527,15 +530,15 @@ func RenderRoadmapStatus(items []Entry) (string, error) {
 	var output strings.Builder
 	output.WriteString("## Command maturity catalog\n\n")
 	output.WriteString("Ce tableau est généré depuis les métadonnées validées du binaire. Une commande `experimental` peut être incomplète; une commande `informational` fournit surtout des conseils ou exemples. `TUI: yes` est réservé aux parcours explicitement sûrs de l’interface guidée.\n\n")
-	output.WriteString("| Command | Summary | Category | Maturity | Safety | TUI |\n")
-	output.WriteString("|---|---|---|---|---|:---:|\n")
+	output.WriteString("| Command | Summary | Category | Maturity | Safety | TUI | Output | File | Quiet (text) | Fail-on | Verbose |\n")
+	output.WriteString("|---|---|---|---|---|:---:|---|:---:|:---:|:---:|:---:|\n")
 	for _, entry := range items {
 		tui := "no"
 		if entry.TUIAllowed {
 			tui = "yes"
 		}
-		fmt.Fprintf(&output, "| `%s` | %s | %s | `%s` | `%s` | %s |\n",
-			escapeTableCell(entry.Path), escapeTableCell(entry.Summary), escapeTableCell(entry.Category), entry.Maturity, entry.Safety, tui)
+		fmt.Fprintf(&output, "| `%s` | %s | %s | `%s` | `%s` | %s | %s | %t | %t | %t | %t |\n",
+			escapeTableCell(entry.Path), escapeTableCell(entry.Summary), escapeTableCell(entry.Category), entry.Maturity, entry.Safety, tui, entry.Capabilities.Formats(), entry.Capabilities.OutputFile, entry.Capabilities.Quiet, entry.Capabilities.FailOn, entry.Capabilities.Verbose)
 	}
 	return strings.TrimSuffix(output.String(), "\n"), nil
 }

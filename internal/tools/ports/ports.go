@@ -1,13 +1,17 @@
 package ports
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Raxuis/RaxuisCLI/internal/shared/netutil"
 )
 
 type Options struct {
@@ -24,58 +28,55 @@ type ScanResult struct {
 }
 
 type PortScanner struct {
-	host     string
-	timeout  time.Duration
-	scanType string
-	results  []ScanResult
-	mutex    sync.Mutex
+	host        string
+	timeout     time.Duration
+	scanType    string
+	results     []ScanResult
+	ctx         context.Context
+	concurrency int
+	mutex       sync.Mutex
 }
 
 func Scan(opts Options) {
-	scanner := &PortScanner{
-		host:     opts.Host,
-		timeout:  time.Duration(opts.Timeout) * time.Second,
-		scanType: strings.ToLower(opts.ScanType),
-		results:  make([]ScanResult, 0),
-	}
-
-	portRange := expandPresetRanges(opts.PortRange)
-
-	fmt.Fprintf(stdoutW, "🔍 Scanning %s ports on %s...\n", strings.ToUpper(scanner.scanType), scanner.host)
-	fmt.Fprintf(stdoutW, "📊 Port range: %s\n", portRange)
-	fmt.Fprintf(stdoutW, "⏱️  Timeout: %d seconds\n", opts.Timeout)
-	fmt.Fprintln(stdoutW, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-	ports, err := parsePortRange(portRange)
+	start := time.Now()
+	fmt.Fprintf(stdoutW, "🔍 Scanning %s ports on %s...\n", strings.ToUpper(opts.ScanType), opts.Host)
+	fmt.Fprintf(stdoutW, "📊 Port range: %s\n", expandPresetRanges(opts.PortRange))
+	fmt.Fprintf(stdoutW, "⏱️  Timeout: %v\n", netutil.Timeout(opts.Timeout))
+	results, err := ScanResults(opts)
 	if err != nil {
-		fmt.Fprintf(stdoutW, "❌ Error parsing port range: %v\n", err)
+		fmt.Fprintf(stdoutW, "Error scanning ports: %v\n", err)
 		return
 	}
-
-	startTime := time.Now()
-	scanner.scanPorts(ports)
-	duration := time.Since(startTime)
-
-	scanner.displayResults(duration, len(ports))
+	scanner := &PortScanner{results: results}
+	parsed, _ := parsePortRange(expandPresetRanges(opts.PortRange))
+	scanner.displayResults(time.Since(start), len(parsed))
 }
 
-// ScanResults runs the scan and returns the results without printing, for
-// machine-readable output.
+// ScanResults runs the scan without printing and returns open or ambiguous UDP results.
 func ScanResults(opts Options) ([]ScanResult, error) {
-	scanner := &PortScanner{
-		host:     opts.Host,
-		timeout:  time.Duration(opts.Timeout) * time.Second,
-		scanType: strings.ToLower(opts.ScanType),
-		results:  make([]ScanResult, 0),
-	}
+	return ScanResultsContext(context.Background(), opts)
+}
 
+// ScanResultsContext runs a bounded, cancellable scan without printing.
+func ScanResultsContext(ctx context.Context, opts Options) ([]ScanResult, error) {
+	host, err := netutil.NormalizeHost(opts.Host)
+	if err != nil {
+		return nil, err
+	}
+	scanType := strings.ToLower(strings.TrimSpace(opts.ScanType))
+	if scanType == "" {
+		scanType = "tcp"
+	}
+	if scanType != "tcp" && scanType != "udp" {
+		return nil, fmt.Errorf("unsupported scan type: %s", scanType)
+	}
 	ports, err := parsePortRange(expandPresetRanges(opts.PortRange))
 	if err != nil {
 		return nil, err
 	}
-
+	scanner := &PortScanner{host: host, timeout: netutil.Timeout(opts.Timeout), scanType: scanType, results: make([]ScanResult, 0), ctx: ctx}
 	scanner.scanPorts(ports)
-	return scanner.results, nil
+	return scanner.results, ctx.Err()
 }
 
 func expandPresetRanges(portRange string) string {
@@ -89,120 +90,35 @@ func expandPresetRanges(portRange string) string {
 		"extended": "1-10000",
 	}
 
-	if expandedRange, exists := presets[strings.ToLower(portRange)]; exists {
+	if expandedRange, exists := presets[strings.ToLower(strings.TrimSpace(portRange))]; exists {
 		return expandedRange
 	}
 	return portRange
 }
 func parsePortRange(portRange string) ([]int, error) {
-	var ports []int
-
-	if strings.Contains(portRange, ",") {
-		// Gestion des ports multiples séparés par des virgules (ex: "22,80,443")
-		portStrs := strings.Split(portRange, ",")
-		for _, portStr := range portStrs {
-			portStr = strings.TrimSpace(portStr)
-			if strings.Contains(portStr, "-") {
-				rangePorts, err := parseRange(portStr)
-				if err != nil {
-					return nil, err
-				}
-				ports = append(ports, rangePorts...)
-			} else {
-				port, err := strconv.Atoi(portStr)
-				if err != nil {
-					return nil, fmt.Errorf("invalid port number: %s", portStr)
-				}
-				if !isValidPort(port) {
-					return nil, fmt.Errorf("port %d is out of valid range (1-65535)", port)
-				}
-				ports = append(ports, port)
-			}
-		}
-	} else if strings.Contains(portRange, "-") {
-		// Gestion des plages (ex: "1-1024")
-		return parseRange(portRange)
-	} else {
-		// Port unique
-		port, err := strconv.Atoi(portRange)
-		if err != nil {
-			return nil, fmt.Errorf("invalid port number: %s", portRange)
-		}
-		if !isValidPort(port) {
-			return nil, fmt.Errorf("port %d is out of valid range (1-65535)", port)
-		}
-		ports = append(ports, port)
-	}
-
-	return ports, nil
+	return netutil.ParsePorts(portRange)
 }
 
-func parseRange(portRange string) ([]int, error) {
-	parts := strings.Split(portRange, "-")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid port range format: %s", portRange)
-	}
-
-	startPort, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-	if err != nil {
-		return nil, fmt.Errorf("invalid start port: %s", parts[0])
-	}
-
-	endPort, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil {
-		return nil, fmt.Errorf("invalid end port: %s", parts[1])
-	}
-
-	if startPort > endPort {
-		return nil, fmt.Errorf("start port (%d) cannot be greater than end port (%d)", startPort, endPort)
-	}
-
-	if !isValidPort(startPort) || !isValidPort(endPort) {
-		return nil, fmt.Errorf("ports must be in range 1-65535")
-	}
-
-	var ports []int
-	for port := startPort; port <= endPort; port++ {
-		ports = append(ports, port)
-	}
-
-	return ports, nil
-}
-
-func isValidPort(port int) bool {
-	return port >= 1 && port <= 65535
-}
+func isValidPort(port int) bool { return netutil.ValidPort(port) }
 
 func (ps *PortScanner) scanPorts(ports []int) {
-	// Limitation le nombre de goroutines pour éviter de surcharger le système
-	const maxGoroutines = 100
-	semaphore := make(chan struct{}, maxGoroutines)
-	var wg sync.WaitGroup
-
-	for _, port := range ports {
-		wg.Add(1)
-		go func(p int) {
-			defer wg.Done()
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			result := ps.scanPort(p)
-			if result.Status == "open" {
-				ps.mutex.Lock()
-				ps.results = append(ps.results, result)
-				ps.mutex.Unlock()
-
-				// Affichage en temps réel des ports ouverts
-				fmt.Fprintf(stdoutW, "✅ Port %d/%s: %s %s\n", p, ps.scanType, result.Status, result.Service)
-			}
-		}(port)
+	ctx := ps.ctx
+	if ctx == nil {
+		ctx = context.Background()
 	}
-
-	wg.Wait()
+	netutil.ForEach(ctx, netutil.UniquePorts(ports), ps.concurrency, func(port int) {
+		result := ps.scanPort(port)
+		if result.Status == "open" || result.Status == "open|filtered" {
+			ps.mutex.Lock()
+			ps.results = append(ps.results, result)
+			ps.mutex.Unlock()
+		}
+	})
+	sort.Slice(ps.results, func(i, j int) bool { return ps.results[i].Port < ps.results[j].Port })
 }
 
 func (ps *PortScanner) scanPort(port int) ScanResult {
-	target := fmt.Sprintf("%s:%d", ps.host, port)
+	target := net.JoinHostPort(ps.host, strconv.Itoa(port))
 	result := ScanResult{
 		Port:    port,
 		Status:  "closed",
@@ -222,37 +138,34 @@ func (ps *PortScanner) scanPort(port int) ScanResult {
 }
 
 func (ps *PortScanner) scanTCP(target string) string {
-	conn, err := net.DialTimeout("tcp", target, ps.timeout)
+	conn, err := netutil.Dial(ps.context(), "tcp", target, ps.timeout)
 	if err != nil {
 		return "closed"
 	}
-	defer func(conn net.Conn) {
-		err := conn.Close()
-		if err != nil {
-			fmt.Fprintf(stdoutW, "Error closing connection: %v\n", err)
-		}
-	}(conn)
+	defer conn.Close()
 	return "open"
 }
 
 func (ps *PortScanner) scanUDP(target string) string {
-	conn, err := net.DialTimeout("udp", target, ps.timeout)
+	conn, err := netutil.Dial(ps.context(), "udp", target, ps.timeout)
 	if err != nil {
 		return "closed"
 	}
-	defer func(conn net.Conn) {
-		err := conn.Close()
-		if err != nil {
-			fmt.Fprintf(stdoutW, "Error closing connection: %v\n", err)
-		}
-	}(conn)
+	defer conn.Close()
 
-	_, err = conn.Write([]byte{})
+	stop := context.AfterFunc(ps.context(), func() { _ = conn.Close() })
+	defer stop()
+	timeout := ps.timeout
+	if timeout <= 0 {
+		timeout = netutil.Timeout(0)
+	}
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	_, err = conn.Write([]byte{0})
 	if err != nil {
 		return "closed"
 	}
 
-	err = conn.SetReadDeadline(time.Now().Add(ps.timeout))
+	err = conn.SetReadDeadline(time.Now().Add(timeout))
 	if err != nil {
 		return "closed"
 	}
@@ -328,4 +241,11 @@ func (ps *PortScanner) displayResults(duration time.Duration, totalPorts int) {
 	for _, result := range ps.results {
 		fmt.Fprintf(stdoutW, "Port %-6d: %s %s\n", result.Port, result.Status, result.Service)
 	}
+}
+
+func (ps *PortScanner) context() context.Context {
+	if ps.ctx == nil {
+		return context.Background()
+	}
+	return ps.ctx
 }

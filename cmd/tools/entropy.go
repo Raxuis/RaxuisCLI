@@ -3,7 +3,7 @@ package tools
 import (
 	"fmt"
 	"io"
-	"os"
+
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
@@ -38,7 +38,8 @@ Examples:
   raxuiscli entropy encrypted.bin --block-size 4096
   raxuiscli entropy archive.zip --no-color`,
 	Args: cobra.ExactArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(command *cobra.Command, args []string) error {
+		entropyNoColor, _ = command.Flags().GetBool("no-color")
 		path := args[0]
 
 		opts := entropy.Options{
@@ -48,8 +49,7 @@ Examples:
 
 		result, err := entropy.Calculate(path, opts)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		hasBlocks := entropyBlockSize > 0 && len(result.BlockEntropies) > 0
@@ -90,7 +90,7 @@ Examples:
 			}
 		}
 
-		_ = output.Emit(payload, func(w io.Writer) {
+		return output.Emit(payload, func(w io.Writer) {
 			fmt.Fprintf(w, "File: %s\n", path)
 			fmt.Fprintf(w, "Size: %d bytes\n", result.FileSize)
 			fmt.Fprintln(w, strings.Repeat("-", 60))
@@ -140,6 +140,7 @@ Examples:
 			fmt.Fprintf(w, "Blocks: %d | Min: %.4f | Max: %.4f | Avg: %.4f\n",
 				len(result.BlockEntropies), minE, maxE, sumE/float64(len(result.BlockEntropies)))
 		})
+
 	},
 }
 
@@ -147,5 +148,4 @@ func init() {
 	cmd.RootCmd.AddCommand(entropyCmd)
 
 	entropyCmd.Flags().IntVarP(&entropyBlockSize, "block-size", "b", 0, "Block size for per-block analysis (0 = global only)")
-	entropyCmd.Flags().BoolVar(&entropyNoColor, "no-color", false, "Disable colorized output")
 }

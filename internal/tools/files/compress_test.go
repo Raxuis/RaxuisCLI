@@ -6,6 +6,24 @@ import (
 	"testing"
 )
 
+func TestArchivePasswordIsNotSilentlyIgnored(t *testing.T) {
+	dir := t.TempDir()
+	input := writeFile(t, dir, "plain.txt", "confidential")
+	archive := filepath.Join(dir, "archive.zip")
+	if err := Compress([]string{input}, CompressOptions{Format: "zip", Output: archive, Password: "secret"}); err == nil {
+		t.Fatal("password-protected compression must fail when unsupported")
+	}
+	if _, err := os.Stat(archive); !os.IsNotExist(err) {
+		t.Fatalf("unprotected archive was created: %v", err)
+	}
+	if err := Compress([]string{input}, CompressOptions{Format: "zip", Output: archive}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Extract(archive, ExtractOptions{Password: "secret"}); err == nil {
+		t.Fatal("password-protected extraction must fail when unsupported")
+	}
+}
+
 // chdirTemp switches the working directory to a fresh temp dir for the
 // duration of the test and restores it afterward. Needed because
 // Extract/extractZip/extractTar write output relative to the current

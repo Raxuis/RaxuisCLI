@@ -65,67 +65,56 @@ Only run this against accounts you are authorized to test. Know the lockout
 policy first (see 'raxuiscli ldap' domain info) and use --round-delay to space
 password rounds across the lockout window.`,
 	Args: cobra.NoArgs,
-	Run:  runSpray,
+	RunE: runSpray,
 }
 
-func runSpray(_ *cobra.Command, _ []string) {
+func runSpray(_ *cobra.Command, _ []string) error {
 	proto := strings.ToLower(sprayProtocol)
 	if proto != "ldap" && proto != "kerberos" {
-		fmt.Fprintf(os.Stderr, "Error: --protocol must be 'ldap' or 'kerberos'\n")
-		os.Exit(1)
+		return fmt.Errorf("--protocol must be 'ldap' or 'kerberos'")
 	}
 	if sprayDomain == "" {
-		fmt.Fprintf(os.Stderr, "Error: --domain is required\n")
-		os.Exit(1)
+		return fmt.Errorf("--domain is required")
 	}
 
 	targets, err := resolveSprayTargets(proto)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	users, err := readListOrLiteral(sprayUsers)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading users: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error reading users: %v", err)
 	}
 	passwords, err := resolveSprayPasswords()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Lockout guard: refuse to try enough passwords to lock accounts.
 	if sprayLockoutMax > 0 && len(passwords) >= sprayLockoutMax && !sprayForce {
-		fmt.Fprintf(os.Stderr,
-			"Error: %d passwords >= lockout threshold %d — this can lock accounts.\n"+
-				"       Reduce passwords, raise --round-delay to the lockout window, or pass --force.\n",
+		return fmt.Errorf("%d passwords >= lockout threshold %d; reduce passwords, raise --round-delay to the lockout window, or pass --override-lockout-guard",
 			len(passwords), sprayLockoutMax)
-		os.Exit(1)
 	}
 
 	delay, err := parseOptDuration("--delay", sprayDelay)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	jitter, err := parseOptDuration("--jitter", sprayJitter)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	roundDelay, err := parseOptDuration("--round-delay", sprayRoundDelay)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	jsonMode := output.JSON()
 	if !jsonMode {
-		fmt.Printf("Spraying %d user(s) x %d password(s) against %d %s target(s) [%s]...\n",
+		fmt.Fprintf(output.Std, "Spraying %d user(s) x %d password(s) against %d %s target(s) [%s]...\n",
 			len(users), len(passwords), len(targets), strings.ToUpper(proto), sprayDomain)
-		fmt.Println(strings.Repeat("-", 60))
+		fmt.Fprintln(output.Std, strings.Repeat("-", 60))
 	}
 
 	opts := spray.Options{
@@ -150,11 +139,11 @@ func runSpray(_ *cobra.Command, _ []string) {
 			if h.Note != "" {
 				note = "  [" + h.Note + "]"
 			}
-			fmt.Printf("[+] %s\\%s : %s  (%s)%s\n", sprayDomain, h.User, h.Password, h.Host, note)
+			fmt.Fprintf(output.Std, "[+] %s\\%s : %s  (%s)%s\n", sprayDomain, h.User, h.Password, h.Host, note)
 		}
 		if len(passwords) > 1 {
 			opts.OnRoundStart = func(round, total int, password string) {
-				fmt.Printf("[*] Round %d/%d — password %q\n", round, total, password)
+				fmt.Fprintf(output.Std, "[*] Round %d/%d — password %q\n", round, total, password)
 			}
 		}
 	}
@@ -163,9 +152,9 @@ func runSpray(_ *cobra.Command, _ []string) {
 
 	if sprayOut != "" {
 		if err := writeCreds(sprayOut, result.Valid); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not write --out %q: %v\n", sprayOut, err)
+			return fmt.Errorf("writing --out %q: %w", sprayOut, err)
 		} else if !jsonMode {
-			fmt.Printf("[*] %d credential(s) written to %s\n", len(result.Valid), sprayOut)
+			fmt.Fprintf(output.Std, "[*] %d credential(s) written to %s\n", len(result.Valid), sprayOut)
 		}
 	}
 
@@ -185,14 +174,20 @@ func runSpray(_ *cobra.Command, _ []string) {
 		"notes":       result.Notes,
 		"duration_ms": result.Duration.Milliseconds(),
 	}
-	_ = output.Emit(payload, func(w io.Writer) {
+	if err := output.Emit(payload, func(w io.Writer) {
 		fmt.Fprintln(w, strings.Repeat("-", 60))
 		for _, n := range result.Notes {
 			fmt.Fprintf(w, "[!] %s\n", n)
 		}
 		fmt.Fprintf(w, "%d valid credential(s), %d attempts, %d errors (%.1fs)\n",
 			len(result.Valid), result.Attempts, result.Errors, result.Duration.Seconds())
-	})
+	}); err != nil {
+		return err
+	}
+	if result.Attempts > 0 && result.Errors == result.Attempts {
+		return fmt.Errorf("all %d authentication probes failed operationally", result.Attempts)
+	}
+	return nil
 }
 
 func resolveSprayTargets(proto string) ([]spray.Target, error) {
@@ -327,7 +322,7 @@ func init() {
 	sprayCmd.Flags().StringVar(&sprayJitter, "jitter", "", "Extra random delay before each attempt (e.g. 300ms)")
 	sprayCmd.Flags().StringVar(&sprayRoundDelay, "round-delay", "", "Pause between password rounds (set to the lockout window, e.g. 31m)")
 	sprayCmd.Flags().IntVar(&sprayLockoutMax, "lockout-threshold", 0, "Abort if password count reaches this lockout threshold (0 = unknown/off)")
-	sprayCmd.Flags().BoolVar(&sprayForce, "force", false, "Override the lockout-threshold guard")
+	sprayCmd.Flags().BoolVar(&sprayForce, "override-lockout-guard", false, "Override the lockout-threshold guard")
 	sprayCmd.Flags().BoolVar(&sprayContinueHits, "continue-on-success", false, "Keep spraying users whose password was already found")
 	sprayCmd.Flags().BoolVar(&sprayStopOnHit, "stop-on-success", false, "Stop launching attempts after the first valid credential (in-flight attempts may still complete)")
 	sprayCmd.Flags().StringVarP(&sprayOut, "out", "o", "", "Write valid credentials (user:password) to this file")

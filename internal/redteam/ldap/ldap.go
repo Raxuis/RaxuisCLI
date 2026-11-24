@@ -334,27 +334,9 @@ func GetBaseDN(domain string) string {
 	return strings.Join(dn, ",")
 }
 
-// EnumerateUsers performs user enumeration (simplified - returns mock data for testing)
+// EnumerateUsers reports unsupported search rather than returning an empty success.
 func EnumerateUsers(opts LDAPOptions, filter string) ([]User, error) {
-	conn, err := Connect(opts)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	if opts.Username != "" {
-		err = conn.Bind(opts.Username, opts.Password, opts.Domain)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Anonymous bind may fail; that is acceptable for enumeration.
-		_ = conn.AnonymousBind()
-	}
-
-	// In a real implementation, we would send LDAP search requests
-	// For now, return connection success indication
-	return []User{}, nil
+	return nil, fmt.Errorf("LDAP user enumeration is not implemented: LDAP search requests are required")
 }
 
 // DisplayUsers displays user enumeration results

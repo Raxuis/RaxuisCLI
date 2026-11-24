@@ -34,6 +34,43 @@ By using this software you agree to:
 
 The author(s) assume no liability and are not responsible for any misuse or damage caused by this software.
 
+## Start with a local audit
+
+The supported workflow is **audit → actionable report → comparison → CI**.
+Try it without an external target:
+
+```bash
+raxuiscli doctor
+raxuiscli demo web
+raxuiscli demo web --output=json --output-file demo.json
+raxuiscli compare demo.json demo.json --output=json
+raxuiscli demo web --output=html --output-file demo.html
+```
+
+The intentionally weak demo explains each finding and its remediation. Comparing
+its saved report with itself produces no changes; for a real before/after
+comparison, capture `audit web`, `audit tls`, `audit dns`, or `audit all` snapshots
+of the same authorized target before and after applying a remediation. In CI,
+`audit ... --fail-on=high` exits 2 for findings at or above the threshold;
+`compare before.json after.json --fail-on-new=medium` gates regressions.
+
+Each command's help lists its supported formats, file output, quiet-text mode,
+severity policy and verbosity. JSON output also accepts `--quiet`. Unsupported
+options fail before the action. File output is atomic and requires `--force`
+to replace an existing destination. `--quiet` preserves results; it does not
+mean suppressing the report. The [full command catalog](ROADMAP.md) lists these
+capabilities for every entry.
+
+To avoid collisions with global flags, checksum manifests use
+`files checksum --manifest-output`, credential conversion uses `creds --out`
+on the relevant subcommand, and the spray lockout override uses
+`--override-lockout-guard`.
+
+Informational commands generate guidance rather than performing the operation.
+Unsupported SMB share enumeration, SMB anonymous authentication and LDAP user
+search return explicit errors. The [local protocol lab](lab/README.md) exercises
+actual client exchanges on loopback without external accounts or Docker.
+
 ## Installation
 
 ### Homebrew (macOS / Linux)
@@ -1316,17 +1353,17 @@ raxuiscli cookie bulk "sess=x" "user=y" "token=z"
 Format conversion.
 
 ```bash
-raxuiscli encode base64 "text"
-raxuiscli encode base64 -d "dGV4dA=="
-raxuiscli encode hex "text"
-raxuiscli encode url "text with spaces"
+raxuiscli encode "text" --format base64
+raxuiscli encode decode "dGV4dA==" --format base64
+raxuiscli encode "text" --format hex
+raxuiscli encode "text with spaces" --format url
 ```
 
 #### `hash` - Hash Calculation
 ```bash
-raxuiscli hash md5 "text"
-raxuiscli hash sha256 "text"
-raxuiscli hash sha512 -f file.bin
+raxuiscli hash "text" --algo md5
+raxuiscli hash "text" --algo sha256
+raxuiscli hash file.bin --file --algo sha512
 ```
 
 #### `hashid` / `hash identify` - Hash Identification
@@ -1351,13 +1388,13 @@ raxuiscli pwgen --no-symbols
 #### `hexdump` - Hexadecimal Display
 ```bash
 raxuiscli hexdump file.bin
-raxuiscli hexdump file.bin --limit 256
+raxuiscli hexdump file.bin --length 256
 ```
 
 #### `strings` - String Extraction
 ```bash
 raxuiscli strings binary.exe
-raxuiscli strings binary.exe --min-length 8
+raxuiscli strings binary.exe --min 8
 ```
 
 #### `entropy` - Entropy Calculation
@@ -1375,13 +1412,18 @@ raxuiscli metadata document.pdf
 Encrypt, decrypt, compress, extract, checksum, find, and securely shred files.
 ```bash
 raxuiscli files checksum report.pdf
-raxuiscli files encrypt secret.txt --algo aes256 --key-file key.bin --out secret.enc
-raxuiscli files decrypt secret.enc --key-file key.bin --out secret.txt
-raxuiscli files compress logs/                 # archive a directory
+raxuiscli files encrypt secret.txt --algo aes256 --password "example-passphrase" --out secret.enc
+raxuiscli files decrypt secret.enc --password "example-passphrase" --out restored.txt
+raxuiscli files compress logs/ --format gz --out logs.tar.gz
 raxuiscli files extract archive.tar.gz
 raxuiscli files find /var --name '*.conf'
 raxuiscli files shred secret.txt               # secure delete
 ```
+
+`--dry-run` previews a file command without reading or modifying its inputs or
+executing matches. Normal output routing still applies. AES/ChaCha20 use `--password`; `--key-file` is for RSA PEM
+keys. Password-protected archives and ASCII-armored encryption are currently
+unsupported and return an error instead of silently ignoring the option.
 
 #### `todo` - Task Management
 A small local todo list.
@@ -1464,12 +1506,12 @@ This table is generated from the command catalog. `stable` means the implementat
 | Category | Stable | Experimental | Informational | Total |
 |---|---:|---:|---:|---:|
 | audit & reporting | 9 | 0 | 0 | 9 |
-| core | 7 | 0 | 0 | 7 |
+| core | 7 | 2 | 0 | 9 |
 | cryptography | 0 | 31 | 0 | 31 |
 | infrastructure | 0 | 22 | 1 | 23 |
 | network | 0 | 8 | 0 | 8 |
 | offensive security | 0 | 58 | 14 | 72 |
-| utilities | 0 | 29 | 0 | 29 |
+| utilities | 0 | 28 | 0 | 28 |
 | web security | 0 | 33 | 2 | 35 |
 <!-- END GENERATED COMMAND CATALOG -->
 

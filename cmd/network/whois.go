@@ -31,7 +31,7 @@ Examples:
   raxuiscli whois 15169           # ASN WHOIS (without AS prefix)
   raxuiscli whois example.com --raw  # Show raw WHOIS data`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
 		queryType := detectQueryType(query)
 
@@ -78,13 +78,17 @@ Examples:
 			payload["error"] = msg
 		}
 
-		_ = output.Emit(payload, func(_ io.Writer) {
+		if err := output.Emit(payload, func(_ io.Writer) {
 			if whoisRaw {
 				whois.DisplayRaw(result)
 			} else {
 				whois.DisplayResult(result)
 			}
-		})
+		}); err != nil {
+			return err
+		}
+		return result.Error
+
 	},
 }
 

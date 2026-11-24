@@ -101,13 +101,17 @@ Examples:
 
 		if useCommon {
 			words = fuzz.CommonDirectories()
-			fmt.Printf("Using %d common directories\n", len(words))
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Using %d common directories\n", len(words))
+			}
 		} else if wordlist != "" {
 			words, err = fuzz.LoadWordlist(wordlist)
 			if err != nil {
 				return fmt.Errorf("loading wordlist: %w", err)
 			}
-			fmt.Printf("Loaded %d words from wordlist\n", len(words))
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Loaded %d words from wordlist\n", len(words))
+			}
 		} else {
 			return fmt.Errorf("please provide --wordlist or --common flag")
 		}
@@ -129,8 +133,7 @@ Examples:
 			RateLimit:    rateLimit,
 		}
 
-		runFuzzer(opts, fuzz.FuzzDirectory)
-		return nil
+		return runFuzzer(opts, fuzz.FuzzDirectory)
 	},
 }
 
@@ -173,13 +176,17 @@ Examples:
 
 		if useCommon {
 			words = fuzz.CommonParams()
-			fmt.Printf("Using %d common parameters\n", len(words))
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Using %d common parameters\n", len(words))
+			}
 		} else if wordlist != "" {
 			words, err = fuzz.LoadWordlist(wordlist)
 			if err != nil {
 				return fmt.Errorf("loading wordlist: %w", err)
 			}
-			fmt.Printf("Loaded %d words from wordlist\n", len(words))
+			if !output.JSON() {
+				fmt.Fprintf(output.Std, "Loaded %d words from wordlist\n", len(words))
+			}
 		} else {
 			return fmt.Errorf("please provide --wordlist or --common flag")
 		}
@@ -202,8 +209,7 @@ Examples:
 			Data:         data,
 		}
 
-		runFuzzer(opts, fuzz.FuzzParameter)
-		return nil
+		return runFuzzer(opts, fuzz.FuzzParameter)
 	},
 }
 
@@ -251,7 +257,9 @@ Examples:
 			}
 		}
 
-		fmt.Printf("Loaded %d vhosts to test\n", len(words))
+		if !output.JSON() {
+			fmt.Fprintf(output.Std, "Loaded %d vhosts to test\n", len(words))
+		}
 
 		opts := fuzz.FuzzOptions{
 			Type:         fuzz.FuzzVhost,
@@ -266,12 +274,11 @@ Examples:
 			RateLimit:    rateLimit,
 		}
 
-		runFuzzer(opts, fuzz.FuzzVirtualHost)
-		return nil
+		return runFuzzer(opts, fuzz.FuzzVirtualHost)
 	},
 }
 
-func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- fuzz.FuzzResult, chan<- bool)) {
+func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- fuzz.FuzzResult, chan<- bool)) error {
 	resultChan := make(chan fuzz.FuzzResult, 100)
 	doneChan := make(chan bool)
 
@@ -309,12 +316,26 @@ func runFuzzer(opts fuzz.FuzzOptions, fuzzerFunc func(fuzz.FuzzOptions, chan<- f
 			}
 
 		case <-doneChan:
+			for len(resultChan) > 0 {
+				result := <-resultChan
+				if result.Error != nil {
+					results.Errors++
+				} else {
+					results.Found++
+					results.Results = append(results.Results, result)
+				}
+			}
 			results.Duration = time.Since(start)
-			_ = output.Emit(fuzzResultsView(results), func(_ io.Writer) {
-				fmt.Println() // New line after progress
+			if err := output.Emit(fuzzResultsView(results), func(_ io.Writer) {
+				fmt.Fprintln(output.Std)
 				fuzz.DisplayResults(results)
-			})
-			return
+			}); err != nil {
+				return err
+			}
+			if results.Errors > 0 && results.Found == 0 {
+				return fmt.Errorf("all fuzz requests failed (%d errors)", results.Errors)
+			}
+			return nil
 		}
 	}
 }

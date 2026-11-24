@@ -6,6 +6,7 @@ package scan
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Raxuis/RaxuisCLI/internal/network/recon"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/netutil"
 )
 
 const maxHosts = 65536
@@ -72,6 +74,12 @@ type Result struct {
 // Run executes host discovery (unless skipped) then a TCP connect scan of the
 // alive hosts, returning the annotated results.
 func Run(opts Options) *Result {
+	result, _ := RunContext(context.Background(), opts)
+	return result
+}
+
+// RunContext performs a scan with bounded work and caller cancellation.
+func RunContext(ctx context.Context, opts Options) (*Result, error) {
 	start := time.Now()
 	if opts.Concurrency <= 0 {
 		opts.Concurrency = 100
@@ -84,54 +92,74 @@ func Run(opts Options) *Result {
 	}
 
 	res := &Result{Targets: len(opts.Targets)}
+	targets := make([]string, 0, len(opts.Targets))
+	seen := make(map[string]bool)
+	for _, target := range opts.Targets {
+		host, err := netutil.NormalizeHost(target)
+		if err != nil {
+			return res, err
+		}
+		if !seen[host] {
+			targets = append(targets, host)
+			seen[host] = true
+		}
+	}
+	opts.Targets = targets
+	opts.Ports = netutil.UniquePorts(opts.Ports)
+	opts.DiscoveryPorts = netutil.UniquePorts(opts.DiscoveryPorts)
+	for _, ports := range [][]int{opts.Ports, opts.DiscoveryPorts} {
+		for _, port := range ports {
+			if !netutil.ValidPort(port) {
+				return res, fmt.Errorf("invalid port: %d", port)
+			}
+		}
+	}
+	res.Targets = len(targets)
 
 	alive := opts.Targets
 	if !opts.SkipDiscovery {
-		alive = discoverHosts(opts)
+		alive = discoverHostsContext(ctx, opts)
 	}
 	sortIPs(alive)
 	res.AliveHosts = len(alive)
 
 	for _, ip := range alive {
+		if ctx.Err() != nil {
+			break
+		}
 		hr := HostResult{IP: ip}
-		if names, err := net.LookupAddr(ip); err == nil && len(names) > 0 {
+		lookupCtx, cancel := context.WithTimeout(ctx, opts.connectTimeout())
+		if names, err := net.DefaultResolver.LookupAddr(lookupCtx, ip); err == nil && len(names) > 0 {
 			hr.Hostname = strings.TrimSuffix(names[0], ".")
 		}
-		hr.OpenPorts = scanHost(ip, opts)
+		cancel()
+		hr.OpenPorts = scanHostContext(ctx, ip, opts)
 		res.Hosts = append(res.Hosts, hr)
 	}
 
 	res.Duration = time.Since(start)
-	return res
+	return res, ctx.Err()
 }
 
-func discoverHosts(opts Options) []string {
-	sem := make(chan struct{}, opts.Concurrency)
-	var wg sync.WaitGroup
+func discoverHostsContext(ctx context.Context, opts Options) []string {
 	var mu sync.Mutex
 	var alive []string
-
-	for _, ip := range opts.Targets {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(ip string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			if hostAlive(ip, opts) {
-				mu.Lock()
-				alive = append(alive, ip)
-				mu.Unlock()
-			}
-		}(ip)
-	}
-	wg.Wait()
+	netutil.ForEach(ctx, opts.Targets, opts.Concurrency, func(ip string) {
+		if hostAliveContext(ctx, ip, opts) {
+			mu.Lock()
+			alive = append(alive, ip)
+			mu.Unlock()
+		}
+	})
 	return alive
 }
 
-func hostAlive(ip string, opts Options) bool {
+func hostAliveContext(ctx context.Context, ip string, opts Options) bool {
 	for _, p := range opts.DiscoveryPorts {
-		jitterSleep(opts.Jitter)
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(p)), opts.discoveryTimeout())
+		if !jitterWait(ctx, opts.Jitter) {
+			return false
+		}
+		conn, err := netutil.Dial(ctx, "tcp", net.JoinHostPort(ip, strconv.Itoa(p)), opts.discoveryTimeout())
 		if err == nil {
 			_ = conn.Close()
 			return true
@@ -140,47 +168,35 @@ func hostAlive(ip string, opts Options) bool {
 	return false
 }
 
-func scanHost(ip string, opts Options) []OpenPort {
-	sem := make(chan struct{}, opts.Concurrency)
-	var wg sync.WaitGroup
+func scanHostContext(ctx context.Context, ip string, opts Options) []OpenPort {
 	var mu sync.Mutex
 	var open []OpenPort
-
-	for _, port := range opts.Ports {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(port int) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			jitterSleep(opts.Jitter)
-			conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(port)), opts.connectTimeout())
-			if err != nil {
-				return
+	netutil.ForEach(ctx, netutil.UniquePorts(opts.Ports), opts.Concurrency, func(port int) {
+		if !jitterWait(ctx, opts.Jitter) {
+			return
+		}
+		conn, err := netutil.Dial(ctx, "tcp", net.JoinHostPort(ip, strconv.Itoa(port)), opts.connectTimeout())
+		if err != nil {
+			return
+		}
+		_ = conn.Close()
+		op := OpenPort{Port: port}
+		if opts.Banner {
+			sr := recon.BannerGrabContext(ctx, ip, port, opts.Timeout, false)
+			op.Service, op.Version, op.Banner, op.TLS = sr.Service, sr.Version, sr.Banner, sr.TLS
+		}
+		if op.Service == "" || op.Service == "unknown" {
+			if service, ok := recon.CommonPorts[port]; ok {
+				op.Service = service
+			} else {
+				op.Service = "unknown"
 			}
-			_ = conn.Close()
-
-			op := OpenPort{Port: port}
-			if opts.Banner {
-				sr := recon.BannerGrab(ip, port, opts.Timeout, false)
-				op.Service, op.Version, op.Banner, op.TLS = sr.Service, sr.Version, sr.Banner, sr.TLS
-			}
-			if op.Service == "" || op.Service == "unknown" {
-				if s, ok := recon.CommonPorts[port]; ok {
-					op.Service = s
-				} else {
-					op.Service = "unknown"
-				}
-			}
-			op.Tag, op.NextStep = annotate(ip, port, op.Service)
-
-			mu.Lock()
-			open = append(open, op)
-			mu.Unlock()
-		}(port)
-	}
-	wg.Wait()
-
+		}
+		op.Tag, op.NextStep = annotate(ip, port, op.Service)
+		mu.Lock()
+		open = append(open, op)
+		mu.Unlock()
+	})
 	sort.Slice(open, func(i, j int) bool { return open[i].Port < open[j].Port })
 	return open
 }
@@ -266,6 +282,11 @@ func ParseTargets(spec string) ([]string, error) {
 			}
 			continue
 		}
+		normalized, err := netutil.NormalizeHost(part)
+		if err != nil {
+			return nil, err
+		}
+		part = normalized
 		if !seen[part] {
 			seen[part] = true
 			out = append(out, part)
@@ -326,18 +347,8 @@ func sortIPs(ips []string) {
 	})
 }
 
-func jitterSleep(d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	time.Sleep(time.Duration(rand.Int63n(int64(d))))
-}
-
 func (o Options) connectTimeout() time.Duration {
-	if o.Timeout <= 0 {
-		return 2 * time.Second
-	}
-	return time.Duration(o.Timeout) * time.Second
+	return netutil.Timeout(o.Timeout)
 }
 
 // discoveryTimeout is capped shorter than the full connect timeout so liveness
@@ -347,4 +358,21 @@ func (o Options) discoveryTimeout() time.Duration {
 		return t
 	}
 	return time.Second
+}
+
+func jitterWait(ctx context.Context, d time.Duration) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	if d <= 0 {
+		return true
+	}
+	timer := time.NewTimer(time.Duration(rand.Int63n(int64(d))))
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return ctx.Err() == nil
+	case <-ctx.Done():
+		return false
+	}
 }

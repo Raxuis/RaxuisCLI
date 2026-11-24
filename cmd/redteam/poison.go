@@ -6,6 +6,7 @@ import (
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/poison"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +26,9 @@ Examples:
   raxuiscli poison analyze -i eth0           # Analyze network traffic
   raxuiscli poison llmnr -i eth0             # LLMNR poisoning commands
   raxuiscli poison arp -i eth0               # ARP poisoning commands`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -34,8 +36,9 @@ var poisonProtocolsCmd = &cobra.Command{
 	Use:   "protocols",
 	Short: "List poisoning protocols",
 	Long:  `List available network poisoning protocols and information.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		poison.DisplayProtocols()
+		return nil
 	},
 }
 
@@ -43,7 +46,7 @@ var poisonAnalyzeCmd = &cobra.Command{
 	Use:   "analyze",
 	Short: "Analyze network for poisoning opportunities",
 	Long:  `Analyze network traffic for potential poisoning targets.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
@@ -52,10 +55,11 @@ var poisonAnalyzeCmd = &cobra.Command{
 			poisonDuration = 10
 		}
 
-		fmt.Printf("Analyzing network on %s for %d seconds...\n", poisonInterface, poisonDuration)
+		fmt.Fprintf(output.Std, "Analyzing network on %s for %d seconds...\n", poisonInterface, poisonDuration)
 
 		findings := poison.AnalyzeNetwork(poisonInterface, poisonDuration)
 		poison.DisplayAnalysis(findings)
+		return nil
 	},
 }
 
@@ -63,12 +67,13 @@ var poisonLLMNRCmd = &cobra.Command{
 	Use:   "llmnr",
 	Short: "LLMNR poisoning commands",
 	Long:  `Generate commands for LLMNR poisoning attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
 
 		poison.DisplayCommands(poison.LLMNR, poisonInterface)
+		return nil
 	},
 }
 
@@ -76,12 +81,13 @@ var poisonMDNSCmd = &cobra.Command{
 	Use:   "mdns",
 	Short: "mDNS poisoning commands",
 	Long:  `Generate commands for mDNS poisoning attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
 
 		poison.DisplayCommands(poison.MDNS, poisonInterface)
+		return nil
 	},
 }
 
@@ -89,12 +95,13 @@ var poisonNBTNSCmd = &cobra.Command{
 	Use:   "nbtns",
 	Short: "NBT-NS poisoning commands",
 	Long:  `Generate commands for NetBIOS Name Service poisoning attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
 
 		poison.DisplayCommands(poison.NBT_NS, poisonInterface)
+		return nil
 	},
 }
 
@@ -102,12 +109,13 @@ var poisonARPCmd = &cobra.Command{
 	Use:   "arp",
 	Short: "ARP poisoning commands",
 	Long:  `Generate commands for ARP poisoning/spoofing attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
 
 		poison.DisplayCommands(poison.ARP, poisonInterface)
+		return nil
 	},
 }
 
@@ -115,8 +123,9 @@ var poisonDHCPCmd = &cobra.Command{
 	Use:   "dhcp",
 	Short: "DHCP poisoning information",
 	Long:  `Generate commands and information for DHCP poisoning attacks.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		poison.DisplayCommands(poison.DHCP, poisonInterface)
+		return nil
 	},
 }
 
@@ -124,33 +133,34 @@ var poisonResponderCmd = &cobra.Command{
 	Use:   "responder",
 	Short: "Responder command generator",
 	Long:  `Generate Responder commands with various options.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if poisonInterface == "" {
 			poisonInterface = "eth0"
 		}
 
-		fmt.Println("\n[RESPONDER COMMANDS]")
-		fmt.Println("====================")
+		fmt.Fprintln(output.Std, "\n[RESPONDER COMMANDS]")
+		fmt.Fprintln(output.Std, "====================")
 
-		fmt.Println("\n# Basic usage")
-		fmt.Println(poison.GenerateResponderCommand(poisonInterface, map[string]bool{}))
+		fmt.Fprintln(output.Std, "\n# Basic usage")
+		fmt.Fprintln(output.Std, poison.GenerateResponderCommand(poisonInterface, map[string]bool{}))
 
-		fmt.Println("\n# With WPAD proxy")
-		fmt.Println(poison.GenerateResponderCommand(poisonInterface, map[string]bool{
+		fmt.Fprintln(output.Std, "\n# With WPAD proxy")
+		fmt.Fprintln(output.Std, poison.GenerateResponderCommand(poisonInterface, map[string]bool{
 			"wpad": true,
 		}))
 
-		fmt.Println("\n# Analyze mode only (no poisoning)")
-		fmt.Println(poison.GenerateResponderCommand(poisonInterface, map[string]bool{
+		fmt.Fprintln(output.Std, "\n# Analyze mode only (no poisoning)")
+		fmt.Fprintln(output.Std, poison.GenerateResponderCommand(poisonInterface, map[string]bool{
 			"analyze": true,
 		}))
 
-		fmt.Println("\n# With fingerprinting")
-		fmt.Println(poison.GenerateResponderCommand(poisonInterface, map[string]bool{
+		fmt.Fprintln(output.Std, "\n# With fingerprinting")
+		fmt.Fprintln(output.Std, poison.GenerateResponderCommand(poisonInterface, map[string]bool{
 			"fingerprint": true,
 		}))
 
-		fmt.Println()
+		fmt.Fprintln(output.Std)
+		return nil
 	},
 }
 

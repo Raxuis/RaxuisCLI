@@ -37,8 +37,9 @@ Examples:
   raxuiscli dns reverse 8.8.8.8
   raxuiscli dns axfr example.com --server ns1.example.com
   raxuiscli dns brute example.com --wordlist subdomains.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -57,7 +58,7 @@ Examples:
   raxuiscli dns lookup example.com --type ANY   # All record types
   raxuiscli dns lookup example.com --server 8.8.8.8  # Custom DNS server`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		domain := args[0]
 
 		opts := dns.LookupOptions{
@@ -87,9 +88,24 @@ Examples:
 			})
 		}
 
-		_ = output.Emit(map[string]any{"domain": domain, "results": view}, func(_ io.Writer) {
+		if err := output.Emit(map[string]any{"domain": domain, "results": view}, func(_ io.Writer) {
 			dns.DisplayLookupResults(results)
-		})
+		}); err != nil {
+			return err
+		}
+		failures := 0
+		var lastErr error
+		for _, r := range results {
+			if r.Error != nil {
+				failures++
+				lastErr = r.Error
+			}
+		}
+		if failures == len(results) {
+			return lastErr
+		}
+		return nil
+
 	},
 }
 
@@ -102,7 +118,7 @@ Examples:
   raxuiscli dns reverse 8.8.8.8
   raxuiscli dns reverse 1.1.1.1 --server 8.8.8.8`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ip := args[0]
 
 		result := dns.ReverseLookup(ip, dnsNameserver, dnsTimeout)
@@ -114,9 +130,11 @@ Examples:
 		if msg := errString(result.Error); msg != "" {
 			payload["error"] = msg
 		}
-		_ = output.Emit(payload, func(_ io.Writer) {
-			dns.DisplayReverseResult(result)
-		})
+		if err := output.Emit(payload, func(_ io.Writer) { dns.DisplayReverseResult(result) }); err != nil {
+			return err
+		}
+		return result.Error
+
 	},
 }
 
@@ -134,12 +152,11 @@ Examples:
   raxuiscli dns axfr example.com --server ns1.example.com
   raxuiscli dns axfr example.com --server 10.0.0.1`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		domain := args[0]
 
 		if dnsAXFRServer == "" {
-			fmt.Fprintln(os.Stderr, "Error: --server is required for zone transfer")
-			os.Exit(1)
+			return fmt.Errorf("--server is required for zone transfer")
 		}
 
 		result := dns.AttemptAXFR(domain, dnsAXFRServer, dnsTimeout)
@@ -153,9 +170,11 @@ Examples:
 		if msg := errString(result.Error); msg != "" {
 			payload["error"] = msg
 		}
-		_ = output.Emit(payload, func(_ io.Writer) {
-			dns.DisplayAXFRResult(result)
-		})
+		if err := output.Emit(payload, func(_ io.Writer) { dns.DisplayAXFRResult(result) }); err != nil {
+			return err
+		}
+		return result.Error
+
 	},
 }
 
@@ -174,22 +193,20 @@ Examples:
   raxuiscli dns brute example.com --wordlist subs.txt --threads 50
   raxuiscli dns brute example.com --wordlist subs.txt --server 8.8.8.8`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		domain := args[0]
 
 		if dnsBruteWordlist == "" {
-			fmt.Fprintln(os.Stderr, "Error: --wordlist is required for subdomain bruteforce")
-			os.Exit(1)
+			return fmt.Errorf("--wordlist is required for subdomain bruteforce")
 		}
 
 		// Check if wordlist exists
 		if _, err := os.Stat(dnsBruteWordlist); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error: wordlist file not found: %s\n", dnsBruteWordlist)
-			os.Exit(1)
+			return fmt.Errorf("wordlist file not found: %s", dnsBruteWordlist)
 		}
 
 		if !output.JSON() {
-			fmt.Printf("Starting subdomain bruteforce for %s...\n", domain)
+			fmt.Fprintf(output.Std, "Starting subdomain bruteforce for %s...\n", domain)
 		}
 		result := dns.BruteSubdomains(domain, dnsBruteWordlist, dnsNameserver, dnsTimeout, dnsBruteThreads)
 
@@ -201,7 +218,7 @@ Examples:
 		for _, s := range result.Subdomains {
 			subs = append(subs, subOut{Subdomain: s.Subdomain, IPs: s.IPs})
 		}
-		_ = output.Emit(map[string]any{
+		return output.Emit(map[string]any{
 			"domain":     result.Domain,
 			"total":      result.Total,
 			"found":      result.Found,
@@ -209,6 +226,7 @@ Examples:
 		}, func(_ io.Writer) {
 			dns.DisplayBruteResult(result)
 		})
+
 	},
 }
 

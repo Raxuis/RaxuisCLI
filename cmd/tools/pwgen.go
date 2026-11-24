@@ -2,10 +2,14 @@ package tools
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/pwgen"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/spf13/cobra"
 )
@@ -14,6 +18,8 @@ var pwgenCmd = &cobra.Command{
 	Use:   "pwgen",
 	Short: "Generate secure passwords",
 	Long:  "Generate cryptographically secure passwords with various options",
+	Args:  cobra.NoArgs,
+	RunE:  runPasswordGeneration,
 }
 
 var pwgenLength int
@@ -24,59 +30,55 @@ var pwgenCount int
 var pwgenGenerateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate password(s)",
-	Run: func(cmd *cobra.Command, args []string) {
-		options := pwgen.Options{
-			Length:    pwgenLength,
-			NoSymbols: pwgenNoSymbols,
-			NoNumbers: pwgenNoNumbers,
-		}
+	Args:  cobra.NoArgs,
+	RunE:  runPasswordGeneration,
+}
 
-		if pwgenLength > 100000 {
-			fmt.Println("Maximum password length is 100000 characters.")
-			return
-		}
-
-		var lastPassword string
-
-		for i := 0; i < pwgenCount; i++ {
-			password, err := pwgen.Generate(options)
-			if err != nil {
-				fmt.Printf("Error generating password: %v\n", err)
-				return
-			}
-
-			fmt.Printf("Password %d: %s\n", i+1, password)
-			lastPassword = password
-		}
-
-		if pwgenCount == 1 {
-			fmt.Print("Copy this password to clipboard? (y/N): ")
-		} else {
-			fmt.Print("Copy the last password to clipboard? (y/N): ")
-		}
-
-		var response string
-		_, err := fmt.Scanln(&response)
+func runPasswordGeneration(command *cobra.Command, _ []string) error {
+	if pwgenLength < 1 || pwgenLength > 100000 {
+		return fmt.Errorf("password length must be between 1 and 100000")
+	}
+	if pwgenCount < 1 {
+		return fmt.Errorf("password count must be positive")
+	}
+	options := pwgen.Options{Length: pwgenLength, NoSymbols: pwgenNoSymbols, NoNumbers: pwgenNoNumbers}
+	passwords := make([]string, 0)
+	for i := 0; i < pwgenCount; i++ {
+		password, err := pwgen.Generate(options)
 		if err != nil {
-			return
+			return fmt.Errorf("generating password: %w", err)
 		}
-
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response == "y" || response == "yes" {
-			err := pwgen.CopyToClipboard(lastPassword)
-			if err != nil {
-				fmt.Printf("Error copying to clipboard: %v\n", err)
-			} else {
-				fmt.Println("Password copied to clipboard!")
-
-				if err := pwgen.VerifyClipboard(lastPassword); err != nil {
-					fmt.Printf("Warning: %v\n", err)
-				} else {
-					fmt.Println("Copy verified successfully")
-				}
-			}
+		passwords = append(passwords, password)
+	}
+	if err := output.Emit(map[string]any{"passwords": passwords}, func(w io.Writer) {
+		for i, password := range passwords {
+			fmt.Fprintf(w, "Password %d: %s\n", i+1, password)
 		}
-	},
+	}); err != nil {
+		return err
+	}
+	in, inOK := command.InOrStdin().(*os.File)
+	out, outOK := command.OutOrStdout().(*os.File)
+	if output.JSON() || !inOK || !outOK || !term.IsTerminal(in.Fd()) || !term.IsTerminal(out.Fd()) {
+		return nil
+	}
+	fmt.Fprint(out, "Copy the last password to clipboard? (y/N): ")
+	var response string
+	if _, err := fmt.Fscanln(in, &response); err != nil {
+		return nil
+	}
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response == "y" || response == "yes" {
+		password := passwords[len(passwords)-1]
+		if err := pwgen.CopyToClipboard(password); err != nil {
+			return fmt.Errorf("copying password: %w", err)
+		}
+		if err := pwgen.VerifyClipboard(password); err != nil {
+			return fmt.Errorf("verifying clipboard: %w", err)
+		}
+		fmt.Fprintln(out, "Password copied to clipboard!")
+	}
+	return nil
 }
 
 func init() {

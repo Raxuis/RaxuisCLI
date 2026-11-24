@@ -9,6 +9,7 @@ import (
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/creds"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +31,9 @@ Examples:
   raxuiscli creds convert dump.txt -f userpass -o clean.txt
   raxuiscli creds decode "YWRtaW46cGFzc3dvcmQ="
   raxuiscli creds combo -u users.txt -p passwords.txt`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -47,13 +49,12 @@ Supports various formats:
 - NTLM hash dumps
 - /etc/shadow format`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		result, err := creds.ExtractFromFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		creds.DisplayResult(result, credsShowAll)
@@ -69,11 +70,11 @@ Supports various formats:
 				}
 			}
 			if err := creds.WriteToFile(lines, credsOutput); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error writing output: %v", err)
 			}
-			fmt.Printf("Exported %d credentials to %s\n", len(lines), credsOutput)
+			fmt.Fprintf(output.Std, "Exported %d credentials to %s\n", len(lines), credsOutput)
 		}
+		return nil
 	},
 }
 
@@ -93,33 +94,32 @@ Available formats:
 - hashcat     : hash only (for hashcat)
 - john        : user:hash (for John)`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		result, err := creds.ExtractFromFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if len(result.Credentials) == 0 {
-			fmt.Println("No credentials found")
-			return
+			fmt.Fprintln(output.Std, "No credentials found")
+			return nil
 		}
 
 		lines := creds.ConvertFormat(result.Credentials, credsFormat)
 
 		if credsOutput != "" {
 			if err := creds.WriteToFile(lines, credsOutput); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error writing output: %v", err)
 			}
-			fmt.Printf("Exported %d lines to %s\n", len(lines), credsOutput)
+			fmt.Fprintf(output.Std, "Exported %d lines to %s\n", len(lines), credsOutput)
 		} else {
 			for _, line := range lines {
-				fmt.Println(line)
+				fmt.Fprintln(output.Std, line)
 			}
 		}
+		return nil
 	},
 }
 
@@ -134,23 +134,24 @@ Tries various encoding methods:
 - URL encoding
 - Hex`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		encoded := args[0]
 
-		fmt.Printf("Input: %s\n\n", encoded)
-		fmt.Println("Decoded results:")
-		fmt.Println(strings.Repeat("-", 40))
+		fmt.Fprintf(output.Std, "Input: %s\n\n", encoded)
+		fmt.Fprintln(output.Std, "Decoded results:")
+		fmt.Fprintln(output.Std, strings.Repeat("-", 40))
 
 		results := creds.DecodeCredential(encoded)
 
 		if len(results) == 0 {
-			fmt.Println("No valid decoding found")
-			return
+			fmt.Fprintln(output.Std, "No valid decoding found")
+			return nil
 		}
 
 		for _, r := range results {
-			fmt.Printf("[%s] %s\n", r.Method, r.Value)
+			fmt.Fprintf(output.Std, "[%s] %s\n", r.Method, r.Value)
 		}
+		return nil
 	},
 }
 
@@ -163,27 +164,24 @@ var credsComboCmd = &cobra.Command{
 	Long: `Generate credential combinations from user and password lists.
 
 Creates all possible user:password combinations.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if credsUsersFile == "" || credsPassFile == "" {
-			fmt.Fprintln(os.Stderr, "Error: both --users and --passwords are required")
-			os.Exit(1)
+			return fmt.Errorf("both --users and --passwords are required")
 		}
 
 		// Read users
 		users, err := readLines(credsUsersFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading users file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading users file: %v", err)
 		}
 
 		// Read passwords
 		passwords, err := readLines(credsPassFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading passwords file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading passwords file: %v", err)
 		}
 
-		fmt.Printf("Generating combinations: %d users x %d passwords = %d combos\n",
+		fmt.Fprintf(output.Std, "Generating combinations: %d users x %d passwords = %d combos\n",
 			len(users), len(passwords), len(users)*len(passwords))
 
 		combos := creds.GenerateCombo(users, passwords, credsDomain)
@@ -198,19 +196,19 @@ Creates all possible user:password combinations.`,
 				}
 			}
 			if err := creds.WriteToFile(lines, credsOutput); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error writing output: %v", err)
 			}
-			fmt.Printf("Exported %d combinations to %s\n", len(lines), credsOutput)
+			fmt.Fprintf(output.Std, "Exported %d combinations to %s\n", len(lines), credsOutput)
 		} else {
 			for _, c := range combos {
 				if credsDomain != "" {
-					fmt.Printf("%s\\%s:%s\n", c.Domain, c.Username, c.Password)
+					fmt.Fprintf(output.Std, "%s\\%s:%s\n", c.Domain, c.Username, c.Password)
 				} else {
-					fmt.Printf("%s:%s\n", c.Username, c.Password)
+					fmt.Fprintf(output.Std, "%s:%s\n", c.Username, c.Password)
 				}
 			}
 		}
+		return nil
 	},
 }
 
@@ -219,30 +217,29 @@ var credsMergeCmd = &cobra.Command{
 	Short: "Merge and deduplicate credential files",
 	Long:  `Merge multiple credential files and remove duplicates.`,
 	Args:  cobra.MinimumNArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var allCreds []creds.Credential
 
 		for _, filePath := range args {
 			result, err := creds.ExtractFromFile(filePath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", filePath, err)
-				continue
+				return fmt.Errorf("reading %s: %w", filePath, err)
 			}
 			allCreds = append(allCreds, result.Credentials...)
-			fmt.Printf("Loaded %d credentials from %s\n", len(result.Credentials), filePath)
+			fmt.Fprintf(output.Std, "Loaded %d credentials from %s\n", len(result.Credentials), filePath)
 		}
 
 		merged := creds.MergeDedupe(allCreds)
-		fmt.Printf("\nMerged: %d unique credentials\n", len(merged))
+		fmt.Fprintf(output.Std, "\nMerged: %d unique credentials\n", len(merged))
 
 		if credsOutput != "" {
 			lines := creds.ConvertFormat(merged, "userpass")
 			if err := creds.WriteToFile(lines, credsOutput); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error writing output: %v", err)
 			}
-			fmt.Printf("Exported to %s\n", credsOutput)
+			fmt.Fprintf(output.Std, "Exported to %s\n", credsOutput)
 		}
+		return nil
 	},
 }
 
@@ -270,7 +267,7 @@ func init() {
 
 	// Global flags
 	credsCmd.PersistentFlags().BoolVar(&credsShowAll, "all", false, "Show all details")
-	credsCmd.PersistentFlags().StringVarP(&credsOutput, "output", "o", "", "Output file")
+	credsCmd.PersistentFlags().StringVarP(&credsOutput, "out", "o", "", "Output file")
 
 	// Extract command
 	credsCmd.AddCommand(credsExtractCmd)

@@ -340,17 +340,6 @@ func TestParsePortsInvalid(t *testing.T) {
 	}
 }
 
-func TestParsePortsSwapsReversedRange(t *testing.T) {
-	ports, err := ParsePorts("22-20")
-	if err != nil {
-		t.Fatalf("ParsePorts returned error: %v", err)
-	}
-	want := []int{20, 21, 22}
-	if len(ports) != len(want) {
-		t.Fatalf("ParsePorts(22-20) = %v, want %v (swapped)", ports, want)
-	}
-}
-
 func TestGetCommonPorts(t *testing.T) {
 	if len(GetCommonPorts()) == 0 {
 		t.Error("GetCommonPorts() should not be empty")

@@ -30,6 +30,9 @@ type ExtractOptions struct {
 
 // Compress compresse des fichiers dans une archive
 func Compress(paths []string, opts CompressOptions) error {
+	if opts.Password != "" {
+		return fmt.Errorf("password-protected archives are not supported")
+	}
 	if opts.Output == "" {
 		return fmt.Errorf("output file is required")
 	}
@@ -59,6 +62,9 @@ func Compress(paths []string, opts CompressOptions) error {
 
 // Extract extrait une archive
 func Extract(archivePath string, opts ExtractOptions) error {
+	if opts.Password != "" {
+		return fmt.Errorf("password-protected archives are not supported")
+	}
 	// Détecter le format automatiquement si non spécifié
 	format := opts.Format
 	if format == "" {

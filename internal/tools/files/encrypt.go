@@ -37,6 +37,9 @@ type DecryptOptions struct {
 
 // Encrypt chiffre un fichier avec l'algorithme spécifié
 func Encrypt(inputPath string, opts EncryptOptions) error {
+	if opts.Armor {
+		return fmt.Errorf("ASCII-armored encryption is not supported")
+	}
 	// Lire le fichier d'entrée
 	plaintext, err := os.ReadFile(inputPath)
 	if err != nil {

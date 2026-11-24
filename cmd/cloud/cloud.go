@@ -1,12 +1,13 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/cloud/cloud"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +27,9 @@ Examples:
   raxuiscli cloud azure blob companyname   # Enumerate Azure blobs
   raxuiscli cloud gcp bucket companyname   # Enumerate GCP buckets
   raxuiscli cloud metadata aws             # Check AWS metadata`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -36,8 +38,9 @@ var cloudAwsCmd = &cobra.Command{
 	Use:   "aws",
 	Short: "AWS enumeration",
 	Long:  `AWS cloud resource enumeration.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -48,13 +51,23 @@ var cloudAwsS3Cmd = &cobra.Command{
 
 Tries various mutations like company-dev, company-backup, etc.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		company := args[0]
 
-		fmt.Printf("Enumerating S3 buckets for '%s'...\n", company)
+		fmt.Fprintf(output.Std, "Enumerating S3 buckets for '%s'...\n", company)
 
 		results := cloud.EnumerateS3(company, nil, cloudTimeout)
 		cloud.DisplayS3Results(results)
+		var failures []error
+		for _, result := range results {
+			if result.Error != nil {
+				failures = append(failures, result.Error)
+			}
+		}
+		if len(results) > 0 && len(failures) == len(results) {
+			return fmt.Errorf("S3 enumeration failed: %w", errors.Join(failures...))
+		}
+		return nil
 	},
 }
 
@@ -62,16 +75,16 @@ var cloudAwsMetaCmd = &cobra.Command{
 	Use:   "metadata",
 	Short: "Check AWS metadata service",
 	Long:  `Check if AWS instance metadata service is accessible (SSRF/IMDSv1).`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Checking AWS metadata service...")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintln(output.Std, "Checking AWS metadata service...")
 
 		metadata, err := cloud.CheckAWSMetadata(cloudTimeout)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		cloud.DisplayMetadata("aws", metadata)
+		return nil
 	},
 }
 
@@ -80,8 +93,9 @@ var cloudAzureCmd = &cobra.Command{
 	Use:   "azure",
 	Short: "Azure enumeration",
 	Long:  `Azure cloud resource enumeration.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -92,13 +106,23 @@ var cloudAzureBlobCmd = &cobra.Command{
 
 Tries various mutations and common container names.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		company := args[0]
 
-		fmt.Printf("Enumerating Azure blob storage for '%s'...\n", company)
+		fmt.Fprintf(output.Std, "Enumerating Azure blob storage for '%s'...\n", company)
 
 		results := cloud.EnumerateAzure(company, nil, cloudTimeout)
 		cloud.DisplayAzureResults(results)
+		var failures []error
+		for _, result := range results {
+			if result.Error != nil {
+				failures = append(failures, result.Error)
+			}
+		}
+		if len(results) > 0 && len(failures) == len(results) {
+			return fmt.Errorf("azure enumeration failed: %w", errors.Join(failures...))
+		}
+		return nil
 	},
 }
 
@@ -106,16 +130,16 @@ var cloudAzureMetaCmd = &cobra.Command{
 	Use:   "metadata",
 	Short: "Check Azure metadata service",
 	Long:  `Check if Azure instance metadata service is accessible.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Checking Azure metadata service...")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintln(output.Std, "Checking Azure metadata service...")
 
 		metadata, err := cloud.CheckAzureMetadata(cloudTimeout)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		cloud.DisplayMetadata("azure", metadata)
+		return nil
 	},
 }
 
@@ -124,8 +148,9 @@ var cloudGcpCmd = &cobra.Command{
 	Use:   "gcp",
 	Short: "GCP enumeration",
 	Long:  `GCP cloud resource enumeration.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -136,13 +161,23 @@ var cloudGcpBucketCmd = &cobra.Command{
 
 Tries various naming patterns and mutations.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		company := args[0]
 
-		fmt.Printf("Enumerating GCP buckets for '%s'...\n", company)
+		fmt.Fprintf(output.Std, "Enumerating GCP buckets for '%s'...\n", company)
 
 		results := cloud.EnumerateGCP(company, nil, cloudTimeout)
 		cloud.DisplayGCPResults(results)
+		var failures []error
+		for _, result := range results {
+			if result.Error != nil {
+				failures = append(failures, result.Error)
+			}
+		}
+		if len(results) > 0 && len(failures) == len(results) {
+			return fmt.Errorf("GCP enumeration failed: %w", errors.Join(failures...))
+		}
+		return nil
 	},
 }
 
@@ -150,16 +185,16 @@ var cloudGcpMetaCmd = &cobra.Command{
 	Use:   "metadata",
 	Short: "Check GCP metadata service",
 	Long:  `Check if GCP instance metadata service is accessible.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Checking GCP metadata service...")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintln(output.Std, "Checking GCP metadata service...")
 
 		metadata, err := cloud.CheckGCPMetadata(cloudTimeout)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		cloud.DisplayMetadata("gcp", metadata)
+		return nil
 	},
 }
 
@@ -172,46 +207,60 @@ var cloudMetadataCmd = &cobra.Command{
 Useful for SSRF detection and cloud instance enumeration.
 Provider can be: aws, azure, gcp, or all.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		provider := args[0]
 
 		switch provider {
 		case "aws":
 			metadata, err := cloud.CheckAWSMetadata(cloudTimeout)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "AWS Error: %v\n", err)
+				return fmt.Errorf("AWS metadata: %w", err)
 			} else {
 				cloud.DisplayMetadata("aws", metadata)
 			}
 		case "azure":
 			metadata, err := cloud.CheckAzureMetadata(cloudTimeout)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Azure Error: %v\n", err)
+				return fmt.Errorf("azure metadata: %w", err)
 			} else {
 				cloud.DisplayMetadata("azure", metadata)
 			}
 		case "gcp":
 			metadata, err := cloud.CheckGCPMetadata(cloudTimeout)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "GCP Error: %v\n", err)
+				return fmt.Errorf("GCP metadata: %w", err)
 			} else {
 				cloud.DisplayMetadata("gcp", metadata)
 			}
 		case "all":
-			fmt.Println("Checking all cloud metadata services...")
+			fmt.Fprintln(output.Std, "Checking all cloud metadata services...")
+			var failures []error
+			successes := 0
 			if metadata, err := cloud.CheckAWSMetadata(cloudTimeout); err == nil {
+				successes++
 				cloud.DisplayMetadata("aws", metadata)
+			} else {
+				failures = append(failures, fmt.Errorf("aws metadata: %w", err))
 			}
 			if metadata, err := cloud.CheckAzureMetadata(cloudTimeout); err == nil {
+				successes++
 				cloud.DisplayMetadata("azure", metadata)
+			} else {
+				failures = append(failures, fmt.Errorf("azure metadata: %w", err))
 			}
 			if metadata, err := cloud.CheckGCPMetadata(cloudTimeout); err == nil {
+				successes++
 				cloud.DisplayMetadata("gcp", metadata)
+			} else {
+				failures = append(failures, fmt.Errorf("gcp metadata: %w", err))
+			}
+			if successes == 0 {
+				return errors.Join(failures...)
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "Unknown provider: %s\n", provider)
-			os.Exit(1)
+			return fmt.Errorf("unknown provider: %s", provider)
 		}
+		return nil
 	},
 }
 

@@ -112,6 +112,7 @@ func TestCheckAPIAccessAllowedEndpoints(t *testing.T) {
 		}
 		if strings.Contains(r.URL.Path, "secrets") || strings.Contains(r.URL.Path, "pods") {
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"kind":"List","items":[]}`))
 			return
 		}
 		w.WriteHeader(http.StatusForbidden)
@@ -189,6 +190,7 @@ func TestListSecretsInvalidJSON(t *testing.T) {
 func TestCheckPrivilegeEscalationAnonymousAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"kind":"APIResourceList","groupVersion":"v1","resources":[]}`))
 	}))
 	defer srv.Close()
 
@@ -213,6 +215,7 @@ func TestCheckPrivilegeEscalationSecretAndPodAccess(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"kind":"List","items":[]}`))
 	}))
 	defer srv.Close()
 

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"runtime/debug"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +22,7 @@ var (
 	date    = ""
 )
 
-// versionString renders the full version banner.
-func versionString() string {
+func buildVersionInfo() map[string]string {
 	v, c, d := version, commit, date
 
 	if info, ok := debug.ReadBuildInfo(); ok {
@@ -46,6 +47,12 @@ func versionString() string {
 		c = c[:12]
 	}
 
+	return map[string]string{"version": v, "commit": c, "built_at": d, "os": runtime.GOOS, "arch": runtime.GOARCH, "go_version": runtime.Version()}
+}
+
+func versionString() string {
+	info := buildVersionInfo()
+	v, c, d := info["version"], info["commit"], info["built_at"]
 	out := fmt.Sprintf("raxuiscli %s", v)
 	if c != "" {
 		out += fmt.Sprintf(" (%s)", c)
@@ -60,8 +67,9 @@ func versionString() string {
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version, commit and build information",
-	Run: func(c *cobra.Command, args []string) {
-		fmt.Println(versionString())
+	Args:  cobra.NoArgs,
+	RunE: func(c *cobra.Command, args []string) error {
+		return output.Emit(buildVersionInfo(), func(w io.Writer) { fmt.Fprintln(w, versionString()) })
 	},
 }
 

@@ -3,7 +3,7 @@ package tools
 import (
 	"fmt"
 	"io"
-	"os"
+
 	"sort"
 	"strings"
 
@@ -29,13 +29,12 @@ Examples:
   raxuiscli metadata document.pdf
   raxuiscli metadata report.docx`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]
 
 		meta, err := metadata.Extract(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		payload := map[string]any{
@@ -51,7 +50,7 @@ Examples:
 			payload["warnings"] = meta.Errors
 		}
 
-		_ = output.Emit(payload, func(w io.Writer) {
+		return output.Emit(payload, func(w io.Writer) {
 			fmt.Fprintf(w, "File: %s\n", meta.FileName)
 			fmt.Fprintf(w, "Type: %s\n", meta.FileType)
 			fmt.Fprintf(w, "Size: %d bytes\n", meta.FileSize)
@@ -92,6 +91,7 @@ Examples:
 				}
 			}
 		})
+
 	},
 }
 
@@ -108,7 +108,7 @@ Examples:
   raxuiscli metadata strip photo.jpg --out photo_clean.jpg
   raxuiscli metadata strip document.pdf --out document_clean.pdf`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputPath := args[0]
 
 		if metadataStripOutputPath == "" {
@@ -122,20 +122,20 @@ Examples:
 			metadataStripOutputPath = base + "_stripped" + ext
 		}
 
-		fmt.Printf("Stripping metadata from: %s\n", inputPath)
-		fmt.Printf("Output: %s\n", metadataStripOutputPath)
+		fmt.Fprintf(output.Std, "Stripping metadata from: %s\n", inputPath)
+		fmt.Fprintf(output.Std, "Output: %s\n", metadataStripOutputPath)
 
 		err := metadata.Strip(inputPath, metadataStripOutputPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		fmt.Println()
-		fmt.Println("Note: Basic metadata stripping applied.")
-		fmt.Println("For complete metadata removal, consider using specialized tools like exiftool or mat2.")
-		fmt.Println()
-		fmt.Printf("Stripped file saved to: %s\n", metadataStripOutputPath)
+		fmt.Fprintln(output.Std)
+		fmt.Fprintln(output.Std, "Note: Basic metadata stripping applied.")
+		fmt.Fprintln(output.Std, "For complete metadata removal, consider using specialized tools like exiftool or mat2.")
+		fmt.Fprintln(output.Std)
+		fmt.Fprintf(output.Std, "Stripped file saved to: %s\n", metadataStripOutputPath)
+		return nil
 	},
 }
 

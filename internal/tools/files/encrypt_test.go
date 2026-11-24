@@ -10,6 +10,17 @@ import (
 	"testing"
 )
 
+func TestEncryptRejectsUnsupportedArmor(t *testing.T) {
+	dir := t.TempDir()
+	input := writeFile(t, dir, "plain.txt", "secret")
+	if err := Encrypt(input, EncryptOptions{Algorithm: "aes256", Password: "test", Armor: true}); err == nil {
+		t.Fatal("unsupported armor must be rejected")
+	}
+	if _, err := os.Stat(input + ".enc"); !os.IsNotExist(err) {
+		t.Fatalf("unexpected encrypted output: %v", err)
+	}
+}
+
 func TestEncryptDecryptAES256RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	inputPath := writeFile(t, dir, "plain.txt", "top secret content")

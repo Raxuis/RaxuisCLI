@@ -1,10 +1,15 @@
 package k8s
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -89,100 +94,148 @@ func DetectK8s() *K8sInfo {
 		if port == "" {
 			port = "443"
 		}
-		info.APIServer = fmt.Sprintf("https://%s:%s", host, port)
+		info.APIServer = "https://" + net.JoinHostPort(strings.Trim(host, "[]"), port)
 	}
 
 	return info
 }
 
-// CheckAPIAccess checks what API access is available
-func CheckAPIAccess(info *K8sInfo) []RBACInfo {
-	var rbac []RBACInfo
-
-	if !info.InCluster || info.Token == "" {
-		return rbac
+// newAPIClient keeps all Kubernetes probes on the same certificate trust policy.
+func newAPIClient(info *K8sInfo, timeout time.Duration) (*http.Client, error) {
+	if info == nil {
+		return nil, fmt.Errorf("kubernetes cluster information is required")
 	}
-
-	// Try common API endpoints
-	endpoints := []struct {
-		path     string
-		resource string
-	}{
-		{"/api/v1/namespaces", "namespaces"},
-		{"/api/v1/pods", "pods"},
-		{"/api/v1/secrets", "secrets"},
-		{"/api/v1/configmaps", "configmaps"},
-		{"/api/v1/services", "services"},
-		{"/api/v1/nodes", "nodes"},
-		{"/apis/rbac.authorization.k8s.io/v1/clusterroles", "clusterroles"},
-		{"/api/v1/namespaces/" + info.Namespace + "/pods", "pods (namespace)"},
-		{"/api/v1/namespaces/" + info.Namespace + "/secrets", "secrets (namespace)"},
+	apiURL, err := url.Parse(info.APIServer)
+	if err != nil || apiURL.Host == "" || (apiURL.Scheme != "http" && apiURL.Scheme != "https") {
+		return nil, fmt.Errorf("invalid Kubernetes API server address %q", info.APIServer)
 	}
-
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: nil, // Skip TLS verification for testing
-		},
-	}
-
-	for _, ep := range endpoints {
-		url := info.APIServer + ep.path
-
-		req, err := http.NewRequest("GET", url, nil)
+	transport := &http.Transport{}
+	if info.CACert != "" {
+		pem, err := os.ReadFile(info.CACert)
 		if err != nil {
+			return nil, fmt.Errorf("reading Kubernetes CA certificate: %w", err)
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("invalid Kubernetes CA certificate")
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
+	}
+	client := &http.Client{Timeout: timeout, Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return client, nil
+}
+
+func readAPIResponse(body io.Reader) ([]byte, error) {
+	const maxResponseSize = 16 << 20
+	data, err := io.ReadAll(io.LimitReader(body, maxResponseSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxResponseSize {
+		return nil, fmt.Errorf("kubernetes API response exceeds %d bytes", maxResponseSize)
+	}
+	return data, nil
+}
+
+// CheckAPIAccess preserves the original allowed-resource view. Call
+// CheckAPIAccessWithError when execution failures must be distinguished from denial.
+func CheckAPIAccess(info *K8sInfo) []RBACInfo {
+	rbac, _ := CheckAPIAccessWithError(info)
+	return rbac
+}
+
+// CheckAPIAccessWithError lists allowed resources and reports incomplete probes.
+// HTTP 403 is an expected permission denial; authentication, transport and
+// malformed API responses are operational errors, including partial failures.
+func CheckAPIAccessWithError(info *K8sInfo) ([]RBACInfo, error) {
+	var rbac []RBACInfo
+	if info == nil || !info.InCluster || strings.TrimSpace(info.Token) == "" {
+		return rbac, fmt.Errorf("not in cluster or no token")
+	}
+	client, err := newAPIClient(info, 5*time.Second)
+	if err != nil {
+		return rbac, err
+	}
+	defer client.CloseIdleConnections()
+	endpoints := []struct{ path, resource string }{
+		{"/api/v1/namespaces", "namespaces"}, {"/api/v1/pods", "pods"},
+		{"/api/v1/secrets", "secrets"}, {"/api/v1/configmaps", "configmaps"},
+		{"/api/v1/services", "services"}, {"/api/v1/nodes", "nodes"},
+		{"/apis/rbac.authorization.k8s.io/v1/clusterroles", "clusterroles"},
+		{"/api/v1/namespaces/" + url.PathEscape(strings.TrimSpace(info.Namespace)) + "/pods", "pods (namespace)"},
+		{"/api/v1/namespaces/" + url.PathEscape(strings.TrimSpace(info.Namespace)) + "/secrets", "secrets (namespace)"},
+	}
+	var failures []error
+	for _, ep := range endpoints {
+		req, err := http.NewRequest(http.MethodGet, strings.TrimRight(info.APIServer, "/")+ep.path, nil)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", ep.resource, err))
 			continue
 		}
-
-		req.Header.Set("Authorization", "Bearer "+info.Token)
-
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(info.Token))
 		resp, err := client.Do(req)
 		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", ep.resource, err))
 			continue
 		}
+		if resp.StatusCode == http.StatusForbidden {
+			resp.Body.Close()
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			failures = append(failures, fmt.Errorf("%s: Kubernetes API returned HTTP %d", ep.resource, resp.StatusCode))
+			continue
+		}
+		// A login page or a proxy's successful response is not a Kubernetes list.
+		body, readErr := readAPIResponse(resp.Body)
 		resp.Body.Close()
-
-		rbacInfo := RBACInfo{
-			Resources: []string{ep.resource},
-			Verbs:     []string{"get", "list"},
-			Allowed:   resp.StatusCode == 200,
+		if readErr != nil {
+			failures = append(failures, fmt.Errorf("%s: reading API response: %w", ep.resource, readErr))
+			continue
 		}
-
-		if resp.StatusCode == 200 {
-			rbac = append(rbac, rbacInfo)
+		var list struct {
+			Items []json.RawMessage `json:"items"`
 		}
+		decodeErr := json.Unmarshal(body, &list)
+		if decodeErr != nil || list.Items == nil {
+			failures = append(failures, fmt.Errorf("%s: malformed Kubernetes list response", ep.resource))
+			continue
+		}
+		rbac = append(rbac, RBACInfo{Resources: []string{ep.resource}, Verbs: []string{"get", "list"}, Allowed: true})
 	}
-
-	return rbac
+	return rbac, errors.Join(failures...)
 }
 
 // ListSecrets lists accessible secrets
 func ListSecrets(info *K8sInfo, namespace string) ([]SecretEntry, error) {
 	var secrets []SecretEntry
 
-	if !info.InCluster || info.Token == "" {
+	if info == nil || !info.InCluster || strings.TrimSpace(info.Token) == "" {
 		return secrets, fmt.Errorf("not in cluster or no token")
 	}
 
 	if namespace == "" {
-		namespace = info.Namespace
+		namespace = strings.TrimSpace(info.Namespace)
 	}
 
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets", info.APIServer, namespace)
 
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: nil,
-		},
+	client, err := newAPIClient(info, 10*time.Second)
+	if err != nil {
+		return secrets, err
 	}
+	defer client.CloseIdleConnections()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return secrets, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+info.Token)
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(info.Token))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -194,7 +247,7 @@ func ListSecrets(info *K8sInfo, namespace string) ([]SecretEntry, error) {
 		return secrets, fmt.Errorf("access denied: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readAPIResponse(resp.Body)
 	if err != nil {
 		return secrets, err
 	}
@@ -233,25 +286,38 @@ func ListSecrets(info *K8sInfo, namespace string) ([]SecretEntry, error) {
 
 // CheckPrivilegeEscalation checks for privilege escalation paths
 func CheckPrivilegeEscalation(info *K8sInfo) []K8sVulnerability {
+	vulns, _ := CheckPrivilegeEscalationWithError(info)
+	return vulns
+}
+
+// CheckPrivilegeEscalationWithError reports incomplete API checks along with findings.
+func CheckPrivilegeEscalationWithError(info *K8sInfo) ([]K8sVulnerability, error) {
 	var vulns []K8sVulnerability
+	if info == nil {
+		return vulns, fmt.Errorf("kubernetes cluster information is required")
+	}
+	var failures []error
 
 	// Check for anonymous auth
-	client := &http.Client{Timeout: 5 * time.Second}
-	if resp, err := client.Get(info.APIServer + "/api/v1"); err == nil {
-		resp.Body.Close()
-		if resp.StatusCode == 200 {
-			vulns = append(vulns, K8sVulnerability{
-				Name:        "Anonymous Authentication",
-				Description: "Kubernetes API allows anonymous access",
-				Severity:    "HIGH",
-				Exploitable: true,
-				Details:     "Can access API without authentication",
-			})
-		}
+	client, err := newAPIClient(info, 5*time.Second)
+	if err != nil {
+		return vulns, err
+	}
+	defer client.CloseIdleConnections()
+	accessible, probeErr := anonymousAPIAccess(client, info.APIServer)
+	if probeErr != nil {
+		failures = append(failures, fmt.Errorf("checking anonymous API access: %w", probeErr))
+	} else if accessible {
+		vulns = append(vulns, K8sVulnerability{
+			Name: "Anonymous Authentication", Description: "Kubernetes API allows anonymous access", Severity: "HIGH", Exploitable: true, Details: "Can access API without authentication",
+		})
 	}
 
 	// Check for overly permissive service account
-	rbac := CheckAPIAccess(info)
+	rbac, accessErr := CheckAPIAccessWithError(info)
+	if accessErr != nil {
+		failures = append(failures, accessErr)
+	}
 	for _, r := range rbac {
 		if contains(r.Resources, "secrets") && r.Allowed {
 			vulns = append(vulns, K8sVulnerability{
@@ -287,7 +353,7 @@ func CheckPrivilegeEscalation(info *K8sInfo) []K8sVulnerability {
 		}
 	}
 
-	return vulns
+	return vulns, errors.Join(failures...)
 }
 
 func contains(slice []string, item string) bool {
@@ -422,4 +488,31 @@ func DisplayRBAC(rbac []RBACInfo) {
 	}
 
 	fmt.Fprintln(stdoutW)
+}
+
+func anonymousAPIAccess(client *http.Client, server string) (bool, error) {
+	response, err := client.Get(strings.TrimRight(server, "/") + "/api/v1")
+	if err != nil {
+		return false, err
+	}
+	defer response.Body.Close()
+	switch response.StatusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	case http.StatusOK:
+		body, err := readAPIResponse(response.Body)
+		if err != nil {
+			return false, err
+		}
+		var discovery struct {
+			Kind      string            `json:"kind"`
+			Resources []json.RawMessage `json:"resources"`
+		}
+		if err := json.Unmarshal(body, &discovery); err != nil || discovery.Kind != "APIResourceList" || discovery.Resources == nil {
+			return false, fmt.Errorf("malformed Kubernetes discovery response")
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("kubernetes discovery returned HTTP %d", response.StatusCode)
+	}
 }

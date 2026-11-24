@@ -3,7 +3,7 @@ package network
 import (
 	"fmt"
 	"io"
-	"os"
+
 	"time"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
@@ -57,34 +57,40 @@ Examples:
   raxuiscli scan 192.168.1.10 --full --no-discovery  # all 65535 ports
   raxuiscli --output=json scan 10.0.0.0/24 > surface.json`,
 	Args: cobra.ExactArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(command *cobra.Command, args []string) error {
+		if scanConcurrency <= 0 {
+			return fmt.Errorf("concurrency must be positive")
+		}
+		if scanTimeout < 0 {
+			return fmt.Errorf("timeout must be nonnegative")
+		}
 		targets, err := scan.ParseTargets(args[0])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		ports, err := resolveScanPorts()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		var jitter time.Duration
 		if scanJitter != "" {
 			jitter, err = time.ParseDuration(scanJitter)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: invalid --jitter %q: %v\n", scanJitter, err)
-				os.Exit(1)
+				return fmt.Errorf("invalid --jitter %q: %v", scanJitter, err)
 			}
 		}
 
+		if jitter < 0 {
+			return fmt.Errorf("jitter must be nonnegative")
+		}
 		if !output.JSON() {
-			fmt.Printf("Scanning %d target(s) across %d ports (concurrency %d)...\n",
+			fmt.Fprintf(output.Std, "Scanning %d target(s) across %d ports (concurrency %d)...\n",
 				len(targets), len(ports), scanConcurrency)
 		}
 
-		result := scan.Run(scan.Options{
+		result, err := scan.RunContext(command.Context(), scan.Options{
 			Targets:       targets,
 			Ports:         ports,
 			Concurrency:   scanConcurrency,
@@ -94,6 +100,9 @@ Examples:
 			Banner:        !scanNoBanner,
 		})
 
+		if err != nil {
+			return err
+		}
 		hosts := make([]hostOut, 0, len(result.Hosts))
 		for _, h := range result.Hosts {
 			ports := make([]openPortOut, 0, len(h.OpenPorts))
@@ -112,7 +121,7 @@ Examples:
 			"duration_ms": result.Duration.Milliseconds(),
 			"hosts":       hosts,
 		}
-		_ = output.Emit(payload, func(w io.Writer) { renderScan(w, result) })
+		return output.Emit(payload, func(w io.Writer) { renderScan(w, result) })
 	},
 }
 

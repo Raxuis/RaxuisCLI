@@ -2,13 +2,17 @@ package recon
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Raxuis/RaxuisCLI/internal/shared/netutil"
 )
 
 // ServiceResult holds the result of service reconnaissance
@@ -190,12 +194,31 @@ var ServiceSignatures = []struct {
 
 // BannerGrab performs banner grabbing on a single target
 func BannerGrab(host string, port int, timeout int, useTLS bool) ServiceResult {
+	return BannerGrabContext(context.Background(), host, port, timeout, useTLS)
+}
+
+// BannerGrabContext performs a probe bounded by the timeout and caller cancellation.
+func BannerGrabContext(ctx context.Context, host string, port int, timeout int, useTLS bool) ServiceResult {
 	result := ServiceResult{
 		Host:     host,
 		Port:     port,
 		Protocol: "tcp",
 	}
 
+	normalized, normalizeErr := netutil.NormalizeHost(host)
+	if normalizeErr != nil {
+		result.Error = normalizeErr
+		return result
+	}
+	if !netutil.ValidPort(port) {
+		result.Error = fmt.Errorf("invalid port: %d", port)
+		return result
+	}
+	host = normalized
+	result.Host = host
+	callerCtx := ctx
+	ctx, cancel := context.WithTimeout(ctx, netutil.Timeout(timeout))
+	defer cancel()
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	start := time.Now()
 
@@ -209,12 +232,7 @@ func BannerGrab(host string, port int, timeout int, useTLS bool) ServiceResult {
 			MinVersion:         tls.VersionTLS10,
 		}
 
-		conn, err = tls.DialWithDialer(
-			&net.Dialer{Timeout: time.Duration(timeout) * time.Second},
-			"tcp",
-			address,
-			tlsConfig,
-		)
+		conn, err = (&tls.Dialer{NetDialer: &net.Dialer{Timeout: netutil.Timeout(timeout)}, Config: tlsConfig}).DialContext(ctx, "tcp", address)
 
 		if err == nil {
 			result.TLS = true
@@ -226,24 +244,36 @@ func BannerGrab(host string, port int, timeout int, useTLS bool) ServiceResult {
 	}
 
 	// If TLS failed or wasn't attempted, try plain connection
-	if conn == nil {
-		conn, err = net.DialTimeout("tcp", address, time.Duration(timeout)*time.Second)
+	if conn == nil && ctx.Err() == nil {
+		conn, err = netutil.Dial(ctx, "tcp", address, netutil.Timeout(timeout))
 	}
 
-	if err != nil {
+	if err != nil || conn == nil {
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		result.Error = err
 		return result
 	}
 	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
 
 	result.ResponseTime = time.Since(start)
 
 	// Set read deadline
-	_ = conn.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
+	deadline, _ := ctx.Deadline()
+	_ = conn.SetDeadline(deadline)
 
 	// Try to get banner based on port type
 	banner := grabBanner(conn, port)
 	result.Banner = banner
+	if callerCtx.Err() != nil {
+		result.Error = callerCtx.Err()
+	} else if deadline, ok := callerCtx.Deadline(); ok && !time.Now().Before(deadline) {
+		// Socket deadlines can fire just before the context timer publishes its error.
+		result.Error = context.DeadlineExceeded
+	}
 
 	// Identify service
 	service, version := identifyService(banner, port)
@@ -264,9 +294,6 @@ func grabBanner(conn net.Conn, port int) string {
 	// Read response
 	buf := make([]byte, 4096)
 	var response strings.Builder
-
-	// Read with timeout
-	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 
 	for {
 		n, err := conn.Read(buf)
@@ -353,31 +380,20 @@ func identifyService(banner string, port int) (service string, version string) {
 
 // ReconMultiple performs reconnaissance on multiple ports
 func ReconMultiple(opts ReconOptions) []ServiceResult {
+	return ReconMultipleContext(context.Background(), opts)
+}
+
+// ReconMultipleContext returns one result per unique port in ascending order.
+func ReconMultipleContext(ctx context.Context, opts ReconOptions) []ServiceResult {
 	var results []ServiceResult
-	var wg sync.WaitGroup
 	var mu sync.Mutex
-
-	// Limit concurrent connections
-	semaphore := make(chan struct{}, 10)
-
-	for _, port := range opts.Ports {
-		wg.Add(1)
-		semaphore <- struct{}{}
-
-		go func(p int) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			result := BannerGrab(opts.Host, p, opts.Timeout, opts.TLS)
-
-			mu.Lock()
-			results = append(results, result)
-			mu.Unlock()
-		}(port)
-	}
-
-	wg.Wait()
-
+	netutil.ForEach(ctx, netutil.UniquePorts(opts.Ports), 10, func(port int) {
+		result := BannerGrabContext(ctx, opts.Host, port, opts.Timeout, opts.TLS)
+		mu.Lock()
+		results = append(results, result)
+		mu.Unlock()
+	})
+	sort.Slice(results, func(i, j int) bool { return results[i].Port < results[j].Port })
 	return results
 }
 
@@ -506,55 +522,7 @@ func sanitizeBanner(s string) string {
 
 // ParsePorts parses port specification string
 func ParsePorts(portSpec string) ([]int, error) {
-	var ports []int
-	seen := make(map[int]bool)
-
-	parts := strings.Split(portSpec, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-
-		if strings.Contains(part, "-") {
-			// Range
-			rangeParts := strings.Split(part, "-")
-			if len(rangeParts) != 2 {
-				return nil, fmt.Errorf("invalid port range: %s", part)
-			}
-
-			var start, end int
-			_, err := fmt.Sscanf(rangeParts[0], "%d", &start)
-			if err != nil {
-				return nil, fmt.Errorf("invalid port: %s", rangeParts[0])
-			}
-			_, err = fmt.Sscanf(rangeParts[1], "%d", &end)
-			if err != nil {
-				return nil, fmt.Errorf("invalid port: %s", rangeParts[1])
-			}
-
-			if start > end {
-				start, end = end, start
-			}
-
-			for p := start; p <= end; p++ {
-				if !seen[p] && p > 0 && p <= 65535 {
-					ports = append(ports, p)
-					seen[p] = true
-				}
-			}
-		} else {
-			// Single port
-			var p int
-			_, err := fmt.Sscanf(part, "%d", &p)
-			if err != nil {
-				return nil, fmt.Errorf("invalid port: %s", part)
-			}
-			if !seen[p] && p > 0 && p <= 65535 {
-				ports = append(ports, p)
-				seen[p] = true
-			}
-		}
-	}
-
-	return ports, nil
+	return netutil.ParsePorts(portSpec)
 }
 
 // GetCommonPorts returns a list of commonly used ports

@@ -3,12 +3,13 @@ package network
 import (
 	"fmt"
 	"io"
-	"os"
+	"net"
 	"strconv"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/network/recon"
+	"github.com/Raxuis/RaxuisCLI/internal/shared/netutil"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 
 	"github.com/spf13/cobra"
@@ -61,11 +62,17 @@ Examples:
   raxuiscli recon example.com --ports 1-1024 # Port range
   raxuiscli recon example.com --ports common # Common ports`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if reconTimeout < 0 {
+			return fmt.Errorf("timeout must be nonnegative")
+		}
 		target := args[0]
 
 		// Parse target (host:port or just host)
-		host, port := parseTarget(target)
+		host, port, parseErr := parseReconTarget(target)
+		if parseErr != nil {
+			return parseErr
+		}
 
 		var ports []int
 		var err error
@@ -80,8 +87,7 @@ Examples:
 			} else {
 				ports, err = recon.ParsePorts(reconPorts)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error parsing ports: %v\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error parsing ports: %v", err)
 				}
 			}
 		} else {
@@ -91,14 +97,17 @@ Examples:
 
 		if len(ports) == 1 {
 			// Single port - detailed view
-			result := recon.BannerGrab(host, ports[0], reconTimeout, reconTLS)
-			_ = output.Emit(serviceView(result), func(_ io.Writer) {
+			result := recon.BannerGrabContext(cmd.Context(), host, ports[0], reconTimeout, reconTLS)
+			if result.Error != nil {
+				return result.Error
+			}
+			return output.Emit(serviceView(result), func(_ io.Writer) {
 				recon.DisplayResult(result)
 			})
 		} else {
 			// Multiple ports - summary view
 			if !output.JSON() {
-				fmt.Printf("Scanning %s with %d ports...\n", host, len(ports))
+				fmt.Fprintf(output.Std, "Scanning %s with %d ports...\n", host, len(ports))
 			}
 			opts := recon.ReconOptions{
 				Host:    host,
@@ -106,31 +115,46 @@ Examples:
 				Timeout: reconTimeout,
 				TLS:     reconTLS,
 			}
-			results := recon.ReconMultiple(opts)
+			results := recon.ReconMultipleContext(cmd.Context(), opts)
+			if err := cmd.Context().Err(); err != nil {
+				return err
+			}
+			failures := 0
 			views := make([]serviceOut, 0, len(results))
 			for _, r := range results {
+				if r.Error != nil {
+					failures++
+				}
 				views = append(views, serviceView(r))
 			}
-			_ = output.Emit(map[string]any{"host": host, "results": views}, func(_ io.Writer) {
-				recon.DisplayResults(results)
-			})
+			if err := output.Emit(map[string]any{"host": host, "results": views}, func(_ io.Writer) { recon.DisplayResults(results) }); err != nil {
+				return err
+			}
+			if failures == len(results) {
+				return fmt.Errorf("reconnaissance failed for all %d ports", failures)
+			}
+			return nil
 		}
 	},
 }
 
-// parseTarget extracts host and optional port from target string
-func parseTarget(target string) (string, int) {
-	// Check for host:port format
-	if strings.Contains(target, ":") {
-		parts := strings.SplitN(target, ":", 2)
-		if len(parts) == 2 {
-			port, err := strconv.Atoi(parts[1])
-			if err == nil && port > 0 && port <= 65535 {
-				return parts[0], port
-			}
+// parseReconTarget accepts a hostname or IP with an optional explicit port.
+func parseReconTarget(target string) (string, int, error) {
+	target = strings.TrimSpace(target)
+	if strings.Contains(target, ":") && net.ParseIP(target) == nil {
+		host, portText, err := net.SplitHostPort(target)
+		if err != nil {
+			return "", 0, fmt.Errorf("invalid target %q: %w", target, err)
 		}
+		port, err := strconv.Atoi(portText)
+		if err != nil || !netutil.ValidPort(port) {
+			return "", 0, fmt.Errorf("invalid target port %q", portText)
+		}
+		host, err = netutil.NormalizeHost(host)
+		return host, port, err
 	}
-	return target, 0
+	host, err := netutil.NormalizeHost(target)
+	return host, 0, err
 }
 
 func init() {

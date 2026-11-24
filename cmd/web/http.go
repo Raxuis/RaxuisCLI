@@ -199,14 +199,14 @@ Examples:
 			"missing":          analysis.Missing,
 			"technologies":     techs,
 		}
-		_ = output.Emit(payload, func(_ io.Writer) {
+		return output.Emit(payload, func(_ io.Writer) {
 			if verbose {
 				httplib.DisplayResponse(resp, false, 0)
 			}
 			httplib.DisplayHeaderAnalysis(analysis)
 			httplib.DisplayTechnologies(techs)
 		})
-		return nil
+
 	},
 }
 
@@ -249,22 +249,22 @@ Examples:
 			"status_code":    resp.StatusCode,
 			"duration_ms":    resp.Duration.Milliseconds(),
 		}
-		_ = output.Emit(payload, func(_ io.Writer) {
-			fmt.Println("\n[REDIRECT TRACE]")
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Printf("\nOriginal URL: %s\n", url)
+		return output.Emit(payload, func(_ io.Writer) {
+			fmt.Fprintln(output.Std, "\n[REDIRECT TRACE]")
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintf(output.Std, "\nOriginal URL: %s\n", url)
 			if len(resp.RedirectChain) > 0 {
-				fmt.Println("\nRedirect Chain:")
+				fmt.Fprintln(output.Std, "\nRedirect Chain:")
 				for i, redirectURL := range resp.RedirectChain {
-					fmt.Printf("  %d. %s\n", i+1, redirectURL)
+					fmt.Fprintf(output.Std, "  %d. %s\n", i+1, redirectURL)
 				}
 			} else {
-				fmt.Println("\nNo redirects")
+				fmt.Fprintln(output.Std, "\nNo redirects")
 			}
-			fmt.Printf("\nFinal Status: %s\n", resp.Status)
-			fmt.Printf("Duration: %v\n", resp.Duration)
+			fmt.Fprintf(output.Std, "\nFinal Status: %s\n", resp.Status)
+			fmt.Fprintf(output.Std, "Duration: %v\n", resp.Duration)
 		})
-		return nil
+
 	},
 }
 
@@ -313,9 +313,9 @@ Examples:
 
 		curlCmd := httplib.GenerateCurl(opts)
 
-		fmt.Println("\n[CURL COMMAND]")
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Println(curlCmd)
+		fmt.Fprintln(output.Std, "\n[CURL COMMAND]")
+		fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+		fmt.Fprintln(output.Std, curlCmd)
 		return nil
 	},
 }
@@ -378,7 +378,7 @@ func runHTTPRequest(cmd *cobra.Command, args []string, method string) error {
 	return output.Emit(responseView(resp), func(_ io.Writer) {
 		httplib.DisplayResponse(resp, showBody, maxBody)
 		if showCurl {
-			fmt.Printf("\n[Curl Equivalent]\n%s\n", httplib.GenerateCurl(opts))
+			fmt.Fprintf(output.Std, "\n[Curl Equivalent]\n%s\n", httplib.GenerateCurl(opts))
 		}
 	})
 }
@@ -431,7 +431,6 @@ func init() {
 	httpCmd.AddCommand(httpHeadersCmd)
 	httpHeadersCmd.Flags().IntP("timeout", "t", 10, "Request timeout in seconds")
 	httpHeadersCmd.Flags().BoolP("insecure", "k", false, "Skip TLS verification")
-	httpHeadersCmd.Flags().BoolP("verbose", "v", false, "Show full response")
 
 	// Trace command
 	httpCmd.AddCommand(httpTraceCmd)

@@ -3,7 +3,7 @@ package tools
 import (
 	"fmt"
 	"io"
-	"os"
+
 	"sort"
 	"strings"
 
@@ -38,7 +38,7 @@ Examples:
   raxuiscli encode "secret" --format rotn --shift 5
   raxuiscli encode "Hello World"  # Shows all encodings`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		input := strings.Join(args, " ")
 
 		// If no format specified, show all encodings
@@ -48,14 +48,14 @@ Examples:
 				"input":     input,
 				"encodings": results,
 			}
-			_ = output.Emit(payload, func(w io.Writer) {
+			return output.Emit(payload, func(w io.Writer) {
 				fmt.Fprintln(w, "Encoded results:")
 				fmt.Fprintln(w, strings.Repeat("-", 50))
 				for _, format := range sortedKeys(results) {
 					fmt.Fprintf(w, "%-10s: %s\n", format, results[format])
 				}
 			})
-			return
+
 		}
 
 		opts := encode.Options{
@@ -65,8 +65,7 @@ Examples:
 
 		result, err := encode.Encode(input, opts)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		payload := map[string]any{
@@ -74,9 +73,10 @@ Examples:
 			"format": encodeFormat,
 			"result": result,
 		}
-		_ = output.Emit(payload, func(w io.Writer) {
+		return output.Emit(payload, func(w io.Writer) {
 			fmt.Fprintln(w, result)
 		})
+
 	},
 }
 
@@ -99,12 +99,11 @@ Examples:
   raxuiscli encode decode "48656c6c6f" --format hex
   raxuiscli encode decode "frperg" --format rot13`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		input := strings.Join(args, " ")
 
 		if encodeFormat == "" {
-			fmt.Fprintf(os.Stderr, "Error: --format is required for decoding\n")
-			os.Exit(1)
+			return fmt.Errorf("--format is required for decoding")
 		}
 
 		opts := encode.Options{
@@ -114,8 +113,7 @@ Examples:
 
 		result, err := encode.Decode(input, opts)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		payload := map[string]any{
@@ -123,9 +121,10 @@ Examples:
 			"format": encodeFormat,
 			"result": result,
 		}
-		_ = output.Emit(payload, func(w io.Writer) {
+		return output.Emit(payload, func(w io.Writer) {
 			fmt.Fprintln(w, result)
 		})
+
 	},
 }
 
@@ -138,7 +137,7 @@ Useful for decoding unknown Caesar cipher shifts.
 Example:
   raxuiscli encode rot-brute "frperg"`,
 	Args: cobra.MinimumNArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		input := strings.Join(args, " ")
 		results := encode.BruteForceROT(input)
 
@@ -155,13 +154,14 @@ Example:
 			"input":   input,
 			"results": entries,
 		}
-		_ = output.Emit(payload, func(w io.Writer) {
+		return output.Emit(payload, func(w io.Writer) {
 			fmt.Fprintln(w, "ROT-N Brute Force Results:")
 			fmt.Fprintln(w, strings.Repeat("-", 50))
 			for _, e := range entries {
 				fmt.Fprintf(w, "ROT%-2d: %s\n", e.Shift, e.Text)
 			}
 		})
+
 	},
 }
 

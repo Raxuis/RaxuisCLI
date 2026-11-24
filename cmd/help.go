@@ -66,5 +66,5 @@ func catalogMeta(command *cobra.Command) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("Maturity: %s   Safety: %s", entry.Maturity, entry.Safety)
+	return fmt.Sprintf("Maturity: %s   Safety: %s\n%s", entry.Maturity, entry.Safety, capabilityDescription(entry.Capabilities))
 }

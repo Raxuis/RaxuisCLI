@@ -123,6 +123,23 @@ import (
 
 ---
 
+## Command execution contract
+
+Use `RunE`, return operational errors, and write through `output.Std` or the
+command writer. Do not call `os.Exit` in handlers. Declare complete JSON support
+in `internal/shared/catalog/capabilities.go`; all branches must emit structured
+JSON without progress text. The root publishes generic output files atomically,
+checks unsupported options before the action and detects ignored writer errors.
+Audit/report commands retain their native versioned renderers and exit policy.
+Global flags must not be shadowed by local flags: checksums use
+`--manifest-output`, credential conversion uses `--out`, and the spray lockout
+override uses `--override-lockout-guard`. Update the catalog and regenerate docs
+when adding commands or changing their supported capabilities.
+
+`doctor` reports local runtime and optional tools without executing them.
+`./scripts/lab/run.sh` runs loopback fixtures; a passing fixture is not a claim
+of real AD, SMB, Kubernetes or cloud compatibility.
+
 ## Commands Reference
 
 ### Consolidated Audit
@@ -145,10 +162,10 @@ raxuiscli --output=html --output-file report.html audit all https://example.com
 Encryption, decryption, shredding, compression, and checksum operations.
 
 ```bash
-raxuiscli files encrypt <file> --key <key>       # Encrypt file
-raxuiscli files decrypt <file> --key <key>       # Decrypt file
+raxuiscli files encrypt <file> --password <passphrase>       # Encrypt file
+raxuiscli files decrypt <file> --password <passphrase>       # Decrypt file
 raxuiscli files shred <file>                      # Secure delete
-raxuiscli files compress <file>                   # Compress file
+raxuiscli files compress <file> --out archive.zip          # Compress file
 raxuiscli files extract <archive>                 # Extract archive
 raxuiscli files checksum <file>                   # Calculate checksums
 ```
@@ -163,11 +180,11 @@ raxuiscli pwgen --no-symbols                      # Alphanumeric only
 ```
 
 #### `ports` - Port Information
-Display common ports and their services.
+Scan TCP/UDP ports and display their status and services.
 
 ```bash
-raxuiscli ports                                   # List common ports
-raxuiscli ports --port 443                        # Info on specific port
+raxuiscli ports -H localhost -p common                     # Scan common ports
+raxuiscli ports -H localhost -p 443                        # Scan a specific port
 ```
 
 #### `todo` - Task Management
@@ -176,7 +193,7 @@ Simple TODO list management.
 ```bash
 raxuiscli todo add "Task description"             # Add task
 raxuiscli todo list                               # List tasks
-raxuiscli todo done <id>                          # Mark complete
+raxuiscli todo complete <id>                          # Mark complete
 ```
 
 ---
@@ -187,18 +204,18 @@ raxuiscli todo done <id>                          # Mark complete
 Encode and decode data in various formats.
 
 ```bash
-raxuiscli encode base64 "text"                    # Base64 encode
-raxuiscli encode base64 -d "dGV4dA=="             # Base64 decode
-raxuiscli encode hex "text"                       # Hex encode
-raxuiscli encode url "text with spaces"           # URL encode
+raxuiscli encode "text" --format base64                    # Base64 encode
+raxuiscli encode decode "dGV4dA==" --format base64             # Base64 decode
+raxuiscli encode "text" --format hex                       # Hex encode
+raxuiscli encode "text with spaces" --format url           # URL encode
 ```
 
 #### `hash` - Hash Generation
 Calculate cryptographic hashes.
 
 ```bash
-raxuiscli hash md5 "text"                         # MD5 hash
-raxuiscli hash sha256 "text"                      # SHA256 hash
+raxuiscli hash "text" --algo md5                         # MD5 hash
+raxuiscli hash "text" --algo sha256                      # SHA256 hash
 raxuiscli hash -f <file>                          # Hash file
 ```
 
@@ -220,7 +237,7 @@ Display file contents in hexadecimal format.
 
 ```bash
 raxuiscli hexdump <file>                          # Display hex dump
-raxuiscli hexdump <file> --limit 256              # Limit bytes
+raxuiscli hexdump <file> --length 256              # Limit bytes
 ```
 
 #### `strings` - String Extraction
@@ -228,7 +245,7 @@ Extract printable strings from binary files.
 
 ```bash
 raxuiscli strings <file>                          # Extract strings
-raxuiscli strings <file> --min-length 8           # Minimum length
+raxuiscli strings <file> --min 8           # Minimum length
 ```
 
 #### `entropy` - Entropy Calculation

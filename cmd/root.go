@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/catalog"
 	sharedcommand "github.com/Raxuis/RaxuisCLI/internal/shared/command"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/constants"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
@@ -23,6 +25,7 @@ type Options struct {
 	Force      bool
 	NoColor    bool
 	Quiet      bool
+	Verbose    bool
 	FailOn     constants.Severity
 }
 
@@ -45,12 +48,19 @@ func newRootCommand() *cobra.Command {
 			// redirectable and capturable instead of hard-wired to os.Stdout.
 			output.Set(cmd.OutOrStdout())
 			output.SetFormat(options.Output)
+			if err := validateCapabilities(cmd, options); err != nil {
+				return err
+			}
+			wrapCommandOutput(cmd, options)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			options, err := OptionsFromCommand(cmd)
 			if err != nil {
 				return err
+			}
+			if options.Output == outputJSON {
+				return output.Emit(map[string]any{"commands": catalog.All()}, func(io.Writer) {})
 			}
 			if !options.Quiet && options.Output == outputText {
 				fmt.Fprintln(cmd.OutOrStdout(), "Welcome to RaxuisCLI! Use --help to see available commands.")
@@ -121,12 +131,20 @@ func OptionsFromCommand(cmd *cobra.Command) (Options, error) {
 		return Options{}, sharedcommand.NewOperationalError(err)
 	}
 
+	verbose := false
+	if rootFlags.Lookup("verbose") != nil {
+		verbose, err = rootFlags.GetBool("verbose")
+		if err != nil {
+			return Options{}, err
+		}
+	}
 	return Options{
 		Output:     output,
 		OutputFile: outputFile,
 		Force:      force,
 		NoColor:    noColor,
 		Quiet:      quiet,
+		Verbose:    verbose,
 		FailOn:     severity,
 	}, nil
 }

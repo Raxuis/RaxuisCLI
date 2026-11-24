@@ -1,11 +1,13 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/container/k8s"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +27,9 @@ Examples:
   raxuiscli k8s secrets                      # List accessible secrets
   raxuiscli k8s privesc                      # Check privilege escalation
   raxuiscli k8s commands                     # Show useful kubectl commands`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -34,9 +37,10 @@ var k8sDetectCmd = &cobra.Command{
 	Use:   "detect",
 	Short: "Detect Kubernetes environment",
 	Long:  `Detect if running inside Kubernetes and gather cluster info.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 		k8s.DisplayK8sInfo(info)
+		return nil
 	},
 }
 
@@ -44,17 +48,17 @@ var k8sEnumCmd = &cobra.Command{
 	Use:   "enum",
 	Short: "Enumerate accessible resources",
 	Long:  `Enumerate what Kubernetes resources are accessible with current token.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 		if !info.InCluster {
-			fmt.Println("Not running inside Kubernetes")
-			return
+			return fmt.Errorf("not running inside Kubernetes")
 		}
 
 		k8s.DisplayK8sInfo(info)
 
-		rbac := k8s.CheckAPIAccess(info)
+		rbac, err := k8s.CheckAPIAccessWithError(info)
 		k8s.DisplayRBAC(rbac)
+		return err
 	},
 }
 
@@ -62,20 +66,19 @@ var k8sSecretsCmd = &cobra.Command{
 	Use:   "secrets",
 	Short: "List accessible secrets",
 	Long:  `List Kubernetes secrets accessible with current service account.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 		if !info.InCluster {
-			fmt.Println("Not running inside Kubernetes")
-			return
+			return fmt.Errorf("not running inside Kubernetes")
 		}
 
 		secrets, err := k8s.ListSecrets(info, k8sNamespace)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
+			return err
 		}
 
 		k8s.DisplaySecrets(secrets)
+		return nil
 	},
 }
 
@@ -83,15 +86,15 @@ var k8sPrivescCmd = &cobra.Command{
 	Use:   "privesc",
 	Short: "Check privilege escalation paths",
 	Long:  `Check for privilege escalation vulnerabilities in the cluster.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 		if !info.InCluster {
-			fmt.Println("Not running inside Kubernetes")
-			return
+			return fmt.Errorf("not running inside Kubernetes")
 		}
 
-		vulns := k8s.CheckPrivilegeEscalation(info)
+		vulns, err := k8s.CheckPrivilegeEscalationWithError(info)
 		k8s.DisplayVulnerabilities(vulns)
+		return err
 	},
 }
 
@@ -99,19 +102,20 @@ var k8sCommandsCmd = &cobra.Command{
 	Use:   "commands",
 	Short: "Show useful kubectl commands",
 	Long:  `Display useful kubectl commands for pentesting.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 
 		if info.Namespace == "" {
 			info.Namespace = "default"
 		}
 
-		fmt.Println("\n[USEFUL KUBECTL COMMANDS]")
-		fmt.Println("=========================")
+		fmt.Fprintln(output.Std, "\n[USEFUL KUBECTL COMMANDS]")
+		fmt.Fprintln(output.Std, "=========================")
 
 		for _, line := range k8s.GenerateKubectlCommands(info) {
-			fmt.Println(line)
+			fmt.Fprintln(output.Std, line)
 		}
+		return nil
 	},
 }
 
@@ -119,26 +123,28 @@ var k8sCheckCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Full Kubernetes security check",
 	Long:  `Perform a complete Kubernetes security assessment.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		info := k8s.DetectK8s()
 		k8s.DisplayK8sInfo(info)
 
 		if !info.InCluster {
-			return
+			return nil
 		}
 
 		// Check RBAC
-		rbac := k8s.CheckAPIAccess(info)
+		rbac, accessErr := k8s.CheckAPIAccessWithError(info)
 		k8s.DisplayRBAC(rbac)
 
 		// Check secrets
-		if secrets, err := k8s.ListSecrets(info, ""); err == nil {
+		secrets, secretErr := k8s.ListSecrets(info, "")
+		if secretErr == nil {
 			k8s.DisplaySecrets(secrets)
 		}
 
 		// Check privesc
-		vulns := k8s.CheckPrivilegeEscalation(info)
+		vulns, vulnerabilityErr := k8s.CheckPrivilegeEscalationWithError(info)
 		k8s.DisplayVulnerabilities(vulns)
+		return errors.Join(accessErr, secretErr, vulnerabilityErr)
 	},
 }
 

@@ -287,11 +287,11 @@ func runCertinfoValidate(command *cobra.Command, target string) error {
 
 	return output.Emit(map[string]any{"certificates": views}, func(_ io.Writer) {
 		for i := range chainInfo.Certificates {
-			fmt.Printf("\n[Certificate %d]", i+1)
+			fmt.Fprintf(output.Std, "\n[Certificate %d]", i+1)
 			if i == 0 {
-				fmt.Print(" (End Entity)")
+				fmt.Fprint(output.Std, " (End Entity)")
 			}
-			fmt.Println()
+			fmt.Fprintln(output.Std)
 			certinfo.DisplayValidation(certinfo.ValidateCertificate(&chainInfo.Certificates[i]))
 		}
 	})
@@ -338,28 +338,28 @@ func runCertinfoSAN(command *cobra.Command, target string) error {
 		"ip_addresses":    certificate.IPAddresses,
 		"email_addresses": certificate.EmailAddresses,
 	}, func(_ io.Writer) {
-		fmt.Println("\n[SUBJECT ALTERNATIVE NAMES]")
-		fmt.Println(strings.Repeat("=", 60))
+		fmt.Fprintln(output.Std, "\n[SUBJECT ALTERNATIVE NAMES]")
+		fmt.Fprintln(output.Std, strings.Repeat("=", 60))
 		if len(certificate.DNSNames) > 0 {
-			fmt.Println("\nDNS Names:")
+			fmt.Fprintln(output.Std, "\nDNS Names:")
 			for _, name := range certificate.DNSNames {
-				fmt.Printf("  - %s\n", name)
+				fmt.Fprintf(output.Std, "  - %s\n", name)
 			}
 		}
 		if len(certificate.IPAddresses) > 0 {
-			fmt.Println("\nIP Addresses:")
+			fmt.Fprintln(output.Std, "\nIP Addresses:")
 			for _, ip := range certificate.IPAddresses {
-				fmt.Printf("  - %s\n", ip)
+				fmt.Fprintf(output.Std, "  - %s\n", ip)
 			}
 		}
 		if len(certificate.EmailAddresses) > 0 {
-			fmt.Println("\nEmail Addresses:")
+			fmt.Fprintln(output.Std, "\nEmail Addresses:")
 			for _, email := range certificate.EmailAddresses {
-				fmt.Printf("  - %s\n", email)
+				fmt.Fprintf(output.Std, "  - %s\n", email)
 			}
 		}
 		if len(certificate.DNSNames) == 0 && len(certificate.IPAddresses) == 0 && len(certificate.EmailAddresses) == 0 {
-			fmt.Println("No SANs found in certificate")
+			fmt.Fprintln(output.Std, "No SANs found in certificate")
 		}
 	})
 }

@@ -3,7 +3,6 @@ package crypto
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,8 +12,6 @@ import (
 	"github.com/Raxuis/RaxuisCLI/internal/crypto/tlsscan"
 	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 )
-
-const defaultTLSScanPort = 443
 
 var tlsScanCmd = &cobra.Command{
 	Use:   "tlsscan [host|host:port]",
@@ -34,31 +31,31 @@ Examples:
   raxuiscli tlsscan example.com:8443
   raxuiscli tlsscan example.com --output json`,
 	Args: cobra.ExactArgs(1),
-	Run: func(command *cobra.Command, args []string) {
-		host, port := parseTLSScanTarget(args[0])
+	RunE: func(command *cobra.Command, args []string) error {
+		host, port, err := parseCertinfoTarget(args[0])
+		if err != nil {
+			return err
+		}
 		timeout, _ := command.Flags().GetInt("timeout")
 
 		if !output.JSON() {
-			fmt.Printf("[TLS/SSL SCAN] %s:%d\n", host, port)
-			fmt.Println(strings.Repeat("=", 60))
-			fmt.Println("Scanning...")
+			fmt.Fprintf(output.Std, "[TLS/SSL SCAN] %s:%d\n", host, port)
+			fmt.Fprintln(output.Std, strings.Repeat("=", 60))
+			fmt.Fprintln(output.Std, "Scanning...")
 		}
 
+		if timeout < 0 {
+			return fmt.Errorf("timeout must be nonnegative")
+		}
 		result := tlsscan.Scan(host, port, time.Duration(timeout)*time.Second)
+		if result.Error != "" {
+			return fmt.Errorf("TLS scan failed: %s", result.Error)
+		}
 
-		_ = output.Emit(result, func(w io.Writer) {
+		return output.Emit(result, func(w io.Writer) {
 			displayTLSScan(w, result)
 		})
 	},
-}
-
-func parseTLSScanTarget(target string) (string, int) {
-	if idx := strings.LastIndex(target, ":"); idx != -1 {
-		if p, err := strconv.Atoi(target[idx+1:]); err == nil && p > 0 && p <= 65535 {
-			return target[:idx], p
-		}
-	}
-	return target, defaultTLSScanPort
 }
 
 func displayTLSScan(w io.Writer, result *tlsscan.Result) {

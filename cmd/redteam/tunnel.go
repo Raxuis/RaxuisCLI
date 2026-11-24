@@ -9,6 +9,7 @@ import (
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/redteam/tunnel"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +30,9 @@ Examples:
   raxuiscli tunnel tcp --local :8080 --remote internal:80   # TCP proxy
   raxuiscli tunnel dns --domain c2.evil.com                 # DNS tunnel info
   raxuiscli tunnel encode "secret data" --method base64     # Encode for tunnel`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
+		return nil
 	},
 }
 
@@ -40,30 +42,29 @@ var tunnelTCPCmd = &cobra.Command{
 	Long: `Create a TCP port forward/proxy.
 
 Forwards traffic from a local port to a remote destination.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if tunnelLocal == "" || tunnelRemote == "" {
-			fmt.Fprintln(os.Stderr, "Error: both --local and --remote are required")
-			os.Exit(1)
+			return fmt.Errorf("both --local and --remote are required")
 		}
 
 		proxy := tunnel.NewTCPProxy(tunnelLocal, tunnelRemote)
 
-		fmt.Printf("Starting TCP proxy: %s -> %s\n", tunnelLocal, tunnelRemote)
+		fmt.Fprintf(output.Std, "Starting TCP proxy: %s -> %s\n", tunnelLocal, tunnelRemote)
 
 		if err := proxy.Start(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		fmt.Println("Proxy started. Press Ctrl+C to stop.")
+		fmt.Fprintln(output.Std, "Proxy started. Press Ctrl+C to stop.")
 
 		// Wait for interrupt
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 
-		fmt.Println("\nStopping proxy...")
+		fmt.Fprintln(output.Std, "\nStopping proxy...")
 		_ = proxy.Stop()
+		return nil
 	},
 }
 
@@ -73,32 +74,32 @@ var tunnelDNSCmd = &cobra.Command{
 	Long: `DNS tunneling helpers and encoding.
 
 Provides tools for encoding data for DNS exfiltration.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if tunnelDomain == "" {
-			fmt.Fprintln(os.Stderr, "Error: --domain is required")
-			os.Exit(1)
+			return fmt.Errorf("--domain is required")
 		}
 
-		fmt.Println("\n[DNS TUNNEL CONFIGURATION]")
-		fmt.Println("==========================")
-		fmt.Printf("Domain:      %s\n", tunnelDomain)
-		fmt.Printf("Encoding:    %s\n", tunnelEncoding)
-		fmt.Printf("Chunk Size:  %d\n", tunnelChunkSize)
+		fmt.Fprintln(output.Std, "\n[DNS TUNNEL CONFIGURATION]")
+		fmt.Fprintln(output.Std, "==========================")
+		fmt.Fprintf(output.Std, "Domain:      %s\n", tunnelDomain)
+		fmt.Fprintf(output.Std, "Encoding:    %s\n", tunnelEncoding)
+		fmt.Fprintf(output.Std, "Chunk Size:  %d\n", tunnelChunkSize)
 
-		fmt.Println("\nExample DNS queries for exfiltration:")
-		fmt.Printf("  <seq>.<encoded_data>.%s\n", tunnelDomain)
-		fmt.Printf("  0.SGVsbG8gV29ybGQ.%s\n", tunnelDomain)
+		fmt.Fprintln(output.Std, "\nExample DNS queries for exfiltration:")
+		fmt.Fprintf(output.Std, "  <seq>.<encoded_data>.%s\n", tunnelDomain)
+		fmt.Fprintf(output.Std, "  0.SGVsbG8gV29ybGQ.%s\n", tunnelDomain)
 
-		fmt.Println("\nServer-side capture (example):")
-		fmt.Printf("  tcpdump -i any -n 'udp port 53 and host %s'\n", tunnelDomain)
+		fmt.Fprintln(output.Std, "\nServer-side capture (example):")
+		fmt.Fprintf(output.Std, "  tcpdump -i any -n 'udp port 53 and host %s'\n", tunnelDomain)
 
 		dt := tunnel.NewDNSTunnel(tunnelDomain, tunnelEncoding, tunnelChunkSize)
 		sample := []byte("Hello, World!")
 		chunks := dt.Encode(sample)
 
-		fmt.Println("\nSample encoding:")
-		fmt.Printf("  Input:  %s\n", string(sample))
-		fmt.Printf("  Output: %v\n", chunks)
+		fmt.Fprintln(output.Std, "\nSample encoding:")
+		fmt.Fprintf(output.Std, "  Input:  %s\n", string(sample))
+		fmt.Fprintf(output.Std, "  Output: %v\n", chunks)
+		return nil
 	},
 }
 
@@ -109,27 +110,28 @@ var tunnelEncodeCmd = &cobra.Command{
 	Short: "Encode data for tunneling",
 	Long:  `Encode data for safe transmission through various channels.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		data := []byte(args[0])
 
-		fmt.Println("\n[TUNNEL ENCODING]")
-		fmt.Println("=================")
-		fmt.Printf("Input: %s\n", args[0])
-		fmt.Printf("Length: %d bytes\n\n", len(data))
+		fmt.Fprintln(output.Std, "\n[TUNNEL ENCODING]")
+		fmt.Fprintln(output.Std, "=================")
+		fmt.Fprintf(output.Std, "Input: %s\n", args[0])
+		fmt.Fprintf(output.Std, "Length: %d bytes\n\n", len(data))
 
 		// DNS-safe encoding
 		dnsEncoded := tunnel.EncodeForDNS(data)
-		fmt.Printf("DNS-safe:  %s\n", dnsEncoded)
+		fmt.Fprintf(output.Std, "DNS-safe:  %s\n", dnsEncoded)
 
 		// Chunked for DNS
 		dt := tunnel.NewDNSTunnel("example.com", tunnelEncodeMethod, 60)
 		chunks := dt.Encode(data)
-		fmt.Printf("DNS chunks (%s): %v\n", tunnelEncodeMethod, chunks)
+		fmt.Fprintf(output.Std, "DNS chunks (%s): %v\n", tunnelEncodeMethod, chunks)
 
 		// HTTP encoding
 		ht := tunnel.NewHTTPTunnel("", tunnelEncodeMethod, 0, 0)
 		httpEncoded := ht.Encode(data)
-		fmt.Printf("HTTP (%s): %s\n", tunnelEncodeMethod, httpEncoded)
+		fmt.Fprintf(output.Std, "HTTP (%s): %s\n", tunnelEncodeMethod, httpEncoded)
+		return nil
 	},
 }
 
@@ -138,28 +140,29 @@ var tunnelDecodeCmd = &cobra.Command{
 	Short: "Decode tunneled data",
 	Long:  `Decode data that was encoded for tunneling.`,
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		encoded := args[0]
 
-		fmt.Println("\n[TUNNEL DECODING]")
-		fmt.Println("=================")
-		fmt.Printf("Input: %s\n\n", encoded)
+		fmt.Fprintln(output.Std, "\n[TUNNEL DECODING]")
+		fmt.Fprintln(output.Std, "=================")
+		fmt.Fprintf(output.Std, "Input: %s\n\n", encoded)
 
 		// Try DNS decoding
 		if decoded, err := tunnel.DecodeFromDNS(encoded); err == nil {
-			fmt.Printf("DNS-decoded: %s\n", string(decoded))
+			fmt.Fprintf(output.Std, "DNS-decoded: %s\n", string(decoded))
 		}
 
 		// Try various decodings with HTTP tunnel
 		ht := tunnel.NewHTTPTunnel("", "base64", 0, 0)
 		if decoded, err := ht.Decode(encoded); err == nil {
-			fmt.Printf("Base64: %s\n", string(decoded))
+			fmt.Fprintf(output.Std, "Base64: %s\n", string(decoded))
 		}
 
 		ht = tunnel.NewHTTPTunnel("", "hex", 0, 0)
 		if decoded, err := ht.Decode(encoded); err == nil {
-			fmt.Printf("Hex: %s\n", string(decoded))
+			fmt.Fprintf(output.Std, "Hex: %s\n", string(decoded))
 		}
+		return nil
 	},
 }
 

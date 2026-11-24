@@ -2,11 +2,13 @@ package tools
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Raxuis/RaxuisCLI/cmd"
 	"github.com/Raxuis/RaxuisCLI/internal/tools/todo"
 
+	"github.com/Raxuis/RaxuisCLI/internal/shared/output"
 	"github.com/spf13/cobra"
 )
 
@@ -22,37 +24,44 @@ var todoAddCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		task := strings.Join(args, " ")
+		if strings.TrimSpace(task) == "" {
+			return fmt.Errorf("task must not be empty")
+		}
 		if err := todo.Add(task); err != nil {
 			return fmt.Errorf("adding task: %w", err)
 		}
-		fmt.Printf("Added task: %s\n", task)
-		return nil
+		return output.Emit(map[string]any{"action": "added", "description": task}, func(io.Writer) { fmt.Fprintf(output.Std, "Added task: %s\n", task) })
 	},
 }
 
 var todoListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all todo items",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tasks, err := todo.List()
 		if err != nil {
 			return fmt.Errorf("listing tasks: %w", err)
 		}
 
-		if len(tasks) == 0 {
-			fmt.Println("No tasks found!")
-			return nil
+		if tasks == nil {
+			tasks = []todo.Task{}
 		}
-
-		fmt.Println("Todo Items:")
-		for _, task := range tasks {
-			status := "[ ]"
-			if task.Completed {
-				status = "[x]"
+		return output.Emit(map[string]any{"tasks": tasks}, func(io.Writer) {
+			if len(tasks) == 0 {
+				fmt.Fprintln(output.Std, "No tasks found!")
+				return
 			}
-			fmt.Printf("%d. %s %s\n", task.ID, status, task.Description)
-		}
-		return nil
+
+			fmt.Fprintln(output.Std, "Todo Items:")
+			for _, task := range tasks {
+				status := "[ ]"
+				if task.Completed {
+					status = "[x]"
+				}
+				fmt.Fprintf(output.Std, "%d. %s %s\n", task.ID, status, task.Description)
+			}
+		})
 	},
 }
 
@@ -65,8 +74,7 @@ var todoCompleteCmd = &cobra.Command{
 		if err := todo.Complete(id); err != nil {
 			return fmt.Errorf("completing task: %w", err)
 		}
-		fmt.Printf("Completed task: %s\n", id)
-		return nil
+		return output.Emit(map[string]any{"action": "completed", "id": id}, func(io.Writer) { fmt.Fprintf(output.Std, "Completed task: %s\n", id) })
 	},
 }
 
@@ -79,8 +87,7 @@ var todoIncompleteCmd = &cobra.Command{
 		if err := todo.Incomplete(id); err != nil {
 			return fmt.Errorf("marking task as incomplete: %w", err)
 		}
-		fmt.Printf("Marked task as incomplete: %s\n", id)
-		return nil
+		return output.Emit(map[string]any{"action": "incomplete", "id": id}, func(io.Writer) { fmt.Fprintf(output.Std, "Marked task as incomplete: %s\n", id) })
 	},
 }
 
